@@ -1,7 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="114" fill="#2f6b52"/>
-  <g fill="#f4f1ea">
-    <rect x="240" y="270" width="32" height="162" rx="10"/>
-    <path d="M256 96c58 0 104 34 118 82 30 8 44 44 24 70 8 40-30 74-84 78-20 12-72 12-92 0-54-4-92-38-84-78-20-26-6-62 24-70 14-48 60-82 118-82z"/>
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12241d"/>
+      <stop offset="1" stop-color="#0a1512"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="0.5" cy="0.42" r="0.55">
+      <stop offset="0" stop-color="#f2e6c6" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#f2e6c6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gilt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f0d9a8"/>
+      <stop offset="1" stop-color="#c79a45"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#night)"/>
+  <circle cx="256" cy="212" r="150" fill="url(#moon)"/>
+  <g stroke="url(#gilt)" stroke-width="17" stroke-linecap="round" fill="none">
+    <path d="M256 430 V236"/>
+    <path d="M256 300 C214 286 190 250 188 212"/>
+    <path d="M256 288 C300 274 326 236 330 196"/>
+    <path d="M256 258 C238 232 236 198 246 168"/>
+    <path d="M256 250 C278 226 286 196 280 164"/>
   </g>
+  <g fill="url(#gilt)">
+    <circle cx="188" cy="206" r="21"/>
+    <circle cx="330" cy="190" r="21"/>
+    <circle cx="246" cy="160" r="19"/>
+    <circle cx="280" cy="156" r="16"/>
+    <circle cx="256" cy="214" r="13"/>
+  </g>
+  <g fill="#0a1512">
+    <circle cx="188" cy="206" r="7"/>
+    <circle cx="330" cy="190" r="7"/>
+    <circle cx="246" cy="160" r="6"/>
+  </g>
+  <path d="M210 442 C232 430 280 430 302 442" stroke="url(#gilt)" stroke-width="12" stroke-linecap="round" fill="none" opacity="0.55"/>
 </svg>
