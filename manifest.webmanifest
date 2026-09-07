@@ -1,0 +1,17 @@
+{
+  "name": "A Árvore",
+  "short_name": "A Árvore",
+  "description": "Motor de worldbuilding — sete universos, mapa mental, linha do tempo, cenas e o multiverso que os une.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#f6f7f4",
+  "theme_color": "#6b7d5a",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
