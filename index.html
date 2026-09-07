@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>A Árvore</title>
+<title>tree</title>
 <meta name="description" content="Motor de worldbuilding: sete universos, mapa mental, entradas, linha do tempo, cenas e o multiverso que os une." />
 <meta name="theme-color" content="#6b7d5a" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<meta name="apple-mobile-web-app-title" content="A Árvore" />
+<meta name="apple-mobile-web-app-title" content="tree" />
 <link rel="icon" href="./icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="./icon.svg" />
 <link rel="manifest" href="./manifest.webmanifest" />
@@ -721,7 +721,7 @@
 
 <header class="av-top">
   <button class="av-brand" id="homeBtn" type="button" aria-label="Início">
-    <span class="av-brand-dot"></span><span class="av-brand-name">A Árvore</span>
+    <span class="av-brand-dot"></span><span class="av-brand-name">tree</span>
   </button>
   <div class="av-top-actions">
     <div class="sync-line js-sync" id="syncLine"></div>
@@ -1446,7 +1446,7 @@
   function wbHomeView(v) {
     v.appendChild(el("div", { class: "view-head", style: "text-align:center" }, [
       el("p", { class: "eyebrow", text: "O multiverso" }),
-      el("h2", { style: "font-family:var(--font-wb);font-weight:600;font-size:34px;letter-spacing:0.005em", text: "A Árvore" }),
+      el("h2", { style: "font-family:var(--font-wb);font-weight:600;font-size:34px;letter-spacing:0.005em", text: "tree" }),
       el("p", { text: "Sete universos e a raiz que os une. Toque numa flor para entrar." })
     ]));
 
@@ -2930,7 +2930,7 @@
     var root = document.getElementById("modalRoot");
     var m = el("div", { class: "modal-wrap", onclick: function (e) { if (e.target === m) root.innerHTML = ""; } });
     var box = el("div", { class: "modal" });
-    box.appendChild(el("h3", { text: "A Árvore" }));
+    box.appendChild(el("h3", { text: "tree" }));
 
     box.appendChild(el("div", { class: "section-label", text: "Sincronização" }));
     box.appendChild(el("div", { class: "sync-line js-sync", style: "padding-bottom:8px" }));

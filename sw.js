@@ -1,5 +1,5 @@
 /* Rotina — service worker (offline + atualização) */
-var CACHE = "arvore-cache-v1";
+var CACHE = "arvore-cache-v2";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", function (e) {

@@ -1,6 +1,6 @@
 {
-  "name": "A Árvore",
-  "short_name": "A Árvore",
+  "name": "tree",
+  "short_name": "tree",
   "description": "Motor de worldbuilding — sete universos, mapa mental, linha do tempo, cenas e o multiverso que os une.",
   "lang": "pt-BR",
   "start_url": "./",
