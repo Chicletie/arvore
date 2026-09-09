@@ -207,7 +207,8 @@
   .av-icon-btn:hover { border-color: var(--border-strong); color: var(--ink); }
   .av-icon-btn:active { transform: scale(.92); }
   .av-icon-btn svg { width: 18px; height: 18px; }
-  .av-main { max-width: var(--maxw); margin: 0 auto; padding: 22px 16px calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .av-main { max-width: var(--maxw); margin: 0 auto; padding: 20px 16px calc(32px + env(safe-area-inset-bottom, 0px)); }
+  .view.home { padding-bottom: 0; }
   .view { min-width: 0; }
   @media (max-width: 560px) { .av-top-actions .sync-line span:last-child { display: none; } }
 
@@ -427,35 +428,18 @@
   .wl.missing { color: var(--faint); background: var(--surface-2); box-shadow: none; text-decoration: underline dotted; }
 
   /* ===========================================================
-     Home — prancha do herbário
+     Home — a árvore, sozinha, no centro da folha
      =========================================================== */
-  .home { text-align: center; }
-  .plate {
-    position: relative; width: 100%; margin: 2px auto 0; max-width: 470px;
-    padding: 30px 18px 20px;
-    background:
-      repeating-linear-gradient(0deg, transparent 0 27px, color-mix(in srgb, var(--rule) 24%, transparent) 27px 28px),
-      var(--paper);
-    border: 1px solid var(--border-strong);
-    box-shadow: var(--shadow), inset 0 0 0 1px var(--surface), inset 0 0 30px color-mix(in srgb, var(--bg-deep) 30%, transparent);
+  .home {
+    text-align: center;
+    min-height: calc(100dvh - 128px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px;
   }
-  .plate::before {
-    content: ""; position: absolute; inset: 4px; pointer-events: none;
-    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
-  }
-  .plate-no {
-    position: absolute; top: 8px; right: 12px; font-family: var(--font-mono);
-    font-size: 10px; letter-spacing: 0.14em; color: var(--faint); text-transform: uppercase;
-  }
-  .plate-hand {
-    position: absolute; top: 6px; left: 14px; font-family: var(--font-script);
-    font-size: 14px; color: color-mix(in srgb, var(--accent-ink) 78%, transparent);
-    transform: rotate(-3deg);
-  }
-  .spec-stage { position: relative; }
-  .spec-stage.breathe { animation: breathe 9s ease-in-out infinite; transform-origin: 50% 90%; }
-  @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.006); } }
-  .spec-svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .spec-stage { position: relative; width: 100%; max-width: 560px; margin: 0 auto; }
+  .spec-stage.breathe { animation: breathe 10s ease-in-out infinite; transform-origin: 50% 80%; }
+  @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.005); } }
+  .spec-svg { display: block; width: 100%; height: auto; max-height: calc(100dvh - 176px); overflow: visible; }
 
   .spec-ink { fill: none; stroke: var(--ink); stroke-width: 1; stroke-linecap: round; transition: stroke-dashoffset 1.5s var(--ease-bloom); }
   .spec-svg.rm .spec-ink { transition: none !important; stroke-dashoffset: 0 !important; }
@@ -484,15 +468,25 @@
   .tag .tag-string { stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 0.8; fill: none; }
   .bloom:hover .tag .tag-name, .bloom:focus-visible .tag .tag-name { fill: var(--accent-ink); }
 
-  .mount { fill: none; stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 1; }
-  .mount-fill { fill: color-mix(in srgb, var(--surface-2) 80%, transparent); }
-
-  .home-title { font-family: var(--font-display); font-weight: 300; font-size: 50px; line-height: 1; margin: 16px 0 0; letter-spacing: 0.14em; color: var(--ink); }
-  .home-title::first-letter { color: var(--accent-ink); }
-  .home-tagline { font-family: var(--font-script); font-size: 17px; color: var(--muted); margin: 6px 0 2px; text-wrap: balance; }
-  .home-binomial { font-family: var(--font-wb); font-style: italic; font-size: 13px; letter-spacing: 0.04em; color: var(--faint); margin: 0 0 4px; }
-  .home-links { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 18px 0 8px; }
-  .home-card { text-align: left; margin-top: 16px; }
+  .home-whisper {
+    font-family: var(--font-wb); font-style: italic; font-size: 12.5px; letter-spacing: 0.04em;
+    color: color-mix(in srgb, var(--faint) 92%, transparent); margin: 2px 0 0;
+  }
+  .home-caption {
+    display: flex; flex-wrap: wrap; gap: 8px 15px; justify-content: center; align-items: baseline;
+    margin-top: 9px;
+    font-family: var(--font-body); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.22em; text-transform: uppercase;
+  }
+  .home-caption button {
+    background: none; border: 0; padding: 3px 1px; font: inherit; letter-spacing: inherit;
+    color: var(--faint); cursor: pointer;
+    border-bottom: 1px solid transparent; transition: color .16s, border-color .16s;
+  }
+  .home-caption button:hover, .home-caption button:focus-visible {
+    color: var(--ink); border-bottom-color: color-mix(in srgb, var(--ink) 45%, transparent); outline: none;
+  }
+  .home-caption .dot { color: color-mix(in srgb, var(--faint) 50%, transparent); }
 
   /* view transitions */
   .wb-enter { animation: bloom-in .42s var(--ease-bloom); }
@@ -1680,46 +1674,50 @@
     v.className = "view home";
     var rm = reducedMotion();
 
-    var plate = el("div", { class: "plate" });
-    var total = C().entries.length;
-    plate.appendChild(el("div", { class: "plate-no", text: total ? "Prancha I · " + total + " espécimes" : "Prancha I" }));
-    plate.appendChild(el("div", { class: "plate-hand", text: "Herbarium Multiversi" }));
-
     var stage = el("div", { class: "spec-stage" });
-    var svg = svgEl("svg", { viewBox: "0 58 486 452", role: "img", "aria-label": "Prancha do herbário: a árvore dos sete universos" });
+    var svg = svgEl("svg", { viewBox: "0 40 486 486", role: "img", "aria-label": "A árvore dos sete universos" });
     svg.setAttribute("class", "spec-svg" + (rm ? " rm" : ""));
 
     var flowers = FLOWERS.filter(function (f) { return f.kind === "flor"; });
     var CX = 243;
-    var POS = [[48, 214], [110, 168], [176, 122], [243, 146], [310, 122], [376, 168], [438, 214]];
-    var TAGDROP = [8, 30, 12, 44, 12, 30, 8];
-    var FORK = [CX, 292];
+    var POS = [[44, 156], [112, 108], [180, 62], [243, 88], [306, 62], [374, 108], [442, 156]];
+    var TAGDROP = [8, 24, 20, 40, 20, 24, 8];
+    var FORK = [CX, 244];
 
     function inkAttr(elm, delay) { elm.setAttribute("class", "spec-ink"); elm.setAttribute("data-d", (delay).toFixed(2)); return elm; }
 
     // root system
-    ["M243 430 C 237 458 218 472 200 496", "M243 430 C 249 460 268 474 288 498",
-     "M243 432 C 233 454 212 460 192 480", "M243 432 C 253 454 275 460 295 480",
-     "M243 434 C 243 460 245 484 244 502", "M243 432 C 226 444 206 444 186 452",
-     "M243 432 C 260 444 280 444 300 452"].forEach(function (d) {
-      svg.appendChild(inkAttr(svgEl("path", { d: d, "stroke-width": 1.6 }), 0.02 + Math.random() * 0.22));
+    ["M243 402 C 236 440 213 460 192 496", "M243 402 C 250 442 273 462 294 498",
+     "M243 406 C 230 438 203 448 181 476", "M243 406 C 256 438 283 448 305 476",
+     "M243 408 C 243 446 246 482 245 512", "M243 406 C 222 422 198 424 174 434",
+     "M243 406 C 264 422 288 424 312 434"].forEach(function (d) {
+      svg.appendChild(inkAttr(svgEl("path", { d: d, "stroke-width": 1.7 }), 0.02 + Math.random() * 0.22));
     });
-    for (var rh = 0; rh < 11; rh++) {
-      var hx = 188 + Math.random() * 110, hy = 452 + Math.random() * 36;
+    for (var rh = 0; rh < 12; rh++) {
+      var hx = 182 + Math.random() * 122, hy = 434 + Math.random() * 80;
       svg.appendChild(inkAttr(svgEl("path", {
-        d: "M " + hx.toFixed(0) + " " + hy.toFixed(0) + " l " + (Math.random() * 12 - 6).toFixed(0) + " " + (6 + Math.random() * 9).toFixed(0),
+        d: "M " + hx.toFixed(0) + " " + hy.toFixed(0) + " l " + (Math.random() * 14 - 7).toFixed(0) + " " + (7 + Math.random() * 10).toFixed(0),
         "stroke-width": 0.7
       }), 0.28 + Math.random() * 0.2));
     }
 
     // trunk
-    svg.appendChild(inkAttr(svgEl("path", { d: "M243 432 C 237 400 249 344 243 292", "stroke-width": 7.5 }), 0.34));
-    svg.appendChild(inkAttr(svgEl("path", { d: "M243 292 C 242 284 244 278 243 268", "stroke-width": 5 }), 0.5));
+    svg.appendChild(inkAttr(svgEl("path", { d: "M243 406 C 234 356 252 296 243 244", "stroke-width": 8.5 }), 0.34));
+    svg.appendChild(inkAttr(svgEl("path", { d: "M243 244 C 242 232 244 222 243 212", "stroke-width": 5.5 }), 0.5));
+    // low trunk leaves to fill the midriff
+    [[227, 368, -52], [259, 388, 48]].forEach(function (lf, li) {
+      var lgg = svgEl("g", { transform: "translate(" + lf[0] + " " + lf[1] + ") rotate(" + lf[2] + ")" });
+      var ldd = "M0 0 Q 7 -6 17 0 Q 7 6 0 0 Z";
+      var lww = svgEl("path", { d: ldd, fill: "#8aa25a" }); lww.setAttribute("class", "spec-wash"); lww.style.setProperty("--wash", "0.4");
+      lgg.appendChild(lww);
+      lgg.appendChild(inkAttr(svgEl("path", { d: ldd + " M0 0 L 17 0", "stroke-width": 0.8 }), 1.2 + li * 0.06));
+      svg.appendChild(lgg);
+    });
 
     // branches, twigs, leaves
     flowers.forEach(function (f, i) {
       var bx = POS[i][0], by = POS[i][1], side = bx > CX ? -1 : 1;
-      var base = 278 - Math.abs(i - 3) * 4;
+      var base = 232 - Math.abs(i - 3) * 4;
       var mx = CX + (bx - CX) * 0.34;
       var my = base - (base - by) * 0.62;
       var w = i === 3 ? 3.2 : (i === 0 || i === 6) ? 2 : 2.6;
@@ -1776,20 +1774,10 @@
     }
 
     flowers.forEach(function (f, i) { svg.appendChild(bloomG(f, POS[i][0], POS[i][1], false, i, TAGDROP[i])); });
-    svg.appendChild(bloomG(flowerById("raiz"), CX, 336, true, 0, 8));
-
-    // paper-mount corners holding the specimen sheet
-    [[14, 74], [472, 74], [14, 496], [472, 496]].forEach(function (c) {
-      var s = 16, x = c[0], y = c[1], sx = x < CX ? 1 : -1, sy = y < 300 ? 1 : -1;
-      var mf = svgEl("path", { d: "M " + x + " " + y + " l " + (s * sx) + " 0 l 0 " + (s * sy) + " Z" });
-      mf.setAttribute("class", "mount-fill"); svg.appendChild(mf);
-      var mo = svgEl("path", { d: "M " + (x + s * sx) + " " + y + " L " + x + " " + y + " L " + x + " " + (y + s * sy) });
-      mo.setAttribute("class", "mount"); svg.appendChild(mo);
-    });
+    svg.appendChild(bloomG(flowerById("raiz"), CX, 312, true, 0, 8));
 
     stage.appendChild(svg);
-    plate.appendChild(stage);
-    v.appendChild(plate);
+    v.appendChild(stage);
 
     if (!rm) {
       requestAnimationFrame(function () {
@@ -1818,31 +1806,14 @@
       });
     }
 
-    v.appendChild(el("h1", { class: "home-title", text: "tree" }));
-    v.appendChild(el("p", { class: "home-binomial", text: "Arbor universorum septem" }));
-    v.appendChild(el("p", { class: "home-tagline", text: "sete universos e a raiz que os une" }));
-    v.appendChild(el("div", { class: "home-links" }, [
-      el("button", { class: "btn ghost sm", type: "button", text: "Mapa do multiverso", onclick: function () { wbGo({ view: "multimap" }); } }),
-      el("button", { class: "btn ghost sm", type: "button", text: "Regras", onclick: function () { wbGo({ view: "multirules" }); } }),
-      el("button", { class: "btn ghost sm", type: "button", html: "&#10047; modelos", onclick: function () { wbGo({ view: "settings" }); } })
+    v.appendChild(el("p", { class: "home-whisper", text: "sete universos e a raiz que os une" }));
+    v.appendChild(el("div", { class: "home-caption" }, [
+      el("button", { type: "button", text: "multiverso", onclick: function () { wbGo({ view: "multimap" }); } }),
+      el("span", { class: "dot", text: "·" }),
+      el("button", { type: "button", text: "regras", onclick: function () { wbGo({ view: "multirules" }); } }),
+      el("span", { class: "dot", text: "·" }),
+      el("button", { type: "button", text: "modelos", onclick: function () { wbGo({ view: "settings" }); } })
     ]));
-
-    var favs = C().entries.filter(function (e) { return e.favorite; });
-    if (favs.length) {
-      var fc = el("div", { class: "card home-card" });
-      fc.appendChild(sectionLabel("Favoritos"));
-      favs.slice(0, 12).forEach(function (e) { fc.appendChild(wbEntryRow(e, true)); });
-      v.appendChild(fc);
-    }
-    var recent = C().recent.map(wbEntry).filter(Boolean);
-    if (recent.length) {
-      var rc = el("div", { class: "card home-card" });
-      rc.appendChild(sectionLabel("Abertos recentemente"));
-      recent.slice(0, 8).forEach(function (e) { rc.appendChild(wbEntryRow(e, true)); });
-      v.appendChild(rc);
-    }
-    var issues = wbIssues(null);
-    if (issues.length) v.appendChild(el("div", { class: "hint", style: "text-align:center;margin-top:14px", text: issues.length + " ponto(s) de atenção — veja Consistência dentro de um universo." }));
     return v;
   }
 
@@ -3396,7 +3367,18 @@
     var box = el("div", { class: "modal" });
     box.appendChild(el("h3", { text: "tree" }));
 
-    box.appendChild(el("div", { class: "section-label", text: "Sincronização" }));
+    var mFavs = C().entries.filter(function (e) { return e.favorite; });
+    var mRecent = C().recent.map(wbEntry).filter(Boolean).filter(function (e) { return !e.favorite; });
+    if (mFavs.length || mRecent.length) {
+      box.appendChild(el("div", { class: "section-label", text: "Atalhos" }));
+      mFavs.slice(0, 6).forEach(function (e) { box.appendChild(wbEntryRow(e, true)); });
+      mRecent.slice(0, 6).forEach(function (e) { box.appendChild(wbEntryRow(e, true)); });
+      box.querySelectorAll(".row .btn").forEach(function (b) {
+        b.addEventListener("click", function () { root.innerHTML = ""; }, true);
+      });
+    }
+
+    box.appendChild(el("div", { class: "section-label", style: "margin-top:14px", text: "Sincronização" }));
     box.appendChild(el("div", { class: "sync-line js-sync", style: "padding-bottom:8px" }));
     if (fbUser) {
       box.appendChild(el("div", { class: "row-meta", style: "margin-bottom:3px", text: "Conta: " + (fbUser.email || "—") }));
