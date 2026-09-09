@@ -16,7 +16,7 @@
 <link rel="manifest" href="./manifest.webmanifest?v=tree2" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Petit+Formal+Script&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap" />
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -69,10 +69,9 @@
     --maxw: 760px;
     --rule: color-mix(in srgb, var(--ink) 32%, transparent);
 
-    --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-body: "Spectral", Georgia, "Times New Roman", serif;
     --font-display: "Cormorant", "Cormorant Garamond", ui-serif, Georgia, serif;
     --font-wb: "Cormorant Garamond", "Cormorant", Georgia, serif;
-    --font-script: "Petit Formal Script", "Cormorant Garamond", cursive;
     --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
     --ease-bloom: cubic-bezier(.2, .9, .25, 1);
@@ -465,13 +464,18 @@
   .spec-stage.leaving .spec-svg { transition: opacity .45s ease; opacity: 0; }
   .spec-stage.leaving .bloom.chosen { opacity: 1; }
 
-  .tag { opacity: 0; transform: translateY(5px); transition: opacity .5s ease, transform .5s var(--ease-spring); }
+  .tag { opacity: 0; transform: translateY(-3px); transition: opacity .5s ease, transform .5s var(--ease-spring); }
   .tag.in { opacity: 1; transform: translateY(0); }
   .spec-svg.rm .tag { opacity: 1 !important; transform: none !important; }
-  .tag rect { fill: var(--surface); stroke: color-mix(in srgb, var(--ink) 38%, transparent); stroke-width: 1; }
-  .tag .tag-name { font-family: var(--font-wb); font-style: italic; font-size: 11px; font-weight: 600; fill: var(--ink); letter-spacing: 0.01em; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
-  .tag .tag-count { font-family: var(--font-script); font-size: 9.5px; fill: var(--faint); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
-  .tag .tag-string { stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 0.8; fill: none; }
+  .tag .tag-name {
+    font-family: var(--font-body); font-weight: 500; font-size: 11px; fill: var(--ink);
+    letter-spacing: 0.03em; paint-order: stroke; stroke: var(--bg); stroke-width: 3.5px;
+  }
+  .tag .tag-count {
+    font-family: var(--font-body); font-style: italic; font-size: 9px; fill: var(--faint);
+    letter-spacing: 0.02em; paint-order: stroke; stroke: var(--bg); stroke-width: 3px;
+  }
+  .tag .tag-string { stroke: color-mix(in srgb, var(--ink) 26%, transparent); stroke-width: 0.8; fill: none; }
   .bloom:hover .tag .tag-name, .bloom:focus-visible .tag .tag-name { fill: var(--accent-ink); }
 
   .home-whisper {
@@ -1684,13 +1688,13 @@
     var rm = reducedMotion();
 
     var stage = el("div", { class: "spec-stage" });
-    var svg = svgEl("svg", { viewBox: "0 40 486 486", role: "img", "aria-label": "A árvore dos sete universos" });
+    var svg = svgEl("svg", { viewBox: "0 -4 486 532", role: "img", "aria-label": "A árvore dos sete universos" });
     svg.setAttribute("class", "spec-svg" + (rm ? " rm" : ""));
 
     var flowers = FLOWERS.filter(function (f) { return f.kind === "flor"; });
     var CX = 243;
-    var POS = [[44, 156], [112, 108], [180, 62], [243, 88], [306, 62], [374, 108], [442, 156]];
-    var TAGDROP = [8, 24, 20, 40, 20, 24, 8];
+    var POS = [[44, 160], [112, 112], [180, 70], [243, 94], [306, 70], [374, 112], [442, 160]];
+    var TAGDROP = [13, 19, 23, 28, 15, 19, 13];
     var FORK = [CX, 244];
 
     function inkAttr(elm, delay) {
@@ -1765,14 +1769,27 @@
       g.appendChild(ring);
       g.appendChild(speciesG(f, big, big ? 1 : 0.78));
 
-      var r = big ? 34 : 20, dy = r + (drop || 8), n = wbEntriesOf(f.id).length;
+      var r = big ? 34 : 20, n = wbEntriesOf(f.id).length;
+      var hasCount = n > 0 || big;
       var tag = svgEl("g", {}); tag.setAttribute("class", "tag");
-      tag.appendChild(mkStr("M0 " + r + " L 0 " + (dy - 4)));
-      var nm = svgEl("text", { x: 0, y: dy + 4, "text-anchor": "middle" }); nm.setAttribute("class", "tag-name");
+      var nmT, ctT, strT;
+      if (big) {
+        // Raiz label sits below (nothing there but roots)
+        var dy = r + (drop || 8);
+        strT = "M0 " + r + " L 0 " + (dy - 3);
+        nmT = dy + 4; ctT = dy + 15;
+      } else {
+        // universe labels sit ABOVE the flower for visibility
+        var up = r + (drop || 10);
+        strT = "M0 " + (-(up - 6)).toFixed(0) + " L 0 " + (-r);
+        ctT = -up; nmT = hasCount ? -up - 10 : -up;
+      }
+      tag.appendChild(mkStr(strT));
+      var nm = svgEl("text", { x: 0, y: nmT, "text-anchor": "middle" }); nm.setAttribute("class", "tag-name");
       nm.textContent = big ? "Raiz" : ROMAN[idx] + " · " + f.name;
       tag.appendChild(nm);
-      if (n > 0 || big) {
-        var ct = svgEl("text", { x: 0, y: dy + 15, "text-anchor": "middle" }); ct.setAttribute("class", "tag-count");
+      if (hasCount) {
+        var ct = svgEl("text", { x: 0, y: ctT, "text-anchor": "middle" }); ct.setAttribute("class", "tag-count");
         ct.textContent = big ? "lore comum" : n + (n === 1 ? " espécime" : " espécimes");
         tag.appendChild(ct);
       }
