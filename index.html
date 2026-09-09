@@ -441,8 +441,13 @@
   @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.005); } }
   .spec-svg { display: block; width: 100%; height: auto; max-height: calc(100dvh - 176px); overflow: visible; }
 
-  .spec-ink { fill: none; stroke: var(--ink); stroke-width: 1; stroke-linecap: round; transition: stroke-dashoffset 1.4s var(--ease-bloom); }
-  .spec-svg.rm .spec-ink { transition: none !important; stroke-dashoffset: 0 !important; }
+  /* NB: no stroke-width here — CSS would clobber every path's stroke-width attribute (trunk, branches…) */
+  .spec-ink { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-linejoin: round; transition: stroke-dashoffset 1.1s var(--ease-bloom); }
+  /* structural strokes carry pathLength="1" so they can be hidden without JS length math */
+  .spec-ink[data-d] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  .spec-svg.drawn .spec-ink[data-d] { stroke-dashoffset: 0; }
+  .spec-svg.instant .spec-ink, .spec-svg.rm .spec-ink { transition: none !important; stroke-dashoffset: 0 !important; }
+  .spec-svg.instant .spec-wash, .spec-svg.instant .bloom .petals, .spec-svg.instant .tag { transition: none !important; }
   .spec-wash { opacity: 0; transition: opacity .9s ease; }
   .spec-svg.washed .spec-wash { opacity: var(--wash, 0.5); }
 
@@ -1565,18 +1570,9 @@
 
   /* ---- Home: prancha do herbário ---- */
   var ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
+  // the "growing tree" intro plays once per page load; re-renders while already
+  // on home reuse the DOM (see render()), so it never restarts mid-play.
   var homeIntroPlayed = false;
-  // full "growing tree" intro plays at most once per 12h; otherwise the tree
-  // just settles instantly (no stutter on frequent app re-opens).
-  function shouldGrowTree() {
-    if (homeIntroPlayed) return false;
-    try {
-      var last = +localStorage.getItem("rotina.treeGrew") || 0;
-      if (Date.now() - last < 432e5) return false;
-      localStorage.setItem("rotina.treeGrew", String(Date.now()));
-    } catch (e) {}
-    return true;
-  }
 
   function petalPath(kind) {
     switch (kind) {
@@ -1697,33 +1693,39 @@
     var TAGDROP = [8, 24, 20, 40, 20, 24, 8];
     var FORK = [CX, 244];
 
-    function inkAttr(elm, delay) { elm.setAttribute("class", "spec-ink"); elm.setAttribute("data-d", (delay).toFixed(2)); return elm; }
+    function inkAttr(elm, delay) {
+      elm.setAttribute("class", "spec-ink");
+      elm.setAttribute("data-d", delay.toFixed(2));
+      elm.setAttribute("pathLength", "1");
+      elm.style.transitionDelay = delay.toFixed(2) + "s";
+      return elm;
+    }
 
     // root system
     ["M243 402 C 236 440 213 460 192 496", "M243 402 C 250 442 273 462 294 498",
      "M243 406 C 230 438 203 448 181 476", "M243 406 C 256 438 283 448 305 476",
      "M243 408 C 243 446 246 482 245 512", "M243 406 C 222 422 198 424 174 434",
      "M243 406 C 264 422 288 424 312 434"].forEach(function (d) {
-      svg.appendChild(inkAttr(svgEl("path", { d: d, "stroke-width": 1.7 }), Math.random() * 0.35));
+      svg.appendChild(inkAttr(svgEl("path", { d: d, "stroke-width": 1.8 }), Math.random() * 0.3));
     });
     for (var rh = 0; rh < 12; rh++) {
       var hx = 182 + Math.random() * 122, hy = 434 + Math.random() * 80;
       svg.appendChild(inkAttr(svgEl("path", {
         d: "M " + hx.toFixed(0) + " " + hy.toFixed(0) + " l " + (Math.random() * 14 - 7).toFixed(0) + " " + (7 + Math.random() * 10).toFixed(0),
-        "stroke-width": 0.7
-      }), 0.3 + Math.random() * 0.3));
+        "stroke-width": 0.9
+      }), 0.2 + Math.random() * 0.25));
     }
 
     // trunk (draws upward from the roots)
-    svg.appendChild(inkAttr(svgEl("path", { d: "M243 406 C 234 356 252 296 243 244", "stroke-width": 8.5 }), 0.45));
-    svg.appendChild(inkAttr(svgEl("path", { d: "M243 244 C 242 232 244 222 243 212", "stroke-width": 5.5 }), 1.05));
+    svg.appendChild(inkAttr(svgEl("path", { d: "M243 406 C 234 356 252 296 243 244", "stroke-width": 8.5 }), 0.4));
+    svg.appendChild(inkAttr(svgEl("path", { d: "M243 244 C 242 232 244 222 243 212", "stroke-width": 5.5 }), 0.85));
     // low trunk leaves to fill the midriff
     [[227, 368, -52], [259, 388, 48]].forEach(function (lf, li) {
       var lgg = svgEl("g", { transform: "translate(" + lf[0] + " " + lf[1] + ") rotate(" + lf[2] + ")" });
       var ldd = "M0 0 Q 7 -6 17 0 Q 7 6 0 0 Z";
       var lww = svgEl("path", { d: ldd, fill: "#8aa25a" }); lww.setAttribute("class", "spec-wash"); lww.style.setProperty("--wash", "0.4");
       lgg.appendChild(lww);
-      lgg.appendChild(inkAttr(svgEl("path", { d: ldd + " M0 0 L 17 0", "stroke-width": 0.8 }), 1.7 + li * 0.1));
+      lgg.appendChild(inkAttr(svgEl("path", { d: ldd + " M0 0 L 17 0", "stroke-width": 0.9 }), 1.4 + li * 0.08));
       svg.appendChild(lgg);
     });
 
@@ -1737,16 +1739,16 @@
       svg.appendChild(inkAttr(svgEl("path", {
         d: "M" + CX + " " + base + " C " + mx.toFixed(0) + " " + (base - 6).toFixed(0) + " " + (bx + side * 24).toFixed(0) + " " + (by + 26).toFixed(0) + " " + bx + " " + by,
         "stroke-width": w
-      }), 1.25 + i * 0.09));
+      }), 1.0 + i * 0.07));
       var twx = CX + (bx - CX) * 0.62, twy = base - (base - by) * 0.44;
       svg.appendChild(inkAttr(svgEl("path", {
-        d: "M " + twx.toFixed(0) + " " + twy.toFixed(0) + " q " + (7 * -side) + " -6 " + (14 * -side) + " -3", "stroke-width": 1.2
-      }), 1.85 + i * 0.06));
+        d: "M " + twx.toFixed(0) + " " + twy.toFixed(0) + " q " + (7 * -side) + " -6 " + (14 * -side) + " -3", "stroke-width": 1.3
+      }), 1.45 + i * 0.05));
       var lg = svgEl("g", { transform: "translate(" + twx.toFixed(0) + " " + (twy + 3).toFixed(0) + ") rotate(" + (side < 0 ? 40 : -40) + ")" });
       var ld = "M0 0 Q 6 -5 14 0 Q 6 5 0 0 Z";
       var lw = svgEl("path", { d: ld, fill: "#8aa25a" }); lw.setAttribute("class", "spec-wash"); lw.style.setProperty("--wash", "0.42");
       lg.appendChild(lw);
-      lg.appendChild(inkAttr(svgEl("path", { d: ld + " M0 0 L 14 0", "stroke-width": 0.8 }), 2.15 + i * 0.05));
+      lg.appendChild(inkAttr(svgEl("path", { d: ld + " M0 0 L 14 0", "stroke-width": 0.9 }), 1.7 + i * 0.04));
       svg.appendChild(lg);
     });
 
@@ -1793,45 +1795,36 @@
     v.appendChild(stage);
 
     function settleStatic() {
-      svg.classList.add("washed");
+      svg.classList.add("instant", "drawn", "washed", "idle");
       var bl = svg.querySelectorAll(".bloom");
       for (var b = 0; b < bl.length; b++) bl[b].classList.add("grown");
       var tg = svg.querySelectorAll(".tag");
       for (var t = 0; t < tg.length; t++) tg[t].classList.add("in");
-      svg.classList.add("idle");
       stage.classList.add("breathe");
     }
 
-    if (rm || !shouldGrowTree()) {
+    if (rm || homeIntroPlayed) {
       settleStatic();
     } else {
       homeIntroPlayed = true;
-      requestAnimationFrame(function () {
-        var lines = svg.querySelectorAll(".spec-ink[data-d]");
-        for (var i = 0; i < lines.length; i++) {
-          var p = lines[i], L = 0;
-          try { L = p.getTotalLength(); } catch (e) {}
-          if (!L || L > 4000) L = 40;
-          p.style.strokeDasharray = L;
-          p.style.strokeDashoffset = L;
-          p.style.transitionDelay = (p.getAttribute("data-d") || "2") + "s";
-        }
-        svg.getBoundingClientRect();
-        requestAnimationFrame(function () {
-          for (var j = 0; j < lines.length; j++) lines[j].style.strokeDashoffset = 0;
-        });
-        // colour washes soak in as the leaves finish, then flowers bloom
-        setTimeout(function () { svg.classList.add("washed"); }, 2400);
+      // structural strokes start hidden via CSS (pathLength=1, dashoffset=1).
+      // setTimeout (not rAF) so it still fires if the tab is backgrounded at load.
+      setTimeout(function () {
+        // 1. the tree draws itself — roots, trunk, branches, twigs, leaves
+        //    (per-stroke transition-delay set in inkAttr)
+        svg.classList.add("drawn");
+        // 2. colour soaks in, THEN the flowers bloom, THEN the labels
+        setTimeout(function () { svg.classList.add("washed"); }, 2100);
         var blooms = svg.querySelectorAll(".bloom");
         for (var b = 0; b < blooms.length; b++) {
-          (function (bg, bi) { setTimeout(function () { bg.classList.add("grown"); }, 2700 + bi * 140); })(blooms[b], b);
+          (function (bg, bi) { setTimeout(function () { bg.classList.add("grown"); }, 2400 + bi * 130); })(blooms[b], b);
         }
         var tags = svg.querySelectorAll(".tag");
         for (var t = 0; t < tags.length; t++) {
-          (function (tg, ti) { setTimeout(function () { tg.classList.add("in"); }, 3800 + ti * 85); })(tags[t], t);
+          (function (tg, ti) { setTimeout(function () { tg.classList.add("in"); }, 3400 + ti * 75); })(tags[t], t);
         }
-        setTimeout(function () { svg.classList.add("idle"); stage.classList.add("breathe"); }, 4700);
-      });
+        setTimeout(function () { svg.classList.add("idle"); stage.classList.add("breathe"); }, 4100);
+      }, 60);
     }
 
     v.appendChild(el("p", { class: "home-whisper", text: "sete universos e a raiz que os une" }));
