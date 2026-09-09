@@ -441,9 +441,10 @@
   @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.005); } }
   .spec-svg { display: block; width: 100%; height: auto; max-height: calc(100dvh - 176px); overflow: visible; }
 
-  .spec-ink { fill: none; stroke: var(--ink); stroke-width: 1; stroke-linecap: round; transition: stroke-dashoffset 1.5s var(--ease-bloom); }
+  .spec-ink { fill: none; stroke: var(--ink); stroke-width: 1; stroke-linecap: round; transition: stroke-dashoffset 1.4s var(--ease-bloom); }
   .spec-svg.rm .spec-ink { transition: none !important; stroke-dashoffset: 0 !important; }
-  .spec-wash { opacity: var(--wash, 0.5); }
+  .spec-wash { opacity: 0; transition: opacity .9s ease; }
+  .spec-svg.washed .spec-wash { opacity: var(--wash, 0.5); }
 
   .bloom { cursor: pointer; outline: none; }
   .bloom .petals { transform-box: fill-box; transform-origin: center; opacity: 0; transform: scale(.35); transition: opacity .6s ease, transform .75s var(--ease-spring); }
@@ -1564,6 +1565,18 @@
 
   /* ---- Home: prancha do herbário ---- */
   var ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
+  var homeIntroPlayed = false;
+  // full "growing tree" intro plays at most once per 12h; otherwise the tree
+  // just settles instantly (no stutter on frequent app re-opens).
+  function shouldGrowTree() {
+    if (homeIntroPlayed) return false;
+    try {
+      var last = +localStorage.getItem("rotina.treeGrew") || 0;
+      if (Date.now() - last < 432e5) return false;
+      localStorage.setItem("rotina.treeGrew", String(Date.now()));
+    } catch (e) {}
+    return true;
+  }
 
   function petalPath(kind) {
     switch (kind) {
@@ -1691,26 +1704,26 @@
      "M243 406 C 230 438 203 448 181 476", "M243 406 C 256 438 283 448 305 476",
      "M243 408 C 243 446 246 482 245 512", "M243 406 C 222 422 198 424 174 434",
      "M243 406 C 264 422 288 424 312 434"].forEach(function (d) {
-      svg.appendChild(inkAttr(svgEl("path", { d: d, "stroke-width": 1.7 }), 0.02 + Math.random() * 0.22));
+      svg.appendChild(inkAttr(svgEl("path", { d: d, "stroke-width": 1.7 }), Math.random() * 0.35));
     });
     for (var rh = 0; rh < 12; rh++) {
       var hx = 182 + Math.random() * 122, hy = 434 + Math.random() * 80;
       svg.appendChild(inkAttr(svgEl("path", {
         d: "M " + hx.toFixed(0) + " " + hy.toFixed(0) + " l " + (Math.random() * 14 - 7).toFixed(0) + " " + (7 + Math.random() * 10).toFixed(0),
         "stroke-width": 0.7
-      }), 0.28 + Math.random() * 0.2));
+      }), 0.3 + Math.random() * 0.3));
     }
 
-    // trunk
-    svg.appendChild(inkAttr(svgEl("path", { d: "M243 406 C 234 356 252 296 243 244", "stroke-width": 8.5 }), 0.34));
-    svg.appendChild(inkAttr(svgEl("path", { d: "M243 244 C 242 232 244 222 243 212", "stroke-width": 5.5 }), 0.5));
+    // trunk (draws upward from the roots)
+    svg.appendChild(inkAttr(svgEl("path", { d: "M243 406 C 234 356 252 296 243 244", "stroke-width": 8.5 }), 0.45));
+    svg.appendChild(inkAttr(svgEl("path", { d: "M243 244 C 242 232 244 222 243 212", "stroke-width": 5.5 }), 1.05));
     // low trunk leaves to fill the midriff
     [[227, 368, -52], [259, 388, 48]].forEach(function (lf, li) {
       var lgg = svgEl("g", { transform: "translate(" + lf[0] + " " + lf[1] + ") rotate(" + lf[2] + ")" });
       var ldd = "M0 0 Q 7 -6 17 0 Q 7 6 0 0 Z";
       var lww = svgEl("path", { d: ldd, fill: "#8aa25a" }); lww.setAttribute("class", "spec-wash"); lww.style.setProperty("--wash", "0.4");
       lgg.appendChild(lww);
-      lgg.appendChild(inkAttr(svgEl("path", { d: ldd + " M0 0 L 17 0", "stroke-width": 0.8 }), 1.2 + li * 0.06));
+      lgg.appendChild(inkAttr(svgEl("path", { d: ldd + " M0 0 L 17 0", "stroke-width": 0.8 }), 1.7 + li * 0.1));
       svg.appendChild(lgg);
     });
 
@@ -1724,16 +1737,16 @@
       svg.appendChild(inkAttr(svgEl("path", {
         d: "M" + CX + " " + base + " C " + mx.toFixed(0) + " " + (base - 6).toFixed(0) + " " + (bx + side * 24).toFixed(0) + " " + (by + 26).toFixed(0) + " " + bx + " " + by,
         "stroke-width": w
-      }), 0.6 + i * 0.06));
+      }), 1.25 + i * 0.09));
       var twx = CX + (bx - CX) * 0.62, twy = base - (base - by) * 0.44;
       svg.appendChild(inkAttr(svgEl("path", {
         d: "M " + twx.toFixed(0) + " " + twy.toFixed(0) + " q " + (7 * -side) + " -6 " + (14 * -side) + " -3", "stroke-width": 1.2
-      }), 0.9 + i * 0.05));
+      }), 1.85 + i * 0.06));
       var lg = svgEl("g", { transform: "translate(" + twx.toFixed(0) + " " + (twy + 3).toFixed(0) + ") rotate(" + (side < 0 ? 40 : -40) + ")" });
       var ld = "M0 0 Q 6 -5 14 0 Q 6 5 0 0 Z";
       var lw = svgEl("path", { d: ld, fill: "#8aa25a" }); lw.setAttribute("class", "spec-wash"); lw.style.setProperty("--wash", "0.42");
       lg.appendChild(lw);
-      lg.appendChild(inkAttr(svgEl("path", { d: ld + " M0 0 L 14 0", "stroke-width": 0.8 }), 1.05 + i * 0.04));
+      lg.appendChild(inkAttr(svgEl("path", { d: ld + " M0 0 L 14 0", "stroke-width": 0.8 }), 2.15 + i * 0.05));
       svg.appendChild(lg);
     });
 
@@ -1779,7 +1792,20 @@
     stage.appendChild(svg);
     v.appendChild(stage);
 
-    if (!rm) {
+    function settleStatic() {
+      svg.classList.add("washed");
+      var bl = svg.querySelectorAll(".bloom");
+      for (var b = 0; b < bl.length; b++) bl[b].classList.add("grown");
+      var tg = svg.querySelectorAll(".tag");
+      for (var t = 0; t < tg.length; t++) tg[t].classList.add("in");
+      svg.classList.add("idle");
+      stage.classList.add("breathe");
+    }
+
+    if (rm || !shouldGrowTree()) {
+      settleStatic();
+    } else {
+      homeIntroPlayed = true;
       requestAnimationFrame(function () {
         var lines = svg.querySelectorAll(".spec-ink[data-d]");
         for (var i = 0; i < lines.length; i++) {
@@ -1788,21 +1814,23 @@
           if (!L || L > 4000) L = 40;
           p.style.strokeDasharray = L;
           p.style.strokeDashoffset = L;
-          p.style.transitionDelay = (p.getAttribute("data-d") || "1.2") + "s";
+          p.style.transitionDelay = (p.getAttribute("data-d") || "2") + "s";
         }
         svg.getBoundingClientRect();
         requestAnimationFrame(function () {
           for (var j = 0; j < lines.length; j++) lines[j].style.strokeDashoffset = 0;
         });
+        // colour washes soak in as the leaves finish, then flowers bloom
+        setTimeout(function () { svg.classList.add("washed"); }, 2400);
         var blooms = svg.querySelectorAll(".bloom");
         for (var b = 0; b < blooms.length; b++) {
-          (function (bg, bi) { setTimeout(function () { bg.classList.add("grown"); }, 1150 + bi * 120); })(blooms[b], b);
+          (function (bg, bi) { setTimeout(function () { bg.classList.add("grown"); }, 2700 + bi * 140); })(blooms[b], b);
         }
         var tags = svg.querySelectorAll(".tag");
         for (var t = 0; t < tags.length; t++) {
-          (function (tg, ti) { setTimeout(function () { tg.classList.add("in"); }, 2050 + ti * 90); })(tags[t], t);
+          (function (tg, ti) { setTimeout(function () { tg.classList.add("in"); }, 3800 + ti * 85); })(tags[t], t);
         }
-        setTimeout(function () { svg.classList.add("idle"); stage.classList.add("breathe"); }, 3100);
+        setTimeout(function () { svg.classList.add("idle"); stage.classList.add("breathe"); }, 4700);
       });
     }
 
@@ -3129,11 +3157,19 @@
   var _lastViewKey = "";
   function render() {
     var host = document.getElementById("view");
-    host.innerHTML = "";
     var w = wbState();
     var vk = w.view + "|" + (w.entryId || "") + "|" + (w.uniId || "") + "|" + (w.uniTab || "") + "|" + (w.frId || "") + "|" + (w.sceneId || "");
     var changed = vk !== _lastViewKey;
     _lastViewKey = vk;
+    // Home is self-contained + animates on mount. Don't rebuild it on incidental
+    // re-renders (Firebase snapshot, sync status) — that would restart the intro.
+    if (w.view === "home" && !changed && host.firstElementChild &&
+        host.firstElementChild.classList.contains("home")) {
+      paintSync();
+      if (typeof Ambience !== "undefined") Ambience.setActive(true);
+      return;
+    }
+    host.innerHTML = "";
     var content = views.criacao();
     host.appendChild(content);
     if (changed && w.view !== "home" && !reducedMotion() && !content.classList.contains("wb-enter")) {
