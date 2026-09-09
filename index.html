@@ -630,8 +630,46 @@
   .wb-fl { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); font-weight: 600; }
 
   .wb-timeline text.wb-tl-axis { font-family: var(--font-mono); font-size: 10px; fill: var(--faint); text-anchor: middle; }
-  .wb-timeline text.wb-tl-label { font-family: var(--font-wb); font-size: 12px; fill: var(--ink); }
   .wb-famtree text.wb-ft-label { font-family: var(--font-wb); font-size: 12px; fill: var(--ink); text-anchor: middle; }
+
+  /* ---- Timeline chronicle (vertical) ---- */
+  .wb-tl-rail { position: relative; margin-left: 6px; padding-left: 20px; border-left: 2px solid var(--rule); }
+  .wb-tl-era {
+    font-family: var(--font-body); font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.18em; color: var(--gold-ink); margin: 22px 0 4px -20px; padding-left: 20px;
+  }
+  .wb-tl-era:first-child { margin-top: 4px; }
+  .wb-tl-year {
+    font-family: var(--font-display); font-size: 20px; font-weight: 500; color: var(--ink);
+    margin: 16px 0 6px -20px; padding-left: 4px; position: relative;
+  }
+  .wb-tl-year::before {
+    content: ""; position: absolute; left: -20px; top: 0.68em; width: 12px; height: 2px; background: var(--border-strong);
+  }
+  .wb-tl-year:first-child { margin-top: 0; }
+  .wb-tl-item {
+    position: relative; display: flex; gap: 11px; padding: 8px 0; cursor: pointer;
+    border-bottom: 1px dotted var(--rule);
+  }
+  .wb-tl-item:last-child { border-bottom: 0; }
+  .wb-tl-item::before {
+    content: ""; position: absolute; left: -27px; top: 15px; width: 9px; height: 9px;
+    border-radius: 50%; background: var(--paper); border: 2px solid var(--border-strong);
+  }
+  .wb-tl-item:hover .wb-tl-label { color: var(--accent-ink); }
+  .wb-tl-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .wb-tl-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
+  .wb-tl-body { min-width: 0; }
+  .wb-tl-when { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); letter-spacing: 0.02em; }
+  .wb-tl-label { font-family: var(--font-wb); font-size: 16px; font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .wb-tl-meta { font-family: var(--font-body); font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  /* ---- Event editor rows (in an entry) ---- */
+  .wb-event { align-items: flex-start; gap: 10px; }
+  .wb-ev-date { display: flex; flex-wrap: wrap; gap: 5px; flex-shrink: 0; padding-top: 2px; }
+  .wb-ev-date .field { padding: 5px 7px; font-size: 13px; }
+  .wb-ev-label { font-family: var(--font-wb); font-size: 15px; font-weight: 600; }
+  @media (max-width: 560px) { .wb-event { flex-wrap: wrap; } .wb-ev-date { width: 100%; } }
 
   .wb-compare { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
   .wb-comp-col { min-width: 220px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; box-shadow: var(--shadow); }
@@ -955,6 +993,15 @@
       if (e.parentId === undefined) e.parentId = null;
       if (e.favorite === undefined) e.favorite = false;
       if (e.year === undefined) e.year = null;
+      if (!Array.isArray(e.events)) e.events = [];
+      e.events.forEach(function (ev) {
+        if (ev.id == null) ev.id = uid();
+        ev.y = (ev.y == null || isNaN(ev.y)) ? 0 : (ev.y | 0);
+        ev.m = (ev.m == null || isNaN(ev.m)) ? null : (ev.m | 0);
+        ev.d = (ev.d == null || isNaN(ev.d) || ev.m == null) ? null : (ev.d | 0);
+        if (typeof ev.label !== "string") ev.label = "";
+        if (typeof ev.note !== "string") ev.note = "";
+      });
     });
     s.criacao.franchises.forEach(function (fr) {
       if (!fr.writing || typeof fr.writing !== "object") fr.writing = { wordGoal: 0, wordCount: 0, sessions: [] };
@@ -1943,7 +1990,7 @@
 
   function wbNewEntry(uniId, x, y, type) {
     var t = type || C().types[0] || "Conceito";
-    var e = { id: uid(), universeId: uniId, type: t, title: "", aliases: [], summary: "", body: "", fields: {}, tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, x: x != null ? x : null, y: y != null ? y : null, updated: todayKey() };
+    var e = { id: uid(), universeId: uniId, type: t, title: "", aliases: [], summary: "", body: "", fields: {}, tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: x != null ? x : null, y: y != null ? y : null, updated: todayKey() };
     C().entries.push(e);
     wbGo({ view: "entry", entryId: e.id, uniId: uniId, justEntered: true, focusTitle: true });
   }
@@ -2126,43 +2173,115 @@
     v.appendChild(card);
   }
 
-  function wbUniverseTimeline(v, uniId, f) {
-    var events = wbEntriesOf(uniId).filter(function (e) { return e.year != null; }).sort(function (a, b) { return a.year - b.year; });
+  /* ---- Datas de eventos (precisão variável: ano · mês/ano · dia/mês/ano) ---- */
+  function uniMonths(uniId) {
     var cal = C().calendars[uniId];
-    v.appendChild(el("div", { class: "card" }, [
-      sectionLabel("Linha do tempo"),
-      el("div", { class: "hint", style: "margin:0 0 4px", text: "Entradas com um ano definido aparecem aqui. Defina o ano ao editar uma entrada (ex.: Evento histórico)." })
-    ]));
-    if (!events.length) { v.appendChild(el("div", { class: "empty", text: "Nenhuma entrada datada ainda." })); return; }
-    var years = events.map(function (e) { return e.year; });
-    var min = Math.min.apply(null, years), max = Math.max.apply(null, years);
-    if (min === max) { min -= 1; max += 1; }
-    var W = 640, H = 60 + events.length * 4 + 40, pad = 30;
-    var lane = 26;
-    H = pad * 2 + events.length * lane;
-    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "wb-timeline", width: "100%" });
-    var x = function (yr) { return pad + (yr - min) / (max - min) * (W - pad * 2); };
-    svg.appendChild(svgEl("line", { x1: pad, y1: pad, x2: W - pad, y2: pad, stroke: "var(--border-strong)" }));
-    [min, Math.round((min + max) / 2), max].forEach(function (yr) {
-      var t = svgEl("text", { x: x(yr), y: pad - 8, class: "wb-tl-axis" }); t.textContent = yr; svg.appendChild(t);
-      svg.appendChild(svgEl("line", { x1: x(yr), y1: pad - 3, x2: x(yr), y2: pad + 3, stroke: "var(--faint)" }));
+    return (cal && Array.isArray(cal.months) && cal.months.length) ? cal.months.map(function (m) { return m.name; }) : MONTHS;
+  }
+  function evSortKey(ev) {
+    // stable chronological order; year-only (m=0) sorts before dated within the same year
+    return ev.y * 100000 + (ev.m || 0) * 100 + (ev.d || 0);
+  }
+  function evDateLabel(ev, uniId) {
+    var ms = uniMonths(uniId);
+    var mn = ev.m != null ? (ms[ev.m - 1] || ("mês " + ev.m)) : null;
+    if (ev.d != null && mn) return ev.d + " de " + mn + ", ano " + ev.y;
+    if (mn) return mn + " · ano " + ev.y;
+    return "ano " + ev.y;
+  }
+  function eraOf(uniId, y) {
+    var cal = C().calendars[uniId];
+    if (!cal || !Array.isArray(cal.eras)) return null;
+    var best = null;
+    cal.eras.forEach(function (er) {
+      if (er.name && (er.fromYear || 0) <= y && (!best || er.fromYear > best.fromYear)) best = er;
     });
-    events.forEach(function (e, i) {
-      var cy = pad + 14 + i * lane;
-      svg.appendChild(svgEl("line", { x1: x(e.year), y1: pad, x2: x(e.year), y2: cy, stroke: "var(--border)", "stroke-dasharray": "2 3" }));
-      var dot = svgEl("circle", { cx: x(e.year), cy: cy, r: 5, fill: typeColor(e.type) });
-      dot.style.cursor = "pointer";
-      dot.addEventListener("click", function () { wbOpen(e); });
-      svg.appendChild(dot);
-      var tx = svgEl("text", { x: x(e.year) + 9, y: cy + 4, class: "wb-tl-label" });
-      tx.textContent = e.year + " — " + (e.title || "(sem título)");
-      tx.style.cursor = "pointer";
-      tx.addEventListener("click", function () { wbOpen(e); });
-      svg.appendChild(tx);
+    return best ? best.name : null;
+  }
+  // every dated thing in a universe: entry events + entries that only have a plain year
+  function wbTimelineItems(uniId) {
+    var out = [];
+    wbEntriesOf(uniId).forEach(function (e) {
+      if (e.events && e.events.length) {
+        e.events.forEach(function (ev) { out.push({ e: e, ev: ev, y: ev.y, key: evSortKey(ev) }); });
+      } else if (e.year != null) {
+        out.push({ e: e, ev: { y: e.year, m: null, d: null, label: "", implicit: true }, y: e.year, key: evSortKey({ y: e.year }) });
+      }
     });
-    var wrap = el("div", { class: "card", style: "overflow-x:auto" });
-    wrap.appendChild(svg);
-    v.appendChild(wrap);
+    return out.sort(function (a, b) { return a.key - b.key; });
+  }
+
+  function wbUniverseTimeline(v, uniId, f) {
+    var w = wbState();
+    w.tlHide = w.tlHide || {};
+    var items = wbTimelineItems(uniId);
+    var typesPresent = [];
+    items.forEach(function (it) { if (typesPresent.indexOf(it.e.type) === -1) typesPresent.push(it.e.type); });
+
+    var head = el("div", { class: "card" });
+    head.appendChild(sectionLabel("Linha do tempo — " + f.name));
+    head.appendChild(el("div", { class: "hint", style: "margin:0 0 2px", text: "Eventos datados das entradas deste universo. Adicione eventos ao editar uma entrada." }));
+    v.appendChild(head);
+
+    if (!items.length) { v.appendChild(el("div", { class: "empty", text: "Nenhum evento datado ainda." })); return; }
+
+    // filtro por tipo
+    var q = (w.tlQuery || "").trim().toLowerCase();
+    var fbar = el("div", { class: "lens-bar" });
+    typesPresent.forEach(function (t) {
+      fbar.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": w.tlHide[t] ? "false" : "true", style: "color:" + typeColor(t),
+        onclick: function () { w.tlHide[t] = !w.tlHide[t]; render(); } }, [el("span", { class: "cdot" }), el("span", { style: "color:var(--ink)", text: t })]));
+    });
+    v.appendChild(fbar);
+    // filtro por texto (nome da entrada)
+    var search = el("input", { class: "field", placeholder: "filtrar por entrada (nome, apelido)…", value: w.tlQuery || "", style: "width:100%;margin-bottom:14px" });
+    search.addEventListener("input", function () { w.tlQuery = search.value; renderTimelineList(); });
+    v.appendChild(search);
+
+    var listHost = el("div");
+    v.appendChild(listHost);
+
+    function passes(it) {
+      if (w.tlHide[it.e.type]) return false;
+      if (q) {
+        var hay = (it.e.title + " " + (it.e.aliases || []).join(" ")).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    }
+    function renderTimelineList() {
+      q = (w.tlQuery || "").trim().toLowerCase();
+      listHost.innerHTML = "";
+      var shown = items.filter(passes);
+      if (!shown.length) { listHost.appendChild(el("div", { class: "empty", text: "Nenhum evento com esses filtros." })); return; }
+      var rail = el("div", { class: "wb-tl-rail" });
+      var curYear = null, curEra = null;
+      shown.forEach(function (it) {
+        var era = eraOf(uniId, it.y);
+        if (era !== curEra) { curEra = era; if (era) rail.appendChild(el("div", { class: "wb-tl-era", text: era })); }
+        if (it.y !== curYear) {
+          curYear = it.y;
+          rail.appendChild(el("div", { class: "wb-tl-year", text: "ano " + it.y }));
+        }
+        var dot = el("span", { class: "wb-tl-dot", style: "background:" + typeColor(it.e.type) });
+        var isImpl = it.ev.implicit;
+        var labelTxt = isImpl ? it.e.title : (it.ev.label || "(evento sem rótulo)");
+        var metaTxt = isImpl ? it.e.type : (it.e.title + " · " + it.e.type) + (it.ev.note ? " — " + it.ev.note : "");
+        var row = el("div", { class: "wb-tl-item", role: "button", tabindex: "0" }, [
+          dot,
+          el("div", { class: "wb-tl-body" }, [
+            isImpl ? null : el("div", { class: "wb-tl-when", text: evDateLabel(it.ev, uniId) }),
+            el("div", { class: "wb-tl-label", text: labelTxt }),
+            el("div", { class: "wb-tl-meta", text: metaTxt })
+          ])
+        ]);
+        row.addEventListener("click", function () { wbOpen(it.e); });
+        row.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); wbOpen(it.e); } });
+        rail.appendChild(row);
+      });
+      listHost.appendChild(rail);
+    }
+    renderTimelineList();
   }
 
   function wbUniverseFranchises(v, uniId, f) {
@@ -2473,6 +2592,39 @@
       if (t && t.trim()) { e.tags = (e.tags || []).concat([t.trim()]); touch(true); }
     } }));
     card.appendChild(tagWrap);
+
+    // eventos datados
+    if (!Array.isArray(e.events)) e.events = [];
+    card.appendChild(cat("Eventos"));
+    var months = uniMonths(e.universeId);
+    var evsSorted = e.events.slice().sort(function (a, b) { return evSortKey(a) - evSortKey(b); });
+    evsSorted.forEach(function (ev) {
+      var yIn = el("input", { class: "field", value: ev.y != null ? String(ev.y) : "", inputmode: "numeric", placeholder: "ano", "aria-label": "ano", style: "width:64px" });
+      yIn.addEventListener("change", function () { var n = parseInt(yIn.value, 10); ev.y = isNaN(n) ? 0 : n; touch(true); });
+      var mSel = el("select", { class: "field", "aria-label": "mês", style: "width:auto;max-width:130px" });
+      mSel.appendChild(el("option", { value: "", text: "— mês —" }));
+      months.forEach(function (nm, i) { mSel.appendChild(el("option", { value: String(i + 1), text: nm, selected: ev.m === i + 1 ? "selected" : null })); });
+      mSel.addEventListener("change", function () { ev.m = mSel.value ? parseInt(mSel.value, 10) : null; if (ev.m == null) ev.d = null; touch(true); });
+      var dIn = el("input", { class: "field", value: ev.d != null ? String(ev.d) : "", inputmode: "numeric", placeholder: "dia", "aria-label": "dia", style: "width:56px", disabled: ev.m == null ? "disabled" : null });
+      dIn.addEventListener("change", function () { var n = parseInt(dIn.value, 10); ev.d = (isNaN(n) || ev.m == null) ? null : n; touch(true); });
+      card.appendChild(el("div", { class: "row wb-event" }, [
+        el("div", { class: "wb-ev-date" }, [yIn, mSel, dIn]),
+        el("div", { class: "row-body" }, [
+          editable({ tag: "div", className: "wb-ev-label", value: ev.label, placeholder: "o que acontece…", commit: function (nv) { ev.label = nv.trim(); touch(false); } }),
+          editable({ tag: "div", className: "wb-rel", value: ev.note, placeholder: "＋ nota", multiline: true, display: function (val) { return val || null; }, commit: function (nv) { ev.note = nv.trim(); touch(false); } })
+        ]),
+        delBtn(function () { e.events = (e.events || []).filter(function (x) { return x !== ev; }); touch(true); })
+      ]));
+    });
+    card.appendChild(el("div", { class: "inline", style: "margin-top:8px;gap:14px" }, [
+      el("button", { class: "btn ghost sm", type: "button", text: "＋ evento", onclick: function () {
+        if (!Array.isArray(e.events)) e.events = [];
+        var last = e.events[e.events.length - 1];
+        e.events.push({ id: uid(), label: "", y: e.year != null ? e.year : (last ? last.y : 0), m: null, d: null, note: "" });
+        touch(true);
+      } }),
+      el("button", { class: "link", type: "button", text: "ver linha do tempo de " + f.name + " →", onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: "tempo" }); } })
+    ]));
 
     // franchises
     var frs = wbFranchisesOf(e.universeId);
