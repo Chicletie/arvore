@@ -1195,31 +1195,37 @@
 
   /* ============ State shape ============ */
   function emptyState() {
+    var world = {
+      types: WB_TYPES.slice(),
+      templates: JSON.parse(JSON.stringify(WB_TEMPLATES)),
+      linkTypes: [],
+      entries: [], franchises: [], campaigns: [], calendars: {}, mapViews: [], quotes: [], recent: [], multiverseNotes: "", typeMeta: {}, universes: []
+    };
     return {
-      criacao: {
-        types: WB_TYPES.slice(),
-        templates: JSON.parse(JSON.stringify(WB_TEMPLATES)),
-        linkTypes: [],
-        entries: [], franchises: [], campaigns: [], calendars: {}, mapViews: [], quotes: [], recent: [], multiverseNotes: "", typeMeta: {}
-      },
+      criacao: JSON.parse(JSON.stringify(world)),
+      mesa: JSON.parse(JSON.stringify(world)),
       settings: { accent: "ouro" }
     };
   }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   var DEFAULTS = emptyState();
 
-  function normalize(s) {
-    s = s || {};
-    var dc = DEFAULTS.criacao;
-    if (!s.criacao || typeof s.criacao !== "object" || !Array.isArray(s.criacao.entries)) s.criacao = clone(dc);
-    ["types", "linkTypes", "entries", "franchises", "campaigns", "mapViews", "quotes", "recent"].forEach(function (k) { if (!Array.isArray(s.criacao[k])) s.criacao[k] = clone(dc[k] || []); });
-    s.criacao.types = s.criacao.types.filter(function (t) { return t && t !== "Linha do tempo"; });
-    if (!s.criacao.types.length) s.criacao.types = WB_TYPES.slice();
-    if (!s.criacao.templates || typeof s.criacao.templates !== "object") s.criacao.templates = clone(WB_TEMPLATES);
-    if (!s.criacao.calendars || typeof s.criacao.calendars !== "object") s.criacao.calendars = {};
-    if (typeof s.criacao.multiverseNotes !== "string") s.criacao.multiverseNotes = "";
-    if (!s.criacao.typeMeta || typeof s.criacao.typeMeta !== "object") s.criacao.typeMeta = {};
-    s.criacao.entries.forEach(function (e) {
+  function normWorld(cr, dc) {
+    ["types", "linkTypes", "entries", "franchises", "campaigns", "mapViews", "quotes", "recent", "universes"].forEach(function (k) { if (!Array.isArray(cr[k])) cr[k] = clone(dc[k] || []); });
+    cr.types = cr.types.filter(function (t) { return t && t !== "Linha do tempo"; });
+    if (!cr.types.length) cr.types = WB_TYPES.slice();
+    if (!cr.templates || typeof cr.templates !== "object") cr.templates = clone(WB_TEMPLATES);
+    if (!cr.calendars || typeof cr.calendars !== "object") cr.calendars = {};
+    if (typeof cr.multiverseNotes !== "string") cr.multiverseNotes = "";
+    if (!cr.typeMeta || typeof cr.typeMeta !== "object") cr.typeMeta = {};
+    cr.universes = cr.universes.filter(function (u) { return u && typeof u === "object"; });
+    cr.universes.forEach(function (u) {
+      if (u.id == null) u.id = uid();
+      if (typeof u.name !== "string" || !u.name) u.name = "Universo";
+      if (typeof u.color !== "string") u.color = "#8a7d5e";
+      if (typeof u.note !== "string") u.note = "";
+    });
+    cr.entries.forEach(function (e) {
       e.links = e.links || []; e.franchiseIds = e.franchiseIds || []; e.tags = e.tags || [];
       e.fields = e.fields || {}; e.aliases = e.aliases || [];
       if (e.universeId === undefined) e.universeId = "raiz";
@@ -1256,13 +1262,13 @@
         if (typeof ev.note !== "string") ev.note = "";
       });
     });
-    s.criacao.franchises.forEach(function (fr) {
+    cr.franchises.forEach(function (fr) {
       if (!fr.writing || typeof fr.writing !== "object") fr.writing = { wordGoal: 0, wordCount: 0, sessions: [] };
       if (!fr.writing.sessions) fr.writing.sessions = [];
       if (!Array.isArray(fr.scenes)) fr.scenes = [];
       delete fr.rpg;
     });
-    s.criacao.campaigns.forEach(function (cp) {
+    cr.campaigns.forEach(function (cp) {
       if (cp.id == null) cp.id = uid();
       if (typeof cp.name !== "string") cp.name = "";
       if (typeof cp.universeId !== "string") cp.universeId = "raiz";
@@ -1281,6 +1287,17 @@
         if (!Array.isArray(se.present)) se.present = [];
       });
     });
+  }
+
+  function normalize(s) {
+    s = s || {};
+    var dc = DEFAULTS.criacao;
+    if (!s.criacao || typeof s.criacao !== "object" || !Array.isArray(s.criacao.entries)) s.criacao = clone(dc);
+    if (!s.mesa || typeof s.mesa !== "object" || !Array.isArray(s.mesa.entries)) s.mesa = clone(DEFAULTS.mesa);
+    normWorld(s.criacao, dc);
+    normWorld(s.mesa, dc);
+    // tree entries default to raiz; mesa entries have no fixed root, leave as-is
+    s.mesa.entries.forEach(function (e) { if (!e.universeId) e.universeId = (s.mesa.universes[0] || {}).id || ""; });
     if (!s.settings || typeof s.settings !== "object") s.settings = clone(DEFAULTS.settings);
     if (!s.settings.accent) s.settings.accent = "ouro";
     if (s.settings.accent === "ameixa") s.settings.accent = "ametista";
@@ -1638,11 +1655,20 @@
   /* ============ Views ============ */
   var views = {};
 
-  /* ============ Criação — Multiverso ============ */
-  function C() { return state.criacao; }
-  function wbState() { return ui.wb || (ui.wb = { view: "home", uniTab: "mapa" }); }
-  function worlds() { return FLOWERS; }
-  function flowerById(id) { return worlds().filter(function (f) { return f.id === id; })[0] || worlds()[0]; }
+  /* ============ Criação — Multiverso / Mesa ============ */
+  function C() { return ui.env === "mesa" ? state.mesa : state.criacao; }
+  function isMesa() { return ui.env === "mesa"; }
+  function wbState() {
+    var key = ui.env === "mesa" ? "wbMesa" : "wbTree";
+    return ui[key] || (ui[key] = { view: "home", uniTab: "mapa" });
+  }
+  function worlds() { return ui.env === "mesa" ? (state.mesa.universes || []) : FLOWERS; }
+  function flowerById(id) { return worlds().filter(function (f) { return f.id === id; })[0] || worlds()[0] || { id: id || "?", name: "—", color: "#8a8a8a" }; }
+  function switchEnv(env) {
+    ui.env = env === "mesa" ? "mesa" : "tree";
+    wbState().view = wbState().view || "home";
+    render(); window.scrollTo(0, 0);
+  }
   function wbEntry(id) { return C().entries.filter(function (e) { return e.id === id; })[0]; }
   function wbEntriesOf(u) { return C().entries.filter(function (e) { return e.universeId === u; }); }
   function wbFranchisesOf(u) { return C().franchises.filter(function (f) { return f.universeId === u; }); }
@@ -2077,7 +2103,7 @@
     if (w.view === "multirules") return wbMultiRulesView(v);
     if (w.view === "compare" && wbEntry(w.entryId)) return wbCompareView(v);
     if (w.view === "settings") return wbSettingsView(v);
-    return wbHomeView(v);
+    return isMesa() ? wbMesaHome(v) : wbHomeView(v);
   };
 
   /* ---- Consistency check ---- */
@@ -2383,6 +2409,39 @@
     return v;
   }
 
+  /* ---- Mesa: ambiente separado (universos não-autorais) ---- */
+  var MESA_COLORS = ["#c0563f", "#c98a2b", "#c9b02b", "#5aa35f", "#4d97c6", "#8f5cc9", "#c96aa0", "#5e8a3f", "#6d5bd0", "#b07d24"];
+  function wbMesaHome(v) {
+    var uni = state.mesa.universes;
+    v.appendChild(el("div", { class: "wb-unihead", style: "justify-content:space-between" }, [
+      el("h2", { style: "font-size:28px", text: "🎲 mesa" }),
+      el("button", { class: "link", type: "button", text: "← árvore", onclick: function () { switchEnv("tree"); } })
+    ]));
+    v.appendChild(el("p", { class: "hint", style: "margin-top:0", text: "Universos não-autorais (D&D, Tormenta, one-shots…) e as campanhas neles. Totalmente separado da árvore." }));
+    v.appendChild(el("button", { class: "btn", type: "button", text: "＋ criar universo", style: "margin:6px 0 16px", onclick: function () {
+      var nm = window.prompt("Nome do universo / cenário:");
+      if (nm == null) return;
+      var u = { id: uid(), name: nm.trim() || "Universo", color: MESA_COLORS[state.mesa.universes.length % MESA_COLORS.length], note: "" };
+      state.mesa.universes.push(u); save();
+      wbGo({ view: "universe", uniId: u.id, uniTab: "entradas", justEntered: true });
+    } }));
+    if (!uni.length) { v.appendChild(el("div", { class: "empty", text: "Nenhum universo de mesa ainda. Crie o primeiro." })); return v; }
+    var grid = el("div", { class: "wb-cards" });
+    uni.forEach(function (u) {
+      var ne = C().entries.filter(function (e) { return e.universeId === u.id; }).length;
+      var nc = C().campaigns.filter(function (c) { return c.universeId === u.id; }).length;
+      var cd = el("div", { class: "wb-card2", onclick: function () { wbGo({ view: "universe", uniId: u.id, uniTab: "entradas", justEntered: true }); } });
+      cd.appendChild(el("div", { class: "wb-card2-img", style: "background:linear-gradient(135deg," + u.color + "55," + u.color + "18);height:70px" }));
+      cd.appendChild(el("div", { class: "wb-card2-body" }, [
+        el("div", { class: "wb-card2-title", text: u.name }),
+        el("div", { class: "wb-card2-meta", text: ne + " entradas · " + nc + " campanhas" })
+      ]));
+      grid.appendChild(cd);
+    });
+    v.appendChild(grid);
+    return v;
+  }
+
   function wbEntryRow(e, showUniverse) {
     var f = flowerById(e.universeId);
     return el("div", { class: "row" }, [
@@ -2415,10 +2474,33 @@
     var w = wbState(), f = flowerById(w.uniId);
     if (w.justEntered) { v.classList.add("wb-enter"); w.justEntered = false; }
     v.appendChild(el("div", { class: "wb-unihead" }, [
-      el("button", { class: "link", type: "button", text: "← multiverso", onclick: function () { wbGo({ view: "home" }); } }),
+      el("button", { class: "link", type: "button", text: isMesa() ? "← mesa" : "← multiverso", onclick: function () { wbGo({ view: "home" }); } }),
       el("h2", { style: "color:" + f.color }, [uniGlyph(f), el("span", { text: f.name })])
     ]));
     v.appendChild(el("p", { class: "hint", style: "margin:0 0 12px", text: f.kind === "raiz" ? "Lore que atravessa todos os sete universos." : "Universo " + f.name + "." }));
+
+    if (isMesa()) {
+      var u = worlds().filter(function (x) { return x.id === w.uniId; })[0];
+      if (u) {
+        var det = el("details", { class: "detail-strip", style: "margin:0 0 12px;border-top:0;padding-top:0" });
+        det.appendChild(el("summary", { text: "ajustes do universo" }));
+        var nmIn = el("input", { class: "field", value: u.name, style: "width:100%;margin-bottom:8px" });
+        nmIn.addEventListener("change", function () { u.name = nmIn.value.trim() || "Universo"; save(); render(); });
+        var clIn = el("input", { type: "color", value: u.color, style: "width:46px;height:36px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--paper)" });
+        clIn.addEventListener("change", function () { u.color = clIn.value; save(); render(); });
+        det.appendChild(el("div", { class: "inline", style: "gap:8px;align-items:center" }, [el("span", { class: "flab", style: "margin:0", text: "cor" }), clIn]));
+        det.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Excluir universo", style: "color:var(--neg);border-color:var(--neg);margin-top:10px", onclick: function () {
+          if (!window.confirm("Excluir \"" + u.name + "\" e TODAS as entradas e campanhas dele?")) return;
+          C().entries = C().entries.filter(function (e) { return e.universeId !== u.id; });
+          C().campaigns = C().campaigns.filter(function (c) { return c.universeId !== u.id; });
+          C().franchises = C().franchises.filter(function (fr) { return fr.universeId !== u.id; });
+          state.mesa.universes = state.mesa.universes.filter(function (x) { return x.id !== u.id; });
+          save(); wbGo({ view: "home" });
+        } }));
+        det.insertBefore(nmIn, det.children[1]);
+        v.appendChild(det);
+      }
+    }
 
     var tab = w.uniTab || "mapa";
     v.appendChild(segControl([["mapa", "Mapa"], ["entradas", "Entradas"], ["tempo", "Tempo"], ["franquias", "Obras"]], ["mapa", "entradas", "tempo", "franquias"].indexOf(tab) === -1 ? "mapa" : tab, function (t) { wbGo({ uniTab: t }); }));
@@ -3126,7 +3208,7 @@
       var tgt = wbEntry(val);
       var lsel = el("select", { class: "field", style: "padding:4px 8px;max-width:100%" });
       lsel.appendChild(el("option", { value: "", text: "— ligar —" }));
-      FLOWERS.forEach(function (fl) {
+      worlds().forEach(function (fl) {
         var grp = C().entries.filter(function (x) { return x.universeId === fl.id && x.id !== e.id; });
         if (!grp.length) return;
         var og = el("optgroup", { label: fl.name });
@@ -3497,7 +3579,7 @@
       } });
       var toSel = el("select", { class: "field grow", name: "to" });
       toSel.appendChild(el("option", { value: "", text: "ligar a…" }));
-      FLOWERS.forEach(function (fl) {
+      worlds().forEach(function (fl) {
         var grp = others.filter(function (x) { return x.universeId === fl.id; });
         if (!grp.length) return;
         var og = el("optgroup", { label: fl.name });
@@ -3573,7 +3655,7 @@
       wbGo({ view: "entry", entryId: c.id, uniId: c.universeId, justEntered: true, focusTitle: true });
     } }));
     var uniSel = el("select", { class: "field", style: "width:100%" });
-    FLOWERS.forEach(function (fl) { uniSel.appendChild(el("option", { value: fl.id, text: fl.name, selected: fl.id === e.universeId ? "selected" : null })); });
+    worlds().forEach(function (fl) { uniSel.appendChild(el("option", { value: fl.id, text: fl.name, selected: fl.id === e.universeId ? "selected" : null })); });
     uniSel.addEventListener("change", function () { e.universeId = uniSel.value; touch(true); });
     var parSel = el("select", { class: "field", style: "width:100%" });
     parSel.appendChild(el("option", { value: "", text: "— (raiz do universo)" }));
@@ -3943,13 +4025,14 @@
   /* ---- Multiverse ---- */
   function wbMultiMapView(v) {
     var w = wbState();
+    var ulist = worlds();
     v.appendChild(el("div", { class: "wb-unihead" }, [
-      el("button", { class: "link", type: "button", text: "← multiverso", onclick: function () { wbGo({ view: "home" }); } }),
-      el("h2", { style: "font-size:26px", text: "Mapa do multiverso" })
+      el("button", { class: "link", type: "button", text: isMesa() ? "← mesa" : "← multiverso", onclick: function () { wbGo({ view: "home" }); } }),
+      el("h2", { style: "font-size:26px", text: isMesa() ? "Mapa geral" : "Mapa do multiverso" })
     ]));
     w.mmHide = w.mmHide || {};
     var chips = el("div", { class: "lens-bar" });
-    FLOWERS.forEach(function (f) {
+    ulist.forEach(function (f) {
       chips.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": w.mmHide[f.id] ? "false" : "true", style: "color:" + f.color, onclick: function () { w.mmHide[f.id] = !w.mmHide[f.id]; render(); } }, [
         el("span", { class: "cdot" }), el("span", { style: "color:var(--ink)", text: f.name })
       ]));
@@ -3961,11 +4044,12 @@
     var host = el("div", { class: "wb-graph-host tall" });
     card.appendChild(host); v.appendChild(card);
     var hubR = 150;
-    var flowers = FLOWERS.filter(function (f) { return f.kind === "flor"; });
-    var hubPos = { raiz: { x: 0, y: 0 } };
-    flowers.forEach(function (f, i) { var a = -Math.PI / 2 + i * (Math.PI * 2 / flowers.length); hubPos[f.id] = { x: Math.cos(a) * hubR, y: Math.sin(a) * hubR }; });
+    var hubList = isMesa() ? ulist.slice() : FLOWERS.filter(function (f) { return f.kind === "flor"; });
+    var hubPos = {};
+    if (!isMesa()) hubPos.raiz = { x: 0, y: 0 };
+    hubList.forEach(function (f, i) { var a = -Math.PI / 2 + i * (Math.PI * 2 / Math.max(1, hubList.length)); hubPos[f.id] = { x: Math.cos(a) * hubR, y: Math.sin(a) * hubR }; });
     var nodes = [], edges = [], legend = {};
-    FLOWERS.forEach(function (f) { if (w.mmHide[f.id]) return; nodes.push({ id: "hub:" + f.id, label: f.name, color: f.color, r: 24, kind: "hub", fixed: true, x: hubPos[f.id].x, y: hubPos[f.id].y }); legend[f.name] = f.color; });
+    ulist.forEach(function (f) { if (w.mmHide[f.id] || !hubPos[f.id]) return; nodes.push({ id: "hub:" + f.id, label: f.name, color: f.color, r: 24, kind: "hub", fixed: true, x: hubPos[f.id].x, y: hubPos[f.id].y }); legend[f.name] = f.color; });
     all.forEach(function (e) { nodes.push({ id: e.id, label: e.title || "(sem título)", color: flowerById(e.universeId).color, r: 14, kind: "entry", x: null, y: null, hub: hubPos[e.universeId] }); });
     var idset = {}; nodes.forEach(function (n) { idset[n.id] = 1; });
     all.forEach(function (e) {
@@ -4235,10 +4319,11 @@
     host.textContent = "";
     if (w.view === "home") return;
 
-    host.appendChild(el("button", { class: "side-link", type: "button", text: "❦ multiverso", onclick: function () { closeSide(); wbGo({ view: "home" }); } }));
+    host.appendChild(el("button", { class: "side-link", type: "button", text: isMesa() ? "🎲 mesa" : "❦ multiverso", onclick: function () { closeSide(); wbGo({ view: "home" }); } }));
+    if (isMesa()) host.appendChild(el("button", { class: "side-mini", type: "button", text: "← voltar pra árvore", onclick: function () { closeSide(); switchEnv("tree"); } }));
 
     host.appendChild(sideLabel("universos"));
-    FLOWERS.forEach(function (fl) {
+    worlds().forEach(function (fl) {
       var here = w.uniId === fl.id && (w.view === "universe" || w.view === "entry" || w.view === "franchise" || w.view === "campaign" || w.view === "scene" || w.view === "compare");
       var ents = wbEntriesOf(fl.id);
       host.appendChild(el("button", { class: "side-uni" + (here ? " on" : ""), type: "button", onclick: function () {
@@ -4283,7 +4368,10 @@
     if (favs.length) { host.appendChild(sideLabel("favoritas")); favs.forEach(function (e) { host.appendChild(sideEntryRow(e)); }); }
 
     var foot = el("div", { class: "side-foot" });
-    [["mapa do multiverso", "multimap"], ["regras do multiverso", "multirules"], ["modelos de entrada", "settings"]].forEach(function (p) {
+    (isMesa()
+      ? [["mapa geral", "multimap"], ["notas gerais", "multirules"], ["modelos de entrada", "settings"]]
+      : [["mapa do multiverso", "multimap"], ["regras do multiverso", "multirules"], ["modelos de entrada", "settings"]]
+    ).forEach(function (p) {
       foot.appendChild(el("button", { class: "side-mini", type: "button", text: p[0], onclick: function () { closeSide(); wbGo({ view: p[1] }); } }));
     });
     host.appendChild(foot);
@@ -4294,12 +4382,12 @@
     var host = document.getElementById("view");
     var w = wbState();
     document.body.classList.toggle("at-home", w.view === "home");
-    var vk = w.view + "|" + (w.entryId || "") + "|" + (w.uniId || "") + "|" + (w.uniTab || "") + "|" + (w.frId || "") + "|" + (w.sceneId || "") + "|" + (w.campId || "") + "|" + (w.campTab || "");
+    var vk = (ui.env || "tree") + "|" + w.view + "|" + (w.entryId || "") + "|" + (w.uniId || "") + "|" + (w.uniTab || "") + "|" + (w.frId || "") + "|" + (w.sceneId || "") + "|" + (w.campId || "") + "|" + (w.campTab || "");
     var changed = vk !== _lastViewKey;
     _lastViewKey = vk;
-    // Home is self-contained + animates on mount. Don't rebuild it on incidental
+    // Tree home is self-contained + animates on mount. Don't rebuild it on incidental
     // re-renders (Firebase snapshot, sync status) — that would restart the intro.
-    if (w.view === "home" && !changed && host.firstElementChild &&
+    if (w.view === "home" && !isMesa() && !changed && host.firstElementChild &&
         host.firstElementChild.classList.contains("home")) {
       paintSync();
       if (typeof Ambience !== "undefined") Ambience.setActive(true);
@@ -4313,7 +4401,7 @@
     }
     renderSidebar();
     paintSync();
-    if (typeof Ambience !== "undefined") Ambience.setActive(w.view === "home");
+    if (typeof Ambience !== "undefined") Ambience.setActive(w.view === "home" && !isMesa());
   }
 
   /* ============ Theme & accent ============ */
@@ -4585,17 +4673,17 @@
     function close() { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); document.removeEventListener("keydown", onKey, true); }
     function actions() {
       var w = wbState();
-      var uni = w.uniId && flowerById(w.uniId) ? flowerById(w.uniId) : null;
+      var uls = worlds();
+      var uni = w.uniId && uls.filter(function (x) { return x.id === w.uniId; })[0];
       var a = [];
       if (uni) a.push({ kind: "criar", label: "Nova entrada em " + uni.name, run: function () { wbNewEntry(uni.id); } });
-      a.push({ kind: "criar", label: "Nova entrada…", run: function () {
-        var f = FLOWERS[0]; wbNewEntry((wbState().uniId) || f.id);
-      } });
-      a.push({ kind: "ir", label: "Mapa do multiverso", run: function () { wbGo({ view: "multimap" }); } });
-      a.push({ kind: "ir", label: "Regras do multiverso", run: function () { wbGo({ view: "multirules" }); } });
+      if (uls.length) a.push({ kind: "criar", label: "Nova entrada…", run: function () { wbNewEntry((wbState().uniId) || uls[0].id); } });
+      a.push({ kind: "ir", label: isMesa() ? "Mapa geral" : "Mapa do multiverso", run: function () { wbGo({ view: "multimap" }); } });
+      a.push({ kind: "ir", label: isMesa() ? "Notas gerais" : "Regras do multiverso", run: function () { wbGo({ view: "multirules" }); } });
       a.push({ kind: "ir", label: "Modelos de entrada", run: function () { wbGo({ view: "settings" }); } });
-      a.push({ kind: "ir", label: "Início (a árvore)", run: function () { wbGo({ view: "home" }); } });
-      FLOWERS.forEach(function (fl) { a.push({ kind: "universo", label: fl.name, run: function () { wbGo({ view: "universe", uniId: fl.id, uniTab: "entradas", justEntered: true }); } }); });
+      a.push({ kind: "ir", label: isMesa() ? "Início da mesa" : "Início (a árvore)", run: function () { wbGo({ view: "home" }); } });
+      a.push({ kind: "ambiente", label: isMesa() ? "Ir pra árvore (worldbuilding)" : "Ir pra mesa (RPG)", run: function () { switchEnv(isMesa() ? "tree" : "mesa"); } });
+      uls.forEach(function (fl) { a.push({ kind: "universo", label: fl.name, run: function () { wbGo({ view: "universe", uniId: fl.id, uniTab: "entradas", justEntered: true }); } }); });
       return a;
     }
     function build() {
@@ -4654,6 +4742,13 @@
     var m = el("div", { class: "modal-wrap", onclick: function (e) { if (e.target === m) root.innerHTML = ""; } });
     var box = el("div", { class: "modal" });
     box.appendChild(el("h3", { text: "tree" }));
+
+    box.appendChild(el("div", { class: "section-label", text: "Ambiente" }));
+    box.appendChild(el("div", { class: "seg", style: "margin-bottom:14px" }, [
+      el("button", { class: "seg-btn" + (!isMesa() ? " on" : ""), type: "button", text: "🌳 árvore", onclick: function () { root.innerHTML = ""; if (isMesa()) switchEnv("tree"); } }),
+      el("button", { class: "seg-btn" + (isMesa() ? " on" : ""), type: "button", text: "🎲 mesa", onclick: function () { root.innerHTML = ""; if (!isMesa()) switchEnv("mesa"); } })
+    ]));
+    box.appendChild(el("div", { class: "hint", style: "margin:-8px 0 12px", text: isMesa() ? "Mesa: universos não-autorais pra suas campanhas de RPG." : "Árvore: seu worldbuilding autoral (os 7 universos-flor)." }));
 
     var mFavs = C().entries.filter(function (e) { return e.favorite; });
     var mRecent = C().recent.map(wbEntry).filter(Boolean).filter(function (e) { return !e.favorite; });
