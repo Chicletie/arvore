@@ -153,7 +153,62 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   #ambience { position: fixed; inset: 0; z-index: 1; pointer-events: none; width: 100%; height: 100%; opacity: 0; }
-  .av-top, .av-main, #modalRoot { position: relative; z-index: 2; }
+  .app-shell, #modalRoot { position: relative; z-index: 2; }
+  .av-top, .av-main { position: relative; }
+
+  /* ---------- App shell + side index ---------- */
+  .app-shell { display: flex; align-items: flex-start; }
+  .app-col { flex: 1; min-width: 0; }
+  .side {
+    width: 250px; flex-shrink: 0; align-self: stretch;
+    position: sticky; top: 0; height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
+    padding: 16px 12px calc(22px + env(safe-area-inset-bottom, 0px));
+    padding-top: max(16px, env(safe-area-inset-top, 0px));
+    border-right: 1px solid color-mix(in srgb, var(--gold) 32%, transparent);
+    background: color-mix(in srgb, var(--surface) 45%, transparent);
+  }
+  body.at-home .side, body.at-home .side-scrim { display: none; }
+  .side-label {
+    font-family: var(--font-body); font-size: 9.5px; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--faint); margin: 16px 6px 5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .side-label::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--rule), transparent); }
+  .side-link, .side-uni, .side-type, .side-erow, .side-new, .side-mini {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    background: none; border: 0; border-radius: var(--radius-sm); cursor: pointer;
+    font-family: var(--font-body); color: var(--muted); padding: 7px 8px; font-size: 13px;
+    transition: background .14s, color .14s;
+  }
+  .side-link:hover, .side-uni:hover, .side-type:hover, .side-erow:hover, .side-new:hover, .side-mini:hover { background: var(--accent-wash); color: var(--ink); }
+  .side-link { font-family: var(--font-display); font-style: italic; font-size: 17px; color: var(--ink); padding-bottom: 2px; }
+  .side-uni { font-weight: 500; }
+  .side-uni.on { color: var(--ink); background: color-mix(in srgb, var(--gold) 14%, transparent); box-shadow: inset 2px 0 0 var(--gold); }
+  .side-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .side-uni-name, .side-type-name, .side-erow-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side-uni-ct { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); }
+  .side-type { padding-left: 20px; font-size: 12.5px; }
+  .side-type.on { color: var(--ink); background: var(--accent-wash); }
+  .side-erow { padding-left: 10px; font-size: 12.5px; }
+  .side-erow .side-mini-glyph { font-size: 10px; }
+  .side-new { padding-left: 20px; color: var(--accent-ink); font-style: italic; }
+  .side-foot { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  .side-mini { font-size: 12px; color: var(--faint); }
+  .av-icon-btn#sideToggle svg { width: 18px; height: 18px; }
+  @media (max-width: 899px) {
+    .side {
+      position: fixed; top: 0; left: 0; z-index: 46; width: min(84vw, 300px);
+      transform: translateX(-100%); transition: transform .28s var(--ease-bloom);
+      background: var(--surface); box-shadow: var(--shadow-lift);
+    }
+    body.side-open .side { transform: none; }
+    .side-scrim { position: fixed; inset: 0; z-index: 45; background: color-mix(in srgb, var(--bg-deep) 55%, transparent); opacity: 0; pointer-events: none; transition: opacity .2s; }
+    body.side-open .side-scrim { opacity: 1; pointer-events: auto; }
+  }
+  @media (min-width: 900px) {
+    #sideToggle { display: none; }
+    .side-scrim { display: none; }
+  }
 
   /* plate frame — the whole app reads as a mounted botanical plate */
   .plate-frame {
@@ -740,6 +795,32 @@
   .wb-sec-head h3 { font-family: var(--font-display); font-weight: 600; font-size: 22px; margin: 0; flex: 1; }
   .wb-sec-toggle { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 13px; }
 
+  /* ---- entry section index (TOC) ---- */
+  [data-toc] { scroll-margin-top: 108px; }
+  .wb-toc {
+    position: sticky; top: 50px; z-index: 20;
+    display: flex; gap: 6px; overflow-x: auto; padding: 8px 2px; margin: 0 0 6px;
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--rule); scrollbar-width: none;
+  }
+  .wb-toc::-webkit-scrollbar { display: none; }
+  .wb-toc button {
+    flex-shrink: 0; background: none; border: 1px solid var(--border); border-radius: 20px;
+    padding: 4px 11px; font-family: var(--font-body); font-size: 10.5px; color: var(--muted);
+    white-space: nowrap; text-transform: uppercase; letter-spacing: 0.07em; cursor: pointer;
+  }
+  .wb-toc button:hover { border-color: var(--gold); color: var(--ink); }
+
+  /* ---- clean reading mode: hide leftover editing chrome ---- */
+  .wb-reading .wb-fieldctl,
+  .wb-reading .ghost-tray,
+  .wb-reading .field-ghost,
+  .wb-reading .md-bar,
+  .wb-reading .saved-flash,
+  .wb-reading .ie.placeholder { display: none !important; }
+  .wb-reading .ie:hover { box-shadow: none; }
+
   /* ---- status badge ---- */
   .wb-status { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); border: 1px solid var(--border); border-radius: 20px; padding: 2px 9px; cursor: pointer; font-family: var(--font-body); }
   .wb-status.s-arquivado { opacity: 0.55; }
@@ -808,7 +889,14 @@
 <canvas id="ambience" aria-hidden="true"></canvas>
 <div class="plate-frame" aria-hidden="true"></div>
 
+<div class="app-shell">
+<aside class="side" id="sideNav" aria-label="Índice do multiverso"></aside>
+<div class="side-scrim" id="sideScrim" aria-hidden="true"></div>
+<div class="app-col">
 <header class="av-top">
+  <button class="av-icon-btn" id="sideToggle" type="button" aria-label="Índice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
   <button class="av-brand" id="homeBtn" type="button" aria-label="Início">
     <svg class="av-sprig" viewBox="0 0 28 28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 26C14 26 13 15 15 9C17 3 23 2 23 2C23 2 23 9 20 13C17.5 16.3 14 17 14 17"/>
@@ -828,6 +916,8 @@
   </div>
 </header>
 <main class="av-main"><div id="view" class="view"></div></main>
+</div>
+</div>
 <button class="mini-btn" id="exportBtn" type="button" hidden></button>
 <button class="mini-btn" id="themeBtn" type="button" hidden><span id="themeLabel"></span></button>
 <div id="modalRoot"></div>
@@ -2283,13 +2373,53 @@
   }
 
   function wbNewEntry(uniId, x, y, type) {
-    var e = wbStubEntry(uniId, "");
-    e.type = type || C().types[0] || "Conceito";
-    e.status = "rascunho";
-    if (x != null) e.x = x;
-    if (y != null) e.y = y;
-    save();
-    wbGo({ view: "entry", entryId: e.id, uniId: uniId, justEntered: true, focusTitle: true });
+    uniId = uniId || (wbState().uniId) || FLOWERS[0].id;
+    var root = document.getElementById("modalRoot");
+    var m = el("div", { class: "modal-wrap", onclick: function (ev) { if (ev.target === m) root.innerHTML = ""; } });
+    var form = el("form", { class: "modal", onsubmit: function (ev) {
+      ev.preventDefault();
+      var e = wbStubEntry(g("universe").value, g("title").value.trim());
+      e.type = g("type").value;
+      e.status = "rascunho";
+      e.summary = g("summary").value.trim();
+      e.parentId = g("parent").value || null;
+      if (x != null) e.x = x;
+      if (y != null) e.y = y;
+      if (g("tmpl") && g("tmpl").checked) (C().templates[e.type] || []).forEach(function (k) { if (!(k in e.fields)) e.fields[k] = ""; });
+      save();
+      root.innerHTML = "";
+      wbGo({ view: "entry", entryId: e.id, uniId: e.universeId, justEntered: true, focusTitle: !e.title, reading: null });
+    } });
+    function g(n) { return form.querySelector("[name=" + n + "]"); }
+    var typeSel = el("select", { class: "field", name: "type", style: "width:100%" });
+    C().types.forEach(function (t) { typeSel.appendChild(el("option", { value: t, text: typeTag(t), selected: t === (type || C().types[0]) ? "selected" : null })); });
+    var uniSel = el("select", { class: "field", name: "universe", style: "width:100%" });
+    FLOWERS.forEach(function (fl) { uniSel.appendChild(el("option", { value: fl.id, text: fl.name, selected: fl.id === uniId ? "selected" : null })); });
+    var parSel = el("select", { class: "field", name: "parent", style: "width:100%" });
+    function fillParents() {
+      parSel.textContent = "";
+      parSel.appendChild(el("option", { value: "", text: "— (raiz do universo)" }));
+      wbEntriesOf(uniSel.value).forEach(function (x2) { parSel.appendChild(el("option", { value: x2.id, text: x2.title || "(sem título)" })); });
+    }
+    fillParents();
+    uniSel.addEventListener("change", fillParents);
+    var tmplChk = el("input", { type: "checkbox", name: "tmpl", checked: "checked" });
+    form.appendChild(el("h3", { text: "Nova entrada" }));
+    form.appendChild(el("div", { class: "field-grid" }, [
+      el("div", { class: "full" }, [el("label", { class: "flab", text: "Título" }), el("input", { class: "field", name: "title", style: "width:100%", autofocus: "autofocus", placeholder: "pode deixar em branco e nomear depois" })]),
+      el("div", {}, [el("label", { class: "flab", text: "Tipo" }), typeSel]),
+      el("div", {}, [el("label", { class: "flab", text: "Universo" }), uniSel]),
+      el("div", { class: "full" }, [el("label", { class: "flab", text: "Dentro de (opcional)" }), parSel]),
+      el("div", { class: "full" }, [el("label", { class: "flab", text: "Resumo (opcional)" }), el("input", { class: "field", name: "summary", style: "width:100%" })])
+    ]));
+    form.appendChild(el("label", { class: "hint", style: "display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer" }, [tmplChk, el("span", { text: "já criar os campos do modelo deste tipo" })]));
+    form.appendChild(el("div", { class: "modal-actions" }, [
+      el("button", { class: "btn ghost", type: "button", text: "Cancelar", onclick: function () { root.innerHTML = ""; } }),
+      el("button", { class: "btn", type: "submit", text: "Criar" })
+    ]));
+    m.appendChild(form);
+    root.appendChild(m);
+    setTimeout(function () { var a = form.querySelector("[autofocus]"); if (a) a.focus(); }, 20);
   }
 
   function wbUniverseMap(v, uniId, f) {
@@ -2428,7 +2558,13 @@
       stbar.appendChild(el("button", { class: "chip sm", type: "button", "aria-pressed": w.entStatusHide[s.id] ? "false" : "true", onclick: function () { w.entStatusHide[s.id] = !w.entStatusHide[s.id]; render(); } }, [el("span", { text: s.glyph + " " + s.label })]));
     });
     v.appendChild(stbar);
+    if (w.typeFilter) {
+      v.appendChild(el("div", { class: "lens-bar", style: "margin-bottom:12px" }, [
+        el("button", { class: "chip", type: "button", "aria-pressed": "true", onclick: function () { wbGo({ typeFilter: null }); } }, [el("span", { text: (typeIcon(w.typeFilter) || "") + " " + w.typeFilter + "  ✕" })])
+      ]));
+    }
     function match(e) {
+      if (w.typeFilter && e.type !== w.typeFilter) return false;
       if (w.entStatusHide[e.status]) return false;
       if (!q) return true;
       return (e.title + " " + (e.aliases || []).join(" ") + " " + e.summary + " " + e.body + " " + e.tags.join(" ")).toLowerCase().indexOf(q) !== -1;
@@ -2829,7 +2965,7 @@
       else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
     } }));
     if (fm.secret) dt.appendChild(el("span", { class: "wb-secret-mark", text: " 🔒" }));
-    if (!opts.hideSecret) {
+    if (!opts.ro) {
       dt.appendChild(el("span", { class: "wb-fieldctl" }, [
         el("button", { type: "button", title: "Tipo: " + fm.type + " (toque p/ mudar)", text: "⚙", onclick: function () {
           var m = wbFieldMetaWrite(e, k);
@@ -2883,10 +3019,12 @@
     var touch = opts.touch;
     (e.sections || []).forEach(function (sec, idx) {
       if (opts.hideSecret && sec.secret) return;
-      var host = el("div", { class: "wb-sec" + (sec.secret ? " wb-sec-secret" : "") });
+      var host = el("div", { class: "wb-sec" + (sec.secret ? " wb-sec-secret" : ""), "data-toc": (sec.title || "Seção") });
       var head = el("div", { class: "wb-sec-head" });
-      head.appendChild(editable({ tag: "h3", value: sec.title, placeholder: "Título da seção", commit: function (nv) { sec.title = nv.trim(); touch(false); } }));
-      if (!opts.hideSecret) {
+      if (opts.ro) head.appendChild(el("h3", { text: sec.title || "Seção" }));
+      else head.appendChild(editable({ tag: "h3", value: sec.title, placeholder: "Título da seção", commit: function (nv) { sec.title = nv.trim(); touch(false); } }));
+      if (sec.secret) head.appendChild(el("span", { class: "wb-secret-mark", text: "🔒" }));
+      if (!opts.ro) {
         head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Recolher", text: sec.collapsed ? "▸" : "▾", onclick: function () { sec.collapsed = !sec.collapsed; touch(true); } }));
         head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: sec.secret ? "Tornar pública" : "Marcar secreta", text: sec.secret ? "🔒" : "🔓", onclick: function () { sec.secret = !sec.secret; touch(true); } }));
         head.appendChild(el("button", { class: "wb-ord", type: "button", text: "▲", disabled: idx === 0 ? "disabled" : null, onclick: function () { var t = e.sections[idx - 1]; e.sections[idx - 1] = sec; e.sections[idx] = t; touch(true); } }));
@@ -2899,8 +3037,8 @@
         function showBody() {
           bw.className = "wb-prose"; bw.textContent = ""; bw.onclick = null;
           if (sec.body) bw.appendChild(renderMarkdown(sec.body));
-          else if (!opts.hideSecret) bw.appendChild(el("span", { class: "ie placeholder", tabindex: "0", role: "button", text: "Escrever…" }));
-          if (!opts.hideSecret) bw.onclick = function (ev) {
+          else if (!opts.ro) bw.appendChild(el("span", { class: "ie placeholder", tabindex: "0", role: "button", text: "Escrever…" }));
+          if (!opts.ro) bw.onclick = function (ev) {
             if (ev.target.closest && (ev.target.closest(".wl") || ev.target.closest("a[href]") || ev.target.closest(".wb-img") || ev.target.closest(".wb-task-box"))) return;
             bw.className = ""; bw.textContent = ""; bw.onclick = null;
             bw.appendChild(mdEditorUI(sec.body || "", function (val) { sec.body = val; touch(false); }, { uniId: e.universeId, minHeight: "26vh", onExit: showBody }));
@@ -2911,7 +3049,7 @@
       }
       card.appendChild(host);
     });
-    if (!opts.hideSecret) {
+    if (!opts.ro) {
       card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ seção", style: "margin-top:12px", onclick: function () {
         e.sections.push({ id: uid(), title: "", body: "", secret: false, collapsed: false });
         touch(true);
@@ -2939,20 +3077,24 @@
     var w = wbState();
     var f = flowerById(e.universeId);
     wbTouch(e.id);
-    var hideSecret = !!w.hideSecret;
-    function cat(t) { return el("div", { class: "cathead", text: t }); }
+    var reading = w.reading || null;                 // null | "limpa" | "leitor"
+    var hideSecret = reading === "leitor";
+    var ro = !!reading;                              // read-only chrome
+    function cat(t, toc) { var d = el("div", { class: "cathead", text: t }); if (toc) d.setAttribute("data-toc", toc); return d; }
     function touch(reRender) { e.updated = todayKey(); save(); flashSaved(); if (reRender) render(); }
 
+    var readCycle = { "null": { next: "limpa", label: "📖 ler", t: "Ver em leitura limpa" }, "limpa": { next: "leitor", label: "👥 prévia do grupo", t: "Ver como o grupo veria (esconde segredos)" }, "leitor": { next: null, label: "✍ editar", t: "Voltar a editar" } };
+    var rc = readCycle[reading ? reading : "null"];
     v.appendChild(el("div", { class: "wb-unihead" }, [
       el("button", { class: "link", type: "button", text: "← " + f.name, onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: w.uniTab || "mapa" }); } }),
       el("span", { style: "flex:1" }),
-      el("button", { class: "wb-lockbtn" + (hideSecret ? " on" : ""), type: "button", title: "Ver como o grupo veria (esconde segredos)", text: hideSecret ? "🔓 ver tudo" : "👁 modo leitor", onclick: function () { wbGo({ hideSecret: !hideSecret }); } })
+      el("button", { class: "wb-lockbtn" + (ro ? " on" : ""), type: "button", title: rc.t, text: rc.label, onclick: function () { wbGo({ reading: rc.next }); } })
     ]));
     if (hideSecret && e.secret) {
-      v.appendChild(el("div", { class: "card", style: "text-align:center" }, [el("p", { class: "empty", text: "Esta entrada é secreta — oculta no modo leitor." })]));
+      v.appendChild(el("div", { class: "card", style: "text-align:center" }, [el("p", { class: "empty", text: "Esta entrada é secreta — oculta na prévia do grupo." })]));
       return v;
     }
-    var card = el("div", { class: "card wb-read" + (w.justEntered ? " wb-enter" : "") });
+    var card = el("div", { class: "card wb-read" + (ro ? " wb-reading" : "") + (w.justEntered ? " wb-enter" : "") });
     w.justEntered = false;
 
     // cover image
@@ -2965,7 +3107,7 @@
           el("button", { class: "btn ghost sm", type: "button", text: "trocar capa", onclick: function () { pickImage(function (url) { e.cover = url; touch(true); }); } }),
           el("button", { class: "btn ghost sm", type: "button", text: "remover", onclick: function () { e.cover = ""; touch(true); } })
         ]));
-      } else if (!hideSecret) {
+      } else if (!ro) {
         coverWrap.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ imagem de capa", onclick: function () { pickImage(function (url) { e.cover = url; touch(true); }); } }));
       }
     }
@@ -3043,25 +3185,27 @@
     }));
 
     // body
-    card.appendChild(mdField(e, flashSaved));
+    var bodyEl = mdField(e, flashSaved);
+    bodyEl.setAttribute("data-toc", "Descrição");
+    card.appendChild(bodyEl);
 
     // word count
     var wc = wbWordCount(e);
     card.appendChild(el("div", { class: "hint", style: "margin-top:4px", text: "≈ " + wc + (wc === 1 ? " palavra" : " palavras") + (wc >= 60 ? " · " + Math.max(1, Math.round(wc / 200)) + " min de leitura" : "") }));
 
     // sections / posts
-    wbRenderSections(card, e, { hideSecret: hideSecret, touch: touch, cat: cat });
+    wbRenderSections(card, e, { hideSecret: hideSecret, ro: ro, touch: touch, cat: cat });
 
     // fields (typed infobox)
     var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && (e.fieldMeta[k] || {}).secret); });
     if (fkeys.length) {
-      var dl = el("dl", { class: "wb-fields" });
-      fkeys.forEach(function (k) { wbRenderField(dl, e, k, { hideSecret: hideSecret, touch: touch }); });
+      var dl = el("dl", { class: "wb-fields", "data-toc": "Campos" });
+      fkeys.forEach(function (k) { wbRenderField(dl, e, k, { hideSecret: hideSecret, ro: ro, touch: touch }); });
       card.appendChild(dl);
     }
 
     // ghost suggestions
-    if (!hideSecret) {
+    if (!ro) {
       var tmpl = C().templates[e.type] || [];
       var tray = el("div", { class: "ghost-tray" });
       tmpl.filter(function (k) { return !(k in e.fields); }).forEach(function (k) {
@@ -3079,17 +3223,27 @@
     (e.tags || []).forEach(function (t) {
       tagWrap.appendChild(el("button", { class: "ntag", type: "button", title: "remover", text: "#" + t + "  ✕", onclick: function () { e.tags = e.tags.filter(function (x) { return x !== t; }); touch(true); } }));
     });
-    tagWrap.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ marcador", onclick: function () {
+    if (!ro) tagWrap.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ marcador", onclick: function () {
       var t = window.prompt("Marcador:");
       if (t && t.trim()) { e.tags = (e.tags || []).concat([t.trim()]); touch(true); }
     } }));
-    card.appendChild(tagWrap);
+    if (tagWrap.childNodes.length) card.appendChild(tagWrap);
 
     // eventos datados
     if (!Array.isArray(e.events)) e.events = [];
-    card.appendChild(cat("Eventos"));
+    if (e.events.length || !ro) card.appendChild(cat("Eventos", "Tempo"));
     var months = uniMonths(e.universeId);
     var evsSorted = e.events.slice().sort(function (a, b) { return evSortKey(a) - evSortKey(b); });
+    if (ro) {
+      evsSorted.forEach(function (ev) {
+        card.appendChild(el("div", { class: "row wb-rel" }, [
+          el("div", { class: "row-body" }, [
+            el("div", { class: "row-title", style: "font-size:14px", text: ev.label || "(evento)" }),
+            el("div", { class: "row-meta", text: evDateLabel(ev, e.universeId) + (ev.note ? " · " + ev.note : "") })
+          ])
+        ]));
+      });
+    } else {
     evsSorted.forEach(function (ev) {
       var yIn = el("input", { class: "field", value: ev.y != null ? String(ev.y) : "", inputmode: "numeric", placeholder: "ano", "aria-label": "ano", style: "width:64px" });
       yIn.addEventListener("change", function () { var n = parseInt(yIn.value, 10); ev.y = isNaN(n) ? 0 : n; touch(true); });
@@ -3108,24 +3262,26 @@
         delBtn(function () { e.events = (e.events || []).filter(function (x) { return x !== ev; }); touch(true); })
       ]));
     });
-    card.appendChild(el("div", { class: "inline", style: "margin-top:8px;gap:14px" }, [
-      el("button", { class: "btn ghost sm", type: "button", text: "＋ evento", onclick: function () {
-        if (!Array.isArray(e.events)) e.events = [];
-        var last = e.events[e.events.length - 1];
-        e.events.push({ id: uid(), label: "", y: e.year != null ? e.year : (last ? last.y : 0), m: null, d: null, note: "" });
-        touch(true);
-      } }),
-      el("button", { class: "link", type: "button", text: "ver linha do tempo de " + f.name + " →", onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: "tempo" }); } })
-    ]));
+    }
+    var evFoot = el("div", { class: "inline", style: "margin-top:8px;gap:14px" });
+    if (!ro) evFoot.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "＋ evento", onclick: function () {
+      if (!Array.isArray(e.events)) e.events = [];
+      var last = e.events[e.events.length - 1];
+      e.events.push({ id: uid(), label: "", y: e.year != null ? e.year : (last ? last.y : 0), m: null, d: null, note: "" });
+      touch(true);
+    } }));
+    if (e.events.length) evFoot.appendChild(el("button", { class: "link", type: "button", text: "ver linha do tempo de " + f.name + " →", onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: "tempo" }); } }));
+    if (evFoot.childNodes.length) card.appendChild(evFoot);
 
     // franchises
     var frs = wbFranchisesOf(e.universeId);
-    if (frs.length) {
+    if (frs.length && (!ro || (e.franchiseIds || []).length)) {
       card.appendChild(cat("Aparece nas obras"));
       var fw = el("div", { class: "lens-bar" });
       frs.forEach(function (fr) {
         var on = (e.franchiseIds || []).indexOf(fr.id) !== -1;
-        fw.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": on ? "true" : "false", onclick: function () {
+        if (ro && !on) return;
+        fw.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": on ? "true" : "false", onclick: ro ? function () { wbGo({ view: "franchise", frId: fr.id, uniId: e.universeId }); } : function () {
           var i = e.franchiseIds.indexOf(fr.id);
           if (i === -1) e.franchiseIds.push(fr.id); else e.franchiseIds.splice(i, 1);
           touch(true);
@@ -3153,7 +3309,7 @@
     }
 
     // ligações (editável)
-    card.appendChild(cat("Ligações"));
+    if ((e.links || []).length || !ro) card.appendChild(cat("Ligações", "Ligações"));
     var famLabels = ["é filho(a) de", "é pai/mãe de", "irmão/irmã de", "casado(a) com"];
     (e.links || []).forEach(function (lk, idx) {
       var t = wbEntry(lk.to);
@@ -3165,14 +3321,14 @@
           el("div", { class: "row-meta", text: t ? flowerById(t.universeId).name + " · " + t.type : "" })
         ]),
         t ? el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(t); } }) : null,
-        delBtn(function () {
+        ro ? null : delBtn(function () {
           if (t && linkInverseOf(lk.label)) { t.links = (t.links || []).filter(function (l) { return !(l.to === e.id && l.label === linkInverseOf(lk.label)); }); }
           e.links.splice(idx, 1); touch(true);
         })
       ]));
     });
     var others = C().entries.filter(function (x) { return x.id !== e.id; });
-    if (others.length) {
+    if (others.length && !ro) {
       var lf = el("form", { class: "inline", style: "margin-top:8px", onsubmit: function (ev) {
         ev.preventDefault();
         var to = lf.querySelector("[name=to]").value;
@@ -3228,10 +3384,10 @@
     }
 
     var back = wbBacklinks(e);
-    if (back.length) { card.appendChild(cat("Mencionado em")); back.forEach(function (b) { card.appendChild(wbMiniRow(b)); }); }
+    if (back.length) { card.appendChild(cat("Mencionado em", "Menções")); back.forEach(function (b) { card.appendChild(wbMiniRow(b)); }); }
 
     // menções não ligadas
-    if (!hideSecret) {
+    if (!ro) {
       var um = wbUnlinkedMentions(e);
       if (um.length) {
         card.appendChild(cat("Talvez ligar"));
@@ -3249,6 +3405,7 @@
     }
 
     // detalhes
+    if (!ro) {
     var det = el("details", { class: "detail-strip" });
     det.appendChild(el("summary", { text: "detalhes da entrada" }));
     det.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Duplicar entrada", style: "margin-bottom:12px", onclick: function () {
@@ -3278,6 +3435,29 @@
       save(); wbGo({ view: "universe", uniId: e.universeId });
     } }));
     card.appendChild(det);
+    }
+
+    // section index (TOC) — inserted before the card, sticky under the header
+    var tocT = [];
+    card.querySelectorAll("[data-toc]").forEach(function (node, i) {
+      if (!node.id) node.id = "wbtoc-" + e.id + "-" + i;
+      tocT.push({ id: node.id, label: node.getAttribute("data-toc") });
+    });
+    if (tocT.length > 1) {
+      var toc = el("div", { class: "wb-toc" });
+      tocT.forEach(function (t) {
+        toc.appendChild(el("button", { type: "button", text: t.label, onclick: function () {
+          var n = document.getElementById(t.id); if (n) n.scrollIntoView({ behavior: "smooth", block: "start" });
+        } }));
+      });
+      if ((e.sections || []).length) {
+        var anyOpen = e.sections.some(function (s) { return !s.collapsed; });
+        toc.appendChild(el("button", { type: "button", text: anyOpen ? "▾ recolher" : "▸ abrir", onclick: function () {
+          e.sections.forEach(function (s) { s.collapsed = anyOpen; }); touch(true);
+        } }));
+      }
+      v.appendChild(toc);
+    }
 
     v.appendChild(card);
     return v;
@@ -3732,10 +3912,71 @@
   }
 
   /* ============ Router / render ============ */
+  /* ============ Side index ============ */
+  function closeSide() { document.body.classList.remove("side-open"); }
+  function sideLabel(t) { return el("div", { class: "side-label", text: t }); }
+  function sideEntryRow(e) {
+    return el("button", { class: "side-erow", type: "button", onclick: function () { closeSide(); wbOpen(e); } }, [
+      el("span", { class: "side-mini-glyph", text: e.secret ? "🔒" : (statusInfo(e.status).glyph || "•") }),
+      el("span", { class: "side-erow-name", text: e.title || "(sem título)" })
+    ]);
+  }
+  function renderSidebar() {
+    var host = document.getElementById("sideNav");
+    if (!host) return;
+    var w = wbState();
+    host.textContent = "";
+    if (w.view === "home") return;
+
+    host.appendChild(el("button", { class: "side-link", type: "button", text: "❦ multiverso", onclick: function () { closeSide(); wbGo({ view: "home" }); } }));
+
+    host.appendChild(sideLabel("universos"));
+    FLOWERS.forEach(function (fl) {
+      var here = w.uniId === fl.id && (w.view === "universe" || w.view === "entry" || w.view === "franchise" || w.view === "scene" || w.view === "compare");
+      var ents = wbEntriesOf(fl.id);
+      host.appendChild(el("button", { class: "side-uni" + (here ? " on" : ""), type: "button", onclick: function () {
+        closeSide();
+        wbGo({ view: "universe", uniId: fl.id, uniTab: (here && w.uniTab) ? w.uniTab : "entradas", typeFilter: null, justEntered: true });
+      } }, [
+        el("span", { class: "side-dot", style: "background:" + fl.color }),
+        el("span", { class: "side-uni-name", text: fl.name }),
+        el("span", { class: "side-uni-ct", text: ents.length ? String(ents.length) : "" })
+      ]));
+      if (here) {
+        var byType = {};
+        ents.forEach(function (e) { (byType[e.type] = byType[e.type] || []).push(e); });
+        Object.keys(byType).sort().forEach(function (tp) {
+          var on = w.view === "universe" && w.uniTab === "entradas" && w.typeFilter === tp;
+          host.appendChild(el("button", { class: "side-type" + (on ? " on" : ""), type: "button", onclick: function () {
+            closeSide();
+            wbGo({ view: "universe", uniId: fl.id, uniTab: "entradas", typeFilter: on ? null : tp });
+          } }, [
+            el("span", { text: typeIcon(tp) || "·" }),
+            el("span", { class: "side-type-name", text: tp }),
+            el("span", { class: "side-uni-ct", text: String(byType[tp].length) })
+          ]));
+        });
+        host.appendChild(el("button", { class: "side-new", type: "button", text: "＋ nova entrada", onclick: function () { closeSide(); wbNewEntry(fl.id); } }));
+      }
+    });
+
+    var rec = C().recent.map(wbEntry).filter(Boolean).slice(0, 6);
+    if (rec.length) { host.appendChild(sideLabel("recentes")); rec.forEach(function (e) { host.appendChild(sideEntryRow(e)); }); }
+    var favs = C().entries.filter(function (e) { return e.favorite; }).slice(0, 8);
+    if (favs.length) { host.appendChild(sideLabel("favoritas")); favs.forEach(function (e) { host.appendChild(sideEntryRow(e)); }); }
+
+    var foot = el("div", { class: "side-foot" });
+    [["mapa do multiverso", "multimap"], ["regras do multiverso", "multirules"], ["modelos de entrada", "settings"]].forEach(function (p) {
+      foot.appendChild(el("button", { class: "side-mini", type: "button", text: p[0], onclick: function () { closeSide(); wbGo({ view: p[1] }); } }));
+    });
+    host.appendChild(foot);
+  }
+
   var _lastViewKey = "";
   function render() {
     var host = document.getElementById("view");
     var w = wbState();
+    document.body.classList.toggle("at-home", w.view === "home");
     var vk = w.view + "|" + (w.entryId || "") + "|" + (w.uniId || "") + "|" + (w.uniTab || "") + "|" + (w.frId || "") + "|" + (w.sceneId || "");
     var changed = vk !== _lastViewKey;
     _lastViewKey = vk;
@@ -3753,6 +3994,7 @@
     if (changed && w.view !== "home" && !reducedMotion() && !content.classList.contains("wb-enter")) {
       content.classList.add("view-swap");
     }
+    renderSidebar();
     paintSync();
     if (typeof Ambience !== "undefined") Ambience.setActive(w.view === "home");
   }
@@ -4082,6 +4324,8 @@
     if ((ev.ctrlKey || ev.metaKey) && (ev.key === "k" || ev.key === "K")) { ev.preventDefault(); openCmdK(); }
   });
   document.getElementById("cmdkBtn").addEventListener("click", openCmdK);
+  document.getElementById("sideToggle").addEventListener("click", function () { document.body.classList.toggle("side-open"); });
+  document.getElementById("sideScrim").addEventListener("click", closeSide);
 
   /* ============ App menu ============ */
   document.getElementById("homeBtn").addEventListener("click", function () { wbGo({ view: "home" }); });
