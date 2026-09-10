@@ -848,6 +848,17 @@
   }
   .wb-toc button:hover { border-color: var(--gold); color: var(--ink); }
 
+  /* ---- data-quota warning banner ---- */
+  .wb-quota {
+    display: flex; gap: 10px; align-items: flex-start; margin: 0 0 16px;
+    padding: 11px 13px; border-radius: var(--radius-sm); border: 1px solid;
+    font-family: var(--font-body); font-size: 12.5px; line-height: 1.45;
+  }
+  .wb-quota--soft { background: color-mix(in srgb, var(--warn) 13%, var(--surface)); border-color: color-mix(in srgb, var(--warn) 50%, transparent); color: var(--ink); }
+  .wb-quota--hard { background: color-mix(in srgb, var(--neg) 15%, var(--surface)); border-color: var(--neg); color: var(--ink); }
+  .wb-quota-x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; flex-shrink: 0; padding: 0 2px; }
+  .wb-quota-x:hover { color: var(--ink); }
+
   /* ---- clean reading mode: hide leftover editing chrome ---- */
   .wb-reading .wb-fieldctl,
   .wb-reading .ghost-tray,
@@ -1312,8 +1323,25 @@
     else { state = clone(DEFAULTS); }
   } catch (e) { state = clone(DEFAULTS); }
 
-  function saveLocal() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+  var QUOTA_MAX = 1048576;   // Firestore single-doc hard limit (1 MiB)
+  var QUOTA_SOFT = 800000;   // ~76% — start nudging
+  var QUOTA_HARD = 970000;   // ~92% — urgent
+  var _stateBytes = 0;
+  function measureBytes(str) {
+    try { return new TextEncoder().encode(str).length; }
+    catch (e) { try { return unescape(encodeURIComponent(str)).length; } catch (e2) { return str.length; } }
+  }
+  function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return Math.round(n / 1024) + " KB";
+    return (n / 1048576).toFixed(2) + " MB";
+  }
+  function saveLocal() {
+    try { var s = JSON.stringify(state); localStorage.setItem(STORE_KEY, s); _stateBytes = measureBytes(s); }
+    catch (e) {}
+  }
   function save() { saveLocal(); schedulePush(); }
+  try { _stateBytes = measureBytes(JSON.stringify(state)); } catch (e) {}
 
   var ui = {};
 
@@ -4377,6 +4405,18 @@
     host.appendChild(foot);
   }
 
+  function quotaBanner(lvl) {
+    var pct = Math.round(_stateBytes / QUOTA_MAX * 100);
+    var d = el("div", { class: "wb-quota wb-quota--" + lvl });
+    d.appendChild(el("span", { style: "flex:1", text:
+      (lvl === "hard" ? "⚠ Dados quase no limite de sincronização — " : "Dados se aproximando do limite de sincronização — ") +
+      fmtBytes(_stateBytes) + " (" + pct + "% de ~1 MB). " +
+      (lvl === "hard" ? "O sync pode falhar. Peça pro Claude dividir os dados em dois documentos." : "Em breve vai precisar dividir os dados — avise o Claude quando puder.")
+    }));
+    d.appendChild(el("button", { class: "wb-quota-x", type: "button", "aria-label": "dispensar", text: "✕", onclick: function () { ui.quotaDismissed = lvl; d.parentNode && d.parentNode.removeChild(d); } }));
+    return d;
+  }
+
   var _lastViewKey = "";
   function render() {
     var host = document.getElementById("view");
@@ -4398,6 +4438,10 @@
     host.appendChild(content);
     if (changed && w.view !== "home" && !reducedMotion() && !content.classList.contains("wb-enter")) {
       content.classList.add("view-swap");
+    }
+    if (_stateBytes >= QUOTA_SOFT) {
+      var lvl = _stateBytes >= QUOTA_HARD ? "hard" : "soft";
+      if (ui.quotaDismissed !== lvl) host.insertBefore(quotaBanner(lvl), host.firstChild);
     }
     renderSidebar();
     paintSync();
@@ -4449,7 +4493,8 @@
     var txt = el("textarea", { class: "field", style: "width:100%;min-height:150px;font-family:var(--font-mono);font-size:12px", text: JSON.stringify(state) });
     var box = el("div", { class: "modal" }, [
       el("h3", { text: "Backup dos dados" }),
-      el("p", { style: "font-size:13px;color:var(--muted);margin:0 0 12px", text: "Copie este texto e guarde num lugar seguro (e-mail, bloco de notas). Para restaurar, cole aqui e clique em Restaurar." }),
+      el("p", { style: "font-size:13px;color:var(--muted);margin:0 0 8px", text: "Copie este texto e guarde num lugar seguro (e-mail, bloco de notas). Para restaurar, cole aqui e clique em Restaurar." }),
+      el("p", { style: "font-size:12px;color:var(--faint);margin:0 0 12px;font-family:var(--font-mono)", text: "Tamanho atual: " + fmtBytes(_stateBytes) + " / ~1 MB (limite de sincronização)" }),
       txt,
       el("div", { class: "modal-actions" }, [
         el("button", { class: "btn ghost", type: "button", text: "Apagar tudo", style: "margin-right:auto;color:var(--neg);border-color:var(--neg)", onclick: function () {
@@ -4780,6 +4825,11 @@
     box.appendChild(el("button", { class: "mini-btn", type: "button", style: "margin-top:8px", text: (document.getElementById("themeLabel").textContent || "Alternar tema"), onclick: function () { themeBtn.click(); root.innerHTML = ""; } }));
 
     box.appendChild(el("div", { class: "section-label", style: "margin-top:14px", text: "Dados" }));
+    var qpct = Math.round(_stateBytes / QUOTA_MAX * 100);
+    box.appendChild(el("div", { class: "row-meta", style: "margin-bottom:6px", text: "Tamanho: " + fmtBytes(_stateBytes) + " de ~1 MB (" + qpct + "%)" }));
+    box.appendChild(el("div", { class: "bar-track", style: "margin:0 0 10px" }, [
+      el("div", { class: "bar-fill" + (_stateBytes >= QUOTA_HARD ? " neg" : _stateBytes >= QUOTA_SOFT ? " warn" : ""), style: "width:" + Math.min(100, qpct) + "%" })
+    ]));
     box.appendChild(el("button", { class: "mini-btn", type: "button", text: "Backup / apagar dados", onclick: function () { root.innerHTML = ""; document.getElementById("exportBtn").click(); } }));
 
     box.appendChild(el("div", { class: "modal-actions" }, [el("button", { class: "btn", type: "button", text: "Fechar", onclick: function () { root.innerHTML = ""; } })]));
