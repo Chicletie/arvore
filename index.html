@@ -158,7 +158,7 @@
 
   /* ---------- App shell + side index ---------- */
   .app-shell { display: flex; align-items: flex-start; }
-  .app-col { flex: 1; min-width: 0; }
+  .app-col { flex: 1; min-width: 0; overflow-x: clip; }
   .side {
     width: 250px; flex-shrink: 0; align-self: stretch;
     position: sticky; top: 0; height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
@@ -607,30 +607,66 @@
   .wb-read dl.wb-fields dt:last-of-type, .wb-read dl.wb-fields dd:last-of-type { border-bottom: 0; }
   .wb-read .wb-rel { font-family: var(--font-body); font-size: 13.5px; }
   .wb-readbar { display: flex; gap: 8px; align-items: center; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .wb-read dl.wb-fields dd { overflow-wrap: anywhere; min-width: 0; }
+  @media (max-width: 560px) {
+    .wb-read dl.wb-fields { grid-template-columns: 1fr; gap: 0; }
+    .wb-read dl.wb-fields dt { border-bottom: 0; padding: 12px 0 0; }
+    .wb-read dl.wb-fields dd { padding: 3px 0 9px; border-bottom: 1px dotted var(--rule); }
+  }
+
+  /* long descriptive fields — roomy, always-editable */
+  .wb-lfield { margin-top: 16px; }
+  .wb-lfield-head { display: flex; align-items: center; gap: 7px; margin: 0 0 5px 2px; flex-wrap: wrap; }
+  .wb-lfield-lab {
+    font-family: var(--font-body); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.13em;
+    font-weight: 700; color: var(--faint);
+  }
+  .wb-lfield-input {
+    width: 100%; display: block; font-family: var(--font-wb); font-size: 16.5px; line-height: 1.62;
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 11px 13px; min-height: 4.5em; resize: none; color: var(--ink); overflow: hidden;
+    transition: border-color .16s, box-shadow .16s;
+  }
+  .wb-lfield-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--halo); }
+  .wb-lfield-input::placeholder { color: var(--faint); font-style: italic; }
+  .wb-reading .wb-lfield-input, .wb-lfield-read { white-space: pre-wrap; }
 
   /* inline editing */
-  .ie { cursor: text; border-radius: 6px; transition: box-shadow .14s; }
+  .ie { cursor: text; border-radius: 5px; transition: box-shadow .14s, background .14s; }
   .ie:hover { box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--gold) 45%, transparent); }
   .ie:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .ie.placeholder { color: var(--faint); font-style: italic; }
+  /* in edit mode, make tap targets obvious */
+  .wb-read:not(.wb-reading) .ie.placeholder {
+    display: inline-block; padding: 7px 12px; font-style: normal; font-size: 13px;
+    color: var(--accent-ink); background: color-mix(in srgb, var(--gold) 9%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--gold) 40%, transparent); border-radius: var(--radius-sm);
+  }
+  .wb-read:not(.wb-reading) dl.wb-fields .ie:not(.placeholder),
+  .wb-read:not(.wb-reading) .wb-summary.ie:not(.placeholder) {
+    background: color-mix(in srgb, var(--paper) 55%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 60%, transparent);
+    padding: 4px 8px; min-height: 1.6em;
+  }
   .ie-input {
     display: block; width: 100%; font: inherit; color: inherit; line-height: inherit;
     background: var(--paper); border: 1px solid var(--gold); border-radius: var(--radius-sm);
-    padding: 6px 10px; box-shadow: 0 0 0 3px var(--halo);
+    padding: 9px 12px; box-shadow: 0 0 0 3px var(--halo); font-size: 16px;
   }
-  textarea.ie-input { resize: vertical; min-height: 3em; }
+  textarea.ie-input { resize: none; min-height: 4em; overflow: hidden; line-height: 1.6; font-family: var(--font-wb); font-size: 16.5px; }
   .field-ghost {
     display: inline-flex; align-items: center; gap: 5px;
-    background: transparent; border: 1px dashed var(--border-strong); color: var(--faint);
-    border-radius: var(--radius-sm); padding: 5px 12px; font-size: 13px; font-family: var(--font-body); font-style: italic;
-    margin: 3px 5px 3px 0;
+    background: color-mix(in srgb, var(--gold) 7%, transparent); border: 1px dashed var(--border-strong); color: var(--gold-ink);
+    border-radius: var(--radius-sm); padding: 8px 13px; font-size: 13px; font-family: var(--font-body);
+    margin: 4px 6px 4px 0; min-height: 34px;
   }
-  .field-ghost:hover { border-color: var(--gold); color: var(--gold-ink); }
-  .ghost-tray { margin-top: 14px; }
-  .md-bar { display: flex; gap: 4px; margin: 8px 0; flex-wrap: wrap; }
+  .field-ghost:hover { border-color: var(--gold); background: var(--accent-wash); color: var(--gold-ink); }
+  .ghost-tray { margin-top: 16px; display: flex; flex-wrap: wrap; }
+  .ghost-tray .side-label, .ghost-head { width: 100%; font-family: var(--font-body); font-size: 9.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin: 2px 0 7px; }
+  .md-bar { display: flex; gap: 5px; margin: 10px 0; flex-wrap: wrap; }
   .md-bar button {
     border: 1px solid var(--border); background: var(--surface); color: var(--muted);
-    border-radius: var(--radius-sm); min-width: 32px; height: 30px; padding: 0 8px; font-size: 13px; font-family: var(--font-mono);
+    border-radius: var(--radius-sm); min-width: 36px; height: 36px; padding: 0 9px; font-size: 14px; font-family: var(--font-mono);
   }
   .md-bar button:hover { border-color: var(--gold); color: var(--ink); }
   .saved-flash { color: var(--pos); font-size: 11.5px; font-style: italic; opacity: 0; font-family: var(--font-body); }
@@ -1719,7 +1755,7 @@
       inp.value = opts.value || "";
       host.className = ""; host.textContent = ""; host.removeAttribute("tabindex"); host.removeAttribute("role");
       host.appendChild(inp);
-      if (opts.multiline) inp.rows = Math.max(3, (opts.value || "").split("\n").length + 1);
+      if (opts.multiline) { inp.rows = Math.max(3, (opts.value || "").split("\n").length + 1); bindGrow(inp); }
       inp.focus(); if (!opts.multiline) try { inp.select(); } catch (e) {}
       var closed = false;
       function close(keep) {
@@ -1839,16 +1875,17 @@
   function mdEditorUI(initial, commit, opts) {
     opts = opts || {};
     var host = el("div", { class: "md-edit" });
-    var ta = el("textarea", { class: "ie-input", style: "min-height:" + (opts.minHeight || "34vh") + ";font-size:16px;line-height:1.7;width:100%" });
+    var ta = el("textarea", { class: "ie-input", style: "min-height:" + (opts.minHeight || "34vh") + ";width:100%" });
     ta.value = initial || "";
     var taWrap = el("div", { class: "md-ta-wrap" }, [ta]);
     var preview = el("div", { class: "md-preview wb-prose" });
-    var previewOn = opts.previewDefault !== false;
+    var previewOn = opts.previewDefault !== false && (window.innerWidth || 0) >= 760;
     var split = el("div", { class: "md-split" + (previewOn ? " preview" : "") }, [taWrap, preview]);
     var deb;
     function renderPreview() { if (!previewOn) return; preview.textContent = ""; preview.appendChild(renderMarkdown(ta.value)); }
+    bindGrow(ta);
     ta.addEventListener("input", function () { clearTimeout(deb); deb = setTimeout(renderPreview, 180); });
-    function B(label, title, fn) { return el("button", { type: "button", text: label, title: title, onclick: function () { fn(); clearTimeout(deb); renderPreview(); } }); }
+    function B(label, title, fn) { return el("button", { type: "button", text: label, title: title, onclick: function () { fn(); autoGrow(ta); clearTimeout(deb); renderPreview(); } }); }
     function sep() { return el("span", { class: "md-sep" }); }
     var previewBtn = el("button", { type: "button", text: "👁", title: "Prévia", class: previewOn ? "on" : "", onclick: function () {
       previewOn = !previewOn; split.classList.toggle("preview", previewOn); previewBtn.classList.toggle("on", previewOn); renderPreview();
@@ -2946,7 +2983,7 @@
   }
   function wbFieldMeta(e, k) {
     var m = e.fieldMeta[k];
-    if (!m || typeof m !== "object") return { type: "texto", opts: [], secret: false };
+    if (!m || typeof m !== "object") return { type: guessFieldType(k), opts: [], secret: false, _guessed: true };
     if (!Array.isArray(m.opts)) m.opts = [];
     if (!m.type) m.type = "texto";
     return m;
@@ -2955,6 +2992,59 @@
     var m = wbFieldMeta(e, k);
     e.fieldMeta[k] = m;
     return m;
+  }
+  function autoGrow(ta) { ta.style.height = "auto"; ta.style.height = (ta.scrollHeight + 2) + "px"; }
+  function bindGrow(ta) {
+    ta.addEventListener("input", function () { autoGrow(ta); });
+    requestAnimationFrame(function () { autoGrow(ta); });
+  }
+  function guessFieldType(name) {
+    var n = " " + (name || "").toLowerCase() + " ";
+    if (/(idade|anos|n[úu]mero|quantidade|popula[çc][ãa]o|altura|peso|n[íi]vel|contagem|total)/.test(n)) return "numero";
+    if (/(data|nascimento|morte|falecimento|funda[çc][ãa]o|in[íi]cio| fim )/.test(n)) return "data";
+    return "nota";
+  }
+  function wbAddField(e, name, touch) {
+    name = (name || "").trim();
+    if (!name || (name in e.fields)) return;
+    e.fields[name] = "";
+    e.fieldMeta[name] = { type: guessFieldType(name), opts: [], secret: false };
+    touch(true);
+  }
+  function wbRenderLongField(e, k, opts) {
+    var fm = wbFieldMeta(e, k), touch = opts.touch;
+    var wrap = el("div", { class: "wb-lfield" + (fm.secret ? " wb-sec-secret" : ""), "data-toc": k });
+    var head = el("div", { class: "wb-lfield-head" });
+    if (opts.ro) head.appendChild(el("span", { class: "wb-lfield-lab", text: k }));
+    else head.appendChild(editable({ tag: "span", className: "wb-lfield-lab", value: k, placeholder: "campo", commit: function (nv) {
+      nv = nv.trim();
+      if (nv && nv !== k && !(nv in e.fields)) { e.fields[nv] = e.fields[k]; delete e.fields[k]; e.fieldMeta[nv] = fm; delete e.fieldMeta[k]; touch(true); }
+      else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
+    } }));
+    if (fm.secret) head.appendChild(el("span", { class: "wb-secret-mark", text: "🔒" }));
+    if (!opts.ro) head.appendChild(el("span", { class: "wb-fieldctl" }, [
+      el("button", { type: "button", title: "Tipo: " + fm.type, text: "⚙", onclick: function () {
+        var m = wbFieldMetaWrite(e, k), ids = FIELD_TYPES.map(function (x) { return x.id; });
+        m.type = ids[(ids.indexOf(m.type) + 1) % ids.length];
+        if (m.type === "escolha") { var o = window.prompt("Opções separadas por vírgula:", m.opts.join(", ")); m.opts = (o || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean); }
+        touch(true);
+      } }),
+      el("button", { type: "button", title: fm.secret ? "Tornar público" : "Marcar secreto", text: fm.secret ? "🔒" : "🔓", onclick: function () { var m = wbFieldMetaWrite(e, k); m.secret = !m.secret; touch(true); } }),
+      el("button", { type: "button", title: "Remover campo", text: "✕", onclick: function () { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); } })
+    ]));
+    wrap.appendChild(head);
+    if (opts.ro) {
+      wrap.appendChild(el("div", { class: "wb-prose wb-lfield-read", text: e.fields[k] || "" }));
+    } else {
+      var ta = el("textarea", { class: "wb-lfield-input", placeholder: "Escrever…" });
+      ta.value = e.fields[k] || "";
+      bindGrow(ta);
+      var deb;
+      ta.addEventListener("input", function () { clearTimeout(deb); deb = setTimeout(function () { e.fields[k] = ta.value; e.updated = todayKey(); save(); flashSaved(); }, 500); });
+      ta.addEventListener("blur", function () { clearTimeout(deb); if (e.fields[k] !== ta.value) { e.fields[k] = ta.value; e.updated = todayKey(); save(); flashSaved(); } });
+      wrap.appendChild(ta);
+    }
+    return wrap;
   }
   function wbRenderField(dl, e, k, opts) {
     var touch = opts.touch, fm = wbFieldMeta(e, k), val = e.fields[k] || "";
@@ -3041,7 +3131,7 @@
           if (!opts.ro) bw.onclick = function (ev) {
             if (ev.target.closest && (ev.target.closest(".wl") || ev.target.closest("a[href]") || ev.target.closest(".wb-img") || ev.target.closest(".wb-task-box"))) return;
             bw.className = ""; bw.textContent = ""; bw.onclick = null;
-            bw.appendChild(mdEditorUI(sec.body || "", function (val) { sec.body = val; touch(false); }, { uniId: e.universeId, minHeight: "26vh", onExit: showBody }));
+            bw.appendChild(mdEditorUI(sec.body || "", function (val) { sec.body = val; touch(false); }, { uniId: e.universeId, minHeight: "30vh", onExit: showBody }));
           };
         }
         showBody();
@@ -3085,9 +3175,8 @@
 
     var readCycle = { "null": { next: "limpa", label: "📖 ler", t: "Ver em leitura limpa" }, "limpa": { next: "leitor", label: "👥 prévia do grupo", t: "Ver como o grupo veria (esconde segredos)" }, "leitor": { next: null, label: "✍ editar", t: "Voltar a editar" } };
     var rc = readCycle[reading ? reading : "null"];
-    v.appendChild(el("div", { class: "wb-unihead" }, [
+    v.appendChild(el("div", { class: "wb-unihead", style: "justify-content:space-between" }, [
       el("button", { class: "link", type: "button", text: "← " + f.name, onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: w.uniTab || "mapa" }); } }),
-      el("span", { style: "flex:1" }),
       el("button", { class: "wb-lockbtn" + (ro ? " on" : ""), type: "button", title: rc.t, text: rc.label, onclick: function () { wbGo({ reading: rc.next }); } })
     ]));
     if (hideSecret && e.secret) {
@@ -3157,10 +3246,11 @@
     card.appendChild(el("div", { class: "wb-eyebrow", style: "gap:7px;align-items:center;flex-wrap:wrap" }, [
       typeSpan, el("span", { text: "·" }), el("span", { text: f.name }), el("span", { text: "·" }), yearEd,
       el("span", { class: "saved-flash", id: "savedFlash", text: "· salvo" }),
-      el("span", { style: "flex:1" }),
-      statusBtn,
-      el("button", { class: "wb-lockbtn" + (e.secret ? " on" : ""), type: "button", title: "Não publicar no wiki compartilhado", text: e.secret ? "🔒 secreta" : "🔓 pública", onclick: function () { e.secret = !e.secret; touch(true); } }),
-      el("button", { class: "wb-star" + (e.favorite ? " on" : ""), type: "button", "aria-label": "Favoritar", text: "★", onclick: function () { e.favorite = !e.favorite; save(); render(); } })
+      el("span", { style: "display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-left:auto" }, [
+        statusBtn,
+        el("button", { class: "wb-lockbtn" + (e.secret ? " on" : ""), type: "button", title: "Não publicar no wiki compartilhado", text: e.secret ? "🔒 secreta" : "🔓 pública", onclick: function () { e.secret = !e.secret; touch(true); } }),
+        el("button", { class: "wb-star" + (e.favorite ? " on" : ""), type: "button", "aria-label": "Favoritar", text: "★", onclick: function () { e.favorite = !e.favorite; save(); render(); } })
+      ])
     ]));
 
     // title
@@ -3196,24 +3286,32 @@
     // sections / posts
     wbRenderSections(card, e, { hideSecret: hideSecret, ro: ro, touch: touch, cat: cat });
 
-    // fields (typed infobox)
+    // fields — short typed ones as a specimen label, long descriptive ones as roomy blocks
     var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && (e.fieldMeta[k] || {}).secret); });
-    if (fkeys.length) {
+    var shortKeys = fkeys.filter(function (k) { return wbFieldMeta(e, k).type !== "nota"; });
+    var longKeys = fkeys.filter(function (k) { return wbFieldMeta(e, k).type === "nota"; });
+    if (shortKeys.length) {
       var dl = el("dl", { class: "wb-fields", "data-toc": "Campos" });
-      fkeys.forEach(function (k) { wbRenderField(dl, e, k, { hideSecret: hideSecret, ro: ro, touch: touch }); });
+      shortKeys.forEach(function (k) { wbRenderField(dl, e, k, { hideSecret: hideSecret, ro: ro, touch: touch }); });
       card.appendChild(dl);
     }
+    longKeys.forEach(function (k) {
+      if (ro && !(e.fields[k] || "").trim()) return;
+      card.appendChild(wbRenderLongField(e, k, { ro: ro, touch: touch }));
+    });
 
     // ghost suggestions
     if (!ro) {
       var tmpl = C().templates[e.type] || [];
+      var missing = tmpl.filter(function (k) { return !(k in e.fields); });
       var tray = el("div", { class: "ghost-tray" });
-      tmpl.filter(function (k) { return !(k in e.fields); }).forEach(function (k) {
-        tray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ " + k, onclick: function () { e.fields[k] = ""; touch(true); } }));
+      if (missing.length) tray.appendChild(el("div", { class: "ghost-head", text: "campos do modelo " + e.type }));
+      missing.forEach(function (k) {
+        tray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ " + k, onclick: function () { wbAddField(e, k, touch); } }));
       });
-      tray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ campo livre", onclick: function () {
+      tray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ campo livre", style: "font-style:italic", onclick: function () {
         var k = window.prompt("Nome do campo:");
-        if (k && k.trim() && !(k.trim() in e.fields)) { e.fields[k.trim()] = ""; touch(true); }
+        if (k) wbAddField(e, k, touch);
       } }));
       card.appendChild(tray);
     }
