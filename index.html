@@ -1274,10 +1274,24 @@
       });
     });
     cr.franchises.forEach(function (fr) {
-      if (!fr.writing || typeof fr.writing !== "object") fr.writing = { wordGoal: 0, wordCount: 0, sessions: [] };
-      if (!fr.writing.sessions) fr.writing.sessions = [];
-      if (!Array.isArray(fr.scenes)) fr.scenes = [];
       delete fr.rpg;
+      if (!Array.isArray(fr.seasons)) {
+        var oldScenes = Array.isArray(fr.scenes) ? fr.scenes : [];
+        var oldWriting = (fr.writing && typeof fr.writing === "object") ? fr.writing : { wordGoal: 0, wordCount: 0, sessions: [] };
+        fr.seasons = [{ id: uid(), name: "Temporada 1", synopsis: "", status: "Em andamento", roster: [], scenes: oldScenes, writing: oldWriting }];
+        delete fr.scenes; delete fr.writing;
+      }
+      fr.seasons = fr.seasons.filter(function (se) { return se && typeof se === "object"; });
+      fr.seasons.forEach(function (se) {
+        if (se.id == null) se.id = uid();
+        if (typeof se.name !== "string" || !se.name) se.name = "Temporada";
+        if (typeof se.synopsis !== "string") se.synopsis = "";
+        if (typeof se.status !== "string") se.status = "Em andamento";
+        if (!Array.isArray(se.roster)) se.roster = [];
+        if (!Array.isArray(se.scenes)) se.scenes = [];
+        if (!se.writing || typeof se.writing !== "object") se.writing = { wordGoal: 0, wordCount: 0, sessions: [] };
+        if (!Array.isArray(se.writing.sessions)) se.writing.sessions = [];
+      });
     });
     cr.campaigns.forEach(function (cp) {
       if (cp.id == null) cp.id = uid();
@@ -1287,15 +1301,30 @@
       if (typeof cp.synopsis !== "string") cp.synopsis = "";
       if (typeof cp.notes !== "string") cp.notes = "";
       if (CAMPAIGN_STATUS.map(function (x) { return x.id; }).indexOf(cp.status) === -1) cp.status = "planejando";
-      ["roster", "pinned"].forEach(function (k) { if (!Array.isArray(cp[k])) cp[k] = []; });
-      if (!Array.isArray(cp.sessions)) cp.sessions = [];
-      cp.sessions.forEach(function (se) {
+      if (!Array.isArray(cp.seasons)) {
+        var oldRoster = Array.isArray(cp.roster) ? cp.roster : [];
+        var oldPinned = Array.isArray(cp.pinned) ? cp.pinned : [];
+        var oldSessions = Array.isArray(cp.sessions) ? cp.sessions : [];
+        cp.seasons = [{ id: uid(), name: "Temporada 1", synopsis: "", status: cp.status, roster: oldRoster, pinned: oldPinned, sessions: oldSessions }];
+        delete cp.roster; delete cp.pinned; delete cp.sessions;
+      }
+      cp.seasons = cp.seasons.filter(function (se) { return se && typeof se === "object"; });
+      cp.seasons.forEach(function (se) {
         if (se.id == null) se.id = uid();
-        if (typeof se.date !== "string") se.date = "";
-        if (typeof se.title !== "string") se.title = "";
-        if (typeof se.recap !== "string") se.recap = "";
-        if (typeof se.notes !== "string") se.notes = "";
-        if (!Array.isArray(se.present)) se.present = [];
+        if (typeof se.name !== "string" || !se.name) se.name = "Temporada";
+        if (typeof se.synopsis !== "string") se.synopsis = "";
+        if (CAMPAIGN_STATUS.map(function (x) { return x.id; }).indexOf(se.status) === -1) se.status = "planejando";
+        if (!Array.isArray(se.roster)) se.roster = [];
+        if (!Array.isArray(se.pinned)) se.pinned = [];
+        if (!Array.isArray(se.sessions)) se.sessions = [];
+        se.sessions.forEach(function (sx) {
+          if (sx.id == null) sx.id = uid();
+          if (typeof sx.date !== "string") sx.date = "";
+          if (typeof sx.title !== "string") sx.title = "";
+          if (typeof sx.recap !== "string") sx.recap = "";
+          if (typeof sx.notes !== "string") sx.notes = "";
+          if (!Array.isArray(sx.present)) sx.present = [];
+        });
       });
     });
   }
@@ -1702,7 +1731,29 @@
   function wbFranchisesOf(u) { return C().franchises.filter(function (f) { return f.universeId === u; }); }
   function wbCampaign(id) { return C().campaigns.filter(function (c) { return c.id === id; })[0]; }
   function wbCampaignsOf(u) { return C().campaigns.filter(function (c) { return c.universeId === u; }); }
-  function wbCampaignsWith(entryId) { return C().campaigns.filter(function (c) { return (c.roster || []).indexOf(entryId) !== -1; }); }
+  function wbCampaignsWith(entryId) { return C().campaigns.filter(function (c) { return (c.seasons || []).some(function (se) { return (se.roster || []).indexOf(entryId) !== -1; }); }); }
+  function wbCampSeasonsWith(entryId) {
+    var out = [];
+    C().campaigns.forEach(function (c) { (c.seasons || []).forEach(function (se) { if ((se.roster || []).indexOf(entryId) !== -1) out.push({ cp: c, se: se }); }); });
+    return out;
+  }
+  function frTotals(fr) {
+    var scenes = 0, wordCount = 0, cast = {};
+    (fr.seasons || []).forEach(function (se) {
+      scenes += (se.scenes || []).length;
+      wordCount += (se.writing && se.writing.wordCount) || 0;
+      (se.roster || []).forEach(function (id) { cast[id] = 1; });
+    });
+    return { scenes: scenes, wordCount: wordCount, cast: Object.keys(cast).length };
+  }
+  function campTotals(cp) {
+    var sessions = 0, cast = {};
+    (cp.seasons || []).forEach(function (se) {
+      sessions += (se.sessions || []).length;
+      (se.roster || []).forEach(function (id) { cast[id] = 1; });
+    });
+    return { sessions: sessions, cast: Object.keys(cast).length };
+  }
   function wbResolve(name) {
     var n = String(name).toLowerCase().trim();
     return C().entries.filter(function (e) {
@@ -2124,7 +2175,9 @@
     var w = wbState();
     if (w.view === "entry" && wbEntry(w.entryId)) return wbEntryRead(v, wbEntry(w.entryId));
     if (w.view === "franchise" && C().franchises.filter(function (f) { return f.id === w.frId; })[0]) return wbFranchiseView(v);
+    if (w.view === "franchiseSeason" && C().franchises.filter(function (f) { return f.id === w.frId; })[0]) return wbFranchiseSeasonView(v);
     if (w.view === "campaign" && wbCampaign(w.campId)) return wbCampaignView(v);
+    if (w.view === "campaignSeason" && wbCampaign(w.campId)) return wbCampaignSeasonView(v);
     if (w.view === "scene") return wbSceneEdit(v);
     if (w.view === "universe") return wbUniverseView(v);
     if (w.view === "multimap") return wbMultiMapView(v);
@@ -2557,7 +2610,7 @@
     return v;
   }
 
-  function wbNewEntry(uniId, x, y, type, campId) {
+  function wbNewEntry(uniId, x, y, type, campId, seasonId) {
     uniId = uniId || (wbState().uniId) || worlds()[0].id;
     var root = document.getElementById("modalRoot");
     var m = el("div", { class: "modal-wrap", onclick: function (ev) { if (ev.target === m) root.innerHTML = ""; } });
@@ -2572,7 +2625,8 @@
       if (y != null) e.y = y;
       if (g("tmpl") && g("tmpl").checked) (C().templates[e.type] || []).forEach(function (k) { if (!(k in e.fields)) { e.fields[k] = ""; e.fieldMeta[k] = { type: guessFieldType(k), opts: [], secret: false }; } });
       var cp = campId && wbCampaign(campId);
-      if (cp && cp.universeId === e.universeId && cp.roster.indexOf(e.id) === -1) cp.roster.push(e.id);
+      var cse = cp && (cp.seasons || []).filter(function (x) { return x.id === seasonId; })[0];
+      if (cp && cse && cp.universeId === e.universeId && cse.roster.indexOf(e.id) === -1) cse.roster.push(e.id);
       save();
       root.innerHTML = "";
       wbGo({ view: "entry", entryId: e.id, uniId: e.universeId, justEntered: true, focusTitle: !e.title, reading: null });
@@ -2940,12 +2994,12 @@
       if (!name) return;
       var kind = form.querySelector("[name=kind]").value;
       if (kind === "Campanha de RPG") {
-        var cp = { id: uid(), universeId: uniId, name: name, system: "", synopsis: "", notes: "", status: "planejando", roster: [], pinned: [], sessions: [] };
+        var cp = { id: uid(), universeId: uniId, name: name, system: "", synopsis: "", notes: "", status: "planejando", seasons: [{ id: uid(), name: "Temporada 1", synopsis: "", status: "planejando", roster: [], pinned: [], sessions: [] }] };
         C().campaigns.push(cp); save();
-        wbGo({ view: "campaign", campId: cp.id, uniId: uniId, campTab: "visao", justEntered: true });
+        wbGo({ view: "campaign", campId: cp.id, uniId: uniId, justEntered: true });
         return;
       }
-      C().franchises.push({ id: uid(), universeId: uniId, name: name, kind: kind, synopsis: "", status: "Em andamento", writing: { wordGoal: 0, wordCount: 0, sessions: [] }, scenes: [] });
+      C().franchises.push({ id: uid(), universeId: uniId, name: name, kind: kind, synopsis: "", status: "Em andamento", seasons: [{ id: uid(), name: "Temporada 1", synopsis: "", status: "Em andamento", roster: [], scenes: [], writing: { wordGoal: 0, wordCount: 0, sessions: [] } }] });
       save(); render();
     } });
     form.appendChild(el("input", { class: "field grow", name: "name", placeholder: "Nome da obra…" }));
@@ -2956,20 +3010,24 @@
     card.appendChild(form);
     if (!frs.length && !cps.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma obra neste universo ainda. Personagens e locais são do universo; a obra agrupa uma história (romance, série, campanha de RPG…)." }));
     frs.forEach(function (fr) {
+      var ft = frTotals(fr);
+      var nS = fr.seasons.length;
       card.appendChild(el("div", { class: "row" }, [
         el("div", { class: "row-body" }, [
           el("div", { class: "row-title", text: fr.name }),
-          el("div", { class: "row-meta", text: fr.kind + (fr.writing.wordCount ? " · " + fr.writing.wordCount.toLocaleString("pt-BR") + " palavras" : "") + (fr.scenes.length ? " · " + fr.scenes.length + " cenas" : "") })
+          el("div", { class: "row-meta", text: fr.kind + (nS > 1 ? " · " + nS + " temporadas" : "") + (ft.wordCount ? " · " + ft.wordCount.toLocaleString("pt-BR") + " palavras" : "") + (ft.scenes ? " · " + ft.scenes + " cenas" : "") })
         ]),
         el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "franchise", frId: fr.id, uniId: uniId }); } })
       ]));
     });
     cps.forEach(function (cp) {
       var cs = campStatusInfo(cp.status);
+      var ct = campTotals(cp);
+      var nS = cp.seasons.length;
       card.appendChild(el("div", { class: "row" }, [
         el("div", { class: "row-body" }, [
           el("div", { class: "row-title", text: cp.name || "(campanha)" }),
-          el("div", { class: "row-meta", text: "Campanha de RPG · " + cs.glyph + " " + cs.label + (cp.system ? " · " + cp.system : "") + " · " + (cp.roster || []).length + " no elenco" })
+          el("div", { class: "row-meta", text: "Campanha de RPG · " + cs.glyph + " " + cs.label + (cp.system ? " · " + cp.system : "") + (nS > 1 ? " · " + nS + " temporadas" : "") + " · " + ct.cast + " no elenco" })
         ]),
         el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "campaign", campId: cp.id, uniId: uniId, justEntered: true }); } })
       ]));
@@ -3001,8 +3059,8 @@
     var links = entries.reduce(function (a, e) { return a + (e.links || []).length; }, 0);
     var frs = wbFranchisesOf(uniId);
     var cps = wbCampaignsOf(uniId);
-    var scenes = frs.reduce(function (a, fr) { return a + fr.scenes.length; }, 0);
-    var frWords = frs.reduce(function (a, fr) { return a + (fr.writing.wordCount || 0); }, 0);
+    var scenes = frs.reduce(function (a, fr) { return a + frTotals(fr).scenes; }, 0);
+    var frWords = frs.reduce(function (a, fr) { return a + frTotals(fr).wordCount; }, 0);
     v.appendChild(el("div", { class: "tiles" }, [
       tile("Entradas", String(entries.length), Object.keys(byType).length + " tipos"),
       tile("Palavras de lore", words.toLocaleString("pt-BR"), "nas descrições"),
@@ -3122,7 +3180,9 @@
   function wbAppearsIn(e) {
     var out = [];
     wbFranchisesOf(e.universeId).forEach(function (fr) {
-      fr.scenes.forEach(function (sc) { if ((sc.entryIds || []).indexOf(e.id) !== -1) out.push({ fr: fr, sc: sc }); });
+      (fr.seasons || []).forEach(function (se) {
+        (se.scenes || []).forEach(function (sc) { if ((sc.entryIds || []).indexOf(e.id) !== -1) out.push({ fr: fr, se: se, sc: sc }); });
+      });
     });
     return out;
   }
@@ -3540,12 +3600,12 @@
     if (e.events.length) evFoot.appendChild(el("button", { class: "link", type: "button", text: "ver linha do tempo de " + f.name + " →", onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: "tempo" }); } }));
     if (evFoot.childNodes.length) card.appendChild(evFoot);
 
-    // obras (franquias + campanhas — campanha é um tipo de obra)
+    // obras (franquias + campanhas — campanha é um tipo de obra; cada temporada tem seu próprio elenco)
     var frs = wbFranchisesOf(e.universeId);
     var uCamps = wbCampaignsOf(e.universeId);
-    var inCamps = wbCampaignsWith(e.id);
+    var inCampSeasons = wbCampSeasonsWith(e.id);
     if (frs.length || uCamps.length) {
-      var inAnyObra = (e.franchiseIds || []).length || inCamps.length;
+      var inAnyObra = (e.franchiseIds || []).length || inCampSeasons.length;
       if (!ro || inAnyObra) {
         card.appendChild(cat("Aparece nas obras"));
         var ow = el("div", { class: "lens-bar" });
@@ -3559,13 +3619,16 @@
           } }, [el("span", { text: fr.name })]));
         });
         uCamps.forEach(function (cp) {
-          var on = inCamps.indexOf(cp) !== -1;
-          if (ro && !on) return;
-          ow.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": on ? "true" : "false", onclick: ro ? function () { wbGo({ view: "campaign", campId: cp.id, uniId: e.universeId }); } : function () {
-            if (on) { cp.roster = cp.roster.filter(function (x) { return x !== e.id; }); cp.pinned = (cp.pinned || []).filter(function (x) { return x !== e.id; }); }
-            else cp.roster.push(e.id);
-            touch(true);
-          } }, [el("span", { text: "🎲 " + campStatusInfo(cp.status).glyph + " " + (cp.name || "campanha") })]));
+          (cp.seasons || []).forEach(function (se) {
+            var on = (se.roster || []).indexOf(e.id) !== -1;
+            if (ro && !on) return;
+            var label = "🎲 " + campStatusInfo(cp.status).glyph + " " + (cp.name || "campanha") + (cp.seasons.length > 1 ? " · " + se.name : "");
+            ow.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": on ? "true" : "false", onclick: ro ? function () { wbGo({ view: "campaignSeason", campId: cp.id, seasonId: se.id, uniId: e.universeId }); } : function () {
+              if (on) { se.roster = se.roster.filter(function (x) { return x !== e.id; }); se.pinned = (se.pinned || []).filter(function (x) { return x !== e.id; }); }
+              else se.roster.push(e.id);
+              touch(true);
+            } }, [el("span", { text: label })]));
+          });
         });
         card.appendChild(ow);
       }
@@ -3653,8 +3716,8 @@
     if (apps.length) {
       card.appendChild(cat("Aparece em"));
       apps.forEach(function (a) { card.appendChild(el("div", { class: "row wb-rel" }, [
-        el("div", { class: "row-body" }, [el("div", { class: "row-title", style: "font-size:14px", text: a.sc.title || "(cena)" }), el("div", { class: "row-meta", text: a.fr.name })]),
-        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "scene", frId: a.fr.id, sceneId: a.sc.id, uniId: e.universeId }); } })
+        el("div", { class: "row-body" }, [el("div", { class: "row-title", style: "font-size:14px", text: a.sc.title || "(cena)" }), el("div", { class: "row-meta", text: a.fr.name + (a.fr.seasons.length > 1 ? " · " + a.se.name : "") })]),
+        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "scene", frId: a.fr.id, seasonId: a.se.id, sceneId: a.sc.id, uniId: e.universeId }); } })
       ])); });
     }
 
@@ -3818,19 +3881,21 @@
     v.appendChild(el("button", { class: "btn", type: "button", text: "＋ nova campanha", style: "margin-bottom:12px", onclick: function () {
       var nm = window.prompt("Nome da campanha:");
       if (nm == null) return;
-      var cp = { id: uid(), universeId: uniId, name: nm.trim() || "Nova campanha", system: "", synopsis: "", notes: "", status: "planejando", roster: [], pinned: [], sessions: [] };
+      var cp = { id: uid(), universeId: uniId, name: nm.trim() || "Nova campanha", system: "", synopsis: "", notes: "", status: "planejando", seasons: [{ id: uid(), name: "Temporada 1", synopsis: "", status: "planejando", roster: [], pinned: [], sessions: [] }] };
       C().campaigns.push(cp); save();
-      wbGo({ view: "campaign", campId: cp.id, uniId: uniId, campTab: "visao", justEntered: true });
+      wbGo({ view: "campaign", campId: cp.id, uniId: uniId, justEntered: true });
     } }));
     var cps = wbCampaignsOf(uniId);
     if (!cps.length) { v.appendChild(el("div", { class: "empty", text: "Nenhuma campanha neste universo. Uma campanha é uma mesa de RPG situada aqui." })); return; }
     var card = el("div", { class: "card" });
     cps.forEach(function (cp) {
       var cs = campStatusInfo(cp.status);
+      var ct = campTotals(cp);
+      var nS = cp.seasons.length;
       card.appendChild(el("div", { class: "row" }, [
         el("div", { class: "row-body" }, [
           el("div", { class: "row-title", text: cp.name || "(campanha)" }),
-          el("div", { class: "row-meta", text: cs.glyph + " " + cs.label + (cp.system ? " · " + cp.system : "") + " · " + (cp.sessions || []).length + " sessões · " + (cp.roster || []).length + " no elenco" })
+          el("div", { class: "row-meta", text: cs.glyph + " " + cs.label + (cp.system ? " · " + cp.system : "") + (nS > 1 ? " · " + nS + " temporadas" : "") + " · " + ct.sessions + " sessões · " + ct.cast + " no elenco" })
         ]),
         el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "campaign", campId: cp.id, uniId: uniId, justEntered: true }); } })
       ]));
@@ -3864,64 +3929,32 @@
     w.focusTitle = false;
     card.appendChild(editable({ tag: "div", className: "wb-rel", value: cp.system, placeholder: "＋ sistema (D&D 5e, Tormenta, GURPS…)", display: function (x) { return x ? "sistema: " + x : null; }, commit: function (nv) { cp.system = nv.trim(); touch(false); } }));
 
-    var tab = ["visao", "elenco", "sessoes", "notas"].indexOf(w.campTab) === -1 ? "visao" : w.campTab;
-    card.appendChild(segControl([["visao", "Visão"], ["elenco", "Elenco"], ["sessoes", "Sessões"], ["notas", "Notas"]], tab, function (t) { wbGo({ campTab: t }); }));
+    card.appendChild(el("div", { class: "cathead", text: "Premissa" }));
+    card.appendChild(mdBox(function () { return cp.synopsis; }, function (val) { cp.synopsis = val; touch(false); }, cp.universeId, { placeholder: "Premissa, tom, o que está em jogo…", minHeight: "18vh" }));
 
-    if (tab === "visao") {
-      card.appendChild(el("div", { class: "cathead", text: "Sinopse" }));
-      card.appendChild(mdBox(function () { return cp.synopsis; }, function (val) { cp.synopsis = val; touch(false); }, cp.universeId, { placeholder: "Premissa, tom, o que está em jogo…", minHeight: "24vh" }));
-      card.appendChild(el("div", { class: "cathead", text: "Fixados" }));
-      (cp.pinned || []).forEach(function (id) { var en = wbEntry(id); if (en) card.appendChild(wbCampRosterRow(en, cp, "pinned", touch)); });
-      card.appendChild(wbEntryAdder(cp.universeId, function (en) {
-        if (cp.pinned.indexOf(en.id) === -1) cp.pinned.push(en.id);
-        if (cp.roster.indexOf(en.id) === -1) cp.roster.push(en.id);
-        touch(true);
-      }, "fixar entrada-chave"));
-    } else if (tab === "elenco") {
-      card.appendChild(el("p", { class: "hint", text: "Personagens, locais e coisas que importam nesta mesa. Abrir leva à entrada completa no universo." }));
-      var byType = {};
-      (cp.roster || []).forEach(function (id) { var en = wbEntry(id); if (en) (byType[en.type] = byType[en.type] || []).push(en); });
-      Object.keys(byType).sort().forEach(function (tp) {
-        card.appendChild(el("div", { class: "cathead", text: typeTag(tp) + " · " + byType[tp].length }));
-        byType[tp].forEach(function (en) { card.appendChild(wbCampRosterRow(en, cp, "roster", touch)); });
-      });
-      if (!(cp.roster || []).length) card.appendChild(el("div", { class: "empty", text: "Elenco vazio." }));
-      card.appendChild(wbEntryAdder(cp.universeId, function (en) { if (cp.roster.indexOf(en.id) === -1) { cp.roster.push(en.id); touch(true); } }, "ligar entrada existente"));
-      card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ criar entrada nova nesta campanha", style: "margin-top:10px", onclick: function () { wbNewEntry(cp.universeId, null, null, null, cp.id); } }));
-    } else if (tab === "sessoes") {
-      card.appendChild(el("button", { class: "btn", type: "button", text: "＋ nova sessão", onclick: function () {
-        cp.sessions.push({ id: uid(), date: todayKey(), title: "", recap: "", notes: "", present: [] });
-        touch(true);
-      } }));
-      var sess = cp.sessions.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
-      if (!sess.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma sessão registrada." }));
-      sess.forEach(function (se) {
-        var n = cp.sessions.indexOf(se) + 1;
-        var box = el("div", { class: "wb-sec" });
-        var head = el("div", { class: "wb-sec-head" });
-        head.appendChild(el("span", { class: "wb-lfield-lab", text: "sessão " + n }));
-        var di = el("input", { class: "field", type: "date", value: se.date || "", style: "width:auto;padding:4px 8px" });
-        di.addEventListener("change", function () { se.date = di.value; touch(true); });
-        head.appendChild(di);
-        head.appendChild(delBtn(function () { if (window.confirm("Excluir a sessão " + n + "?")) { cp.sessions = cp.sessions.filter(function (x) { return x.id !== se.id; }); touch(true); } }));
-        box.appendChild(head);
-        box.appendChild(editable({ tag: "div", className: "wb-ev-label", value: se.title, placeholder: "título da sessão…", commit: function (nv) { se.title = nv.trim(); touch(false); } }));
-        box.appendChild(el("div", { class: "wb-lfield-lab", style: "margin-top:10px", text: "o que rolou" }));
-        box.appendChild(mdBox(function () { return se.recap; }, function (val) { se.recap = val; touch(false); }, cp.universeId, { placeholder: "Resumo da sessão…", minHeight: "20vh", dropcap: false }));
-        box.appendChild(el("div", { class: "note-tags", style: "margin-top:10px" }, (se.present || []).map(function (id) {
-          var en = wbEntry(id); if (!en) return null;
-          return el("button", { class: "ntag", type: "button", title: "tirar", text: en.title + "  ✕", onclick: function () { se.present = se.present.filter(function (x) { return x !== id; }); touch(true); } });
-        }).filter(Boolean)));
-        box.appendChild(wbEntryAdder(cp.universeId, function (en) {
-          if ((se.present || []).indexOf(en.id) === -1) { se.present = (se.present || []).concat([en.id]); if (cp.roster.indexOf(en.id) === -1) cp.roster.push(en.id); touch(true); }
-        }, "quem apareceu"));
-        box.appendChild(el("div", { class: "wb-lfield-lab", style: "margin-top:10px", text: "ganchos / pendências" }));
-        box.appendChild(mdBox(function () { return se.notes; }, function (val) { se.notes = val; touch(false); }, cp.universeId, { placeholder: "O que ficou em aberto, ideias pra próxima…", minHeight: "16vh", dropcap: false }));
-        card.appendChild(box);
-      });
-    } else {
-      card.appendChild(mdBox(function () { return cp.notes; }, function (val) { cp.notes = val; touch(false); }, cp.universeId, { placeholder: "Notas livres da campanha…", minHeight: "42vh" }));
-    }
+    card.appendChild(el("div", { class: "cathead", text: "Temporadas" }));
+    card.appendChild(el("p", { class: "hint", style: "margin-top:0", text: "Uma campanha longa pode ter várias temporadas — ou spin-offs num elenco totalmente diferente. Cada uma tem seu próprio elenco e suas próprias sessões." }));
+    (cp.seasons || []).forEach(function (se, i) {
+      var scs = campStatusInfo(se.status);
+      var ct = { sessions: (se.sessions || []).length, cast: (se.roster || []).length };
+      card.appendChild(el("div", { class: "row" }, [
+        el("div", { class: "row-body" }, [
+          el("div", { class: "row-title", text: (i + 1) + ". " + (se.name || "Temporada") }),
+          el("div", { class: "row-meta", text: scs.glyph + " " + scs.label + " · " + ct.sessions + " sessões · " + ct.cast + " no elenco" })
+        ]),
+        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "campaignSeason", campId: cp.id, seasonId: se.id, uniId: cp.universeId, seasonTab: "visao", justEntered: true }); } })
+      ]));
+    });
+    card.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "＋ nova temporada", style: "margin-top:6px", onclick: function () {
+      var nm = window.prompt("Nome da temporada (ex: Temporada 2, Spin-off — A Queda…):");
+      if (nm == null) return;
+      var ns = { id: uid(), name: nm.trim() || ("Temporada " + (cp.seasons.length + 1)), synopsis: "", status: "planejando", roster: [], pinned: [], sessions: [] };
+      cp.seasons.push(ns); save();
+      wbGo({ view: "campaignSeason", campId: cp.id, seasonId: ns.id, uniId: cp.universeId, seasonTab: "visao", justEntered: true });
+    } }));
+
+    card.appendChild(el("div", { class: "cathead", text: "Notas" }));
+    card.appendChild(mdBox(function () { return cp.notes; }, function (val) { cp.notes = val; touch(false); }, cp.universeId, { placeholder: "Notas livres da campanha…", minHeight: "24vh" }));
 
     var det = el("details", { class: "detail-strip" });
     det.appendChild(el("summary", { text: "detalhes da campanha" }));
@@ -3930,9 +3963,108 @@
     uSel.addEventListener("change", function () { cp.universeId = uSel.value; touch(true); });
     det.appendChild(el("div", {}, [el("label", { class: "flab", text: "Universo" }), uSel]));
     det.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Excluir campanha", style: "color:var(--neg);border-color:var(--neg);margin-top:12px", onclick: function () {
-      if (!window.confirm("Excluir a campanha \"" + cp.name + "\"? As entradas do universo permanecem.")) return;
+      if (!window.confirm("Excluir a campanha \"" + cp.name + "\" e todas as suas temporadas? As entradas do universo permanecem.")) return;
       C().campaigns = C().campaigns.filter(function (x) { return x.id !== cp.id; });
       save(); wbGo({ view: "universe", uniId: cp.universeId, uniTab: "campanhas" });
+    } }));
+    card.appendChild(det);
+
+    v.appendChild(card);
+    return v;
+  }
+
+  function wbCampaignSeasonView(v) {
+    var w = wbState(), cp = wbCampaign(w.campId);
+    if (!cp) { wbGo({ view: "home" }); return v; }
+    var se = (cp.seasons || []).filter(function (x) { return x.id === w.seasonId; })[0];
+    if (!se) { wbGo({ view: "campaign", campId: cp.id, uniId: cp.universeId }); return v; }
+    var f = flowerById(cp.universeId);
+    function touch(re) { save(); if (re) render(); }
+
+    v.appendChild(el("div", { class: "wb-unihead", style: "justify-content:space-between" }, [
+      el("button", { class: "link", type: "button", text: "← " + (cp.name || "campanha"), onclick: function () { wbGo({ view: "campaign", campId: cp.id, uniId: cp.universeId }); } })
+    ]));
+    var card = el("div", { class: "card wb-read" + (w.justEntered ? " wb-enter" : "") });
+    w.justEntered = false;
+
+    var cs = campStatusInfo(se.status);
+    card.appendChild(el("div", { class: "wb-eyebrow", style: "gap:7px;align-items:center;flex-wrap:wrap" }, [
+      el("span", { text: "TEMPORADA" }), el("span", { text: "·" }), el("span", { text: f.name }),
+      el("span", { class: "saved-flash", id: "savedFlash", text: "· salvo" }),
+      el("span", { style: "display:flex;gap:7px;align-items:center;margin-left:auto" }, [
+        el("button", { class: "wb-status", type: "button", title: "Estado da temporada", text: cs.glyph + " " + cs.label, onclick: function () {
+          var ids = CAMPAIGN_STATUS.map(function (x) { return x.id; });
+          se.status = ids[(ids.indexOf(se.status) + 1) % ids.length]; touch(true);
+        } })
+      ])
+    ]));
+    card.appendChild(editable({ tag: "h1", value: se.name && se.name !== "Temporada" ? se.name : "", placeholder: "Nome da temporada", autoedit: w.focusTitle, commit: function (nv) { se.name = nv.trim() || "Temporada"; touch(true); } }));
+    w.focusTitle = false;
+
+    var tab = ["visao", "elenco", "sessoes"].indexOf(w.seasonTab) === -1 ? "visao" : w.seasonTab;
+    card.appendChild(segControl([["visao", "Visão"], ["elenco", "Elenco"], ["sessoes", "Sessões"]], tab, function (t) { wbGo({ seasonTab: t }); }));
+
+    if (tab === "visao") {
+      card.appendChild(el("div", { class: "cathead", text: "Sinopse" }));
+      card.appendChild(mdBox(function () { return se.synopsis; }, function (val) { se.synopsis = val; touch(false); }, cp.universeId, { placeholder: "O que muda nesta temporada…", minHeight: "24vh" }));
+      card.appendChild(el("div", { class: "cathead", text: "Fixados" }));
+      (se.pinned || []).forEach(function (id) { var en = wbEntry(id); if (en) card.appendChild(wbCampRosterRow(en, se, "pinned", touch)); });
+      card.appendChild(wbEntryAdder(cp.universeId, function (en) {
+        if (se.pinned.indexOf(en.id) === -1) se.pinned.push(en.id);
+        if (se.roster.indexOf(en.id) === -1) se.roster.push(en.id);
+        touch(true);
+      }, "fixar entrada-chave"));
+    } else if (tab === "elenco") {
+      card.appendChild(el("p", { class: "hint", text: "Personagens, locais e coisas que importam nesta temporada. Abrir leva à entrada completa no universo." }));
+      var byType = {};
+      (se.roster || []).forEach(function (id) { var en = wbEntry(id); if (en) (byType[en.type] = byType[en.type] || []).push(en); });
+      Object.keys(byType).sort().forEach(function (tp) {
+        card.appendChild(el("div", { class: "cathead", text: typeTag(tp) + " · " + byType[tp].length }));
+        byType[tp].forEach(function (en) { card.appendChild(wbCampRosterRow(en, se, "roster", touch)); });
+      });
+      if (!(se.roster || []).length) card.appendChild(el("div", { class: "empty", text: "Elenco vazio." }));
+      card.appendChild(wbEntryAdder(cp.universeId, function (en) { if (se.roster.indexOf(en.id) === -1) { se.roster.push(en.id); touch(true); } }, "ligar entrada existente"));
+      card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ criar entrada nova nesta temporada", style: "margin-top:10px", onclick: function () { wbNewEntry(cp.universeId, null, null, null, cp.id, se.id); } }));
+    } else if (tab === "sessoes") {
+      card.appendChild(el("button", { class: "btn", type: "button", text: "＋ nova sessão", onclick: function () {
+        se.sessions.push({ id: uid(), date: todayKey(), title: "", recap: "", notes: "", present: [] });
+        touch(true);
+      } }));
+      var sess = se.sessions.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+      if (!sess.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma sessão registrada." }));
+      sess.forEach(function (sx) {
+        var n = se.sessions.indexOf(sx) + 1;
+        var box = el("div", { class: "wb-sec" });
+        var head = el("div", { class: "wb-sec-head" });
+        head.appendChild(el("span", { class: "wb-lfield-lab", text: "sessão " + n }));
+        var di = el("input", { class: "field", type: "date", value: sx.date || "", style: "width:auto;padding:4px 8px" });
+        di.addEventListener("change", function () { sx.date = di.value; touch(true); });
+        head.appendChild(di);
+        head.appendChild(delBtn(function () { if (window.confirm("Excluir a sessão " + n + "?")) { se.sessions = se.sessions.filter(function (x) { return x.id !== sx.id; }); touch(true); } }));
+        box.appendChild(head);
+        box.appendChild(editable({ tag: "div", className: "wb-ev-label", value: sx.title, placeholder: "título da sessão…", commit: function (nv) { sx.title = nv.trim(); touch(false); } }));
+        box.appendChild(el("div", { class: "wb-lfield-lab", style: "margin-top:10px", text: "o que rolou" }));
+        box.appendChild(mdBox(function () { return sx.recap; }, function (val) { sx.recap = val; touch(false); }, cp.universeId, { placeholder: "Resumo da sessão…", minHeight: "20vh", dropcap: false }));
+        box.appendChild(el("div", { class: "note-tags", style: "margin-top:10px" }, (sx.present || []).map(function (id) {
+          var en = wbEntry(id); if (!en) return null;
+          return el("button", { class: "ntag", type: "button", title: "tirar", text: en.title + "  ✕", onclick: function () { sx.present = sx.present.filter(function (x) { return x !== id; }); touch(true); } });
+        }).filter(Boolean)));
+        box.appendChild(wbEntryAdder(cp.universeId, function (en) {
+          if ((sx.present || []).indexOf(en.id) === -1) { sx.present = (sx.present || []).concat([en.id]); if (se.roster.indexOf(en.id) === -1) se.roster.push(en.id); touch(true); }
+        }, "quem apareceu"));
+        box.appendChild(el("div", { class: "wb-lfield-lab", style: "margin-top:10px", text: "ganchos / pendências" }));
+        box.appendChild(mdBox(function () { return sx.notes; }, function (val) { sx.notes = val; touch(false); }, cp.universeId, { placeholder: "O que ficou em aberto, ideias pra próxima…", minHeight: "16vh", dropcap: false }));
+        card.appendChild(box);
+      });
+    }
+
+    var det = el("details", { class: "detail-strip" });
+    det.appendChild(el("summary", { text: "detalhes da temporada" }));
+    det.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Excluir temporada", style: "color:var(--neg);border-color:var(--neg);margin-top:12px", onclick: function () {
+      if ((cp.seasons || []).length <= 1) { window.alert("A campanha precisa de pelo menos uma temporada."); return; }
+      if (!window.confirm("Excluir a temporada \"" + se.name + "\"? As entradas do universo permanecem.")) return;
+      cp.seasons = cp.seasons.filter(function (x) { return x.id !== se.id; });
+      save(); wbGo({ view: "campaign", campId: cp.id, uniId: cp.universeId });
     } }));
     card.appendChild(det);
 
@@ -3957,10 +4089,10 @@
     sc.appendChild(sy);
     v.appendChild(sc);
 
-    // Elenco — entradas que participam desta obra (uma entrada pode estar em várias obras)
+    // Elenco geral — todas as entradas que participam desta obra, em qualquer temporada (uma entrada pode estar em várias obras)
     function frTouch(re) { save(); if (re) render(); }
     var pc = el("div", { class: "card" });
-    pc.appendChild(sectionLabel("Elenco"));
+    pc.appendChild(sectionLabel("Elenco geral"));
     var cast = C().entries.filter(function (en) { return en.universeId === fr.universeId && (en.franchiseIds || []).indexOf(fr.id) !== -1; });
     if (!cast.length) pc.appendChild(el("div", { class: "empty", text: "Nenhuma entrada nesta obra ainda." }));
     var byType = {};
@@ -3976,73 +4108,31 @@
     }, "ligar entrada existente"));
     v.appendChild(pc);
 
-    // Cenas / outline
-    var cc = el("div", { class: "card" });
-    cc.appendChild(sectionLabel("Cenas / capítulos", "+ cena", function () {
-      fr.scenes.push({ id: uid(), title: "", synopsis: "", body: "", entryIds: [], status: "rascunho" });
-      save(); wbGo({ view: "scene", frId: fr.id, sceneId: fr.scenes[fr.scenes.length - 1].id, uniId: fr.universeId });
-    }));
-    if (!fr.scenes.length) cc.appendChild(el("div", { class: "empty", text: "Nenhuma cena. Monte o esqueleto da história." }));
-    fr.scenes.forEach(function (s, i) {
-      var who = (s.entryIds || []).map(function (id) { var en = wbEntry(id); return en ? en.title : null; }).filter(Boolean);
-      cc.appendChild(el("div", { class: "row" }, [
-        el("div", { style: "display:flex;flex-direction:column;gap:1px" }, [
-          el("button", { class: "wb-ord", type: "button", "aria-label": "Subir", text: "▲", disabled: i === 0 ? "disabled" : null, onclick: function () { var t = fr.scenes[i - 1]; fr.scenes[i - 1] = s; fr.scenes[i] = t; save(); render(); } }),
-          el("button", { class: "wb-ord", type: "button", "aria-label": "Descer", text: "▼", disabled: i === fr.scenes.length - 1 ? "disabled" : null, onclick: function () { var t = fr.scenes[i + 1]; fr.scenes[i + 1] = s; fr.scenes[i] = t; save(); render(); } })
-        ]),
+    // Temporadas — livros/arcos/spin-offs, cada um com seu próprio elenco, cenas e progresso de escrita
+    var tc = el("div", { class: "card" });
+    tc.appendChild(sectionLabel("Temporadas"));
+    tc.appendChild(el("p", { class: "hint", style: "margin-top:0", text: "Pra trilogias, arcos ou spin-offs: cada temporada tem seu próprio elenco, cenas e progresso de escrita." }));
+    (fr.seasons || []).forEach(function (se, i) {
+      var ft2 = { scenes: (se.scenes || []).length, wordCount: (se.writing && se.writing.wordCount) || 0, cast: (se.roster || []).length };
+      tc.appendChild(el("div", { class: "row" }, [
         el("div", { class: "row-body" }, [
-          el("div", { class: "row-title", text: (i + 1) + ". " + (s.title || "(sem título)") }),
-          el("div", { class: "row-meta", text: s.status + (who.length ? " · " + who.join(", ") : "") })
+          el("div", { class: "row-title", text: (i + 1) + ". " + (se.name || "Temporada") }),
+          el("div", { class: "row-meta", text: (ft2.wordCount ? ft2.wordCount.toLocaleString("pt-BR") + " palavras · " : "") + ft2.scenes + " cenas · " + ft2.cast + " no elenco" })
         ]),
-        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "scene", frId: fr.id, sceneId: s.id, uniId: fr.universeId }); } })
+        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "franchiseSeason", frId: fr.id, seasonId: se.id, uniId: fr.universeId, seasonTab: "visao", justEntered: true }); } })
       ]));
     });
-    v.appendChild(cc);
-
-    // Escrita
-    var W = fr.writing;
-    var wc = el("div", { class: "card" });
-    wc.appendChild(sectionLabel("Progresso de escrita"));
-    var gf = el("form", { class: "inline", onsubmit: function (e) { e.preventDefault(); W.wordGoal = parseInt(gf.querySelector("input").value, 10) || 0; save(); render(); } });
-    gf.appendChild(el("input", { class: "field", inputmode: "numeric", placeholder: "meta de palavras", value: W.wordGoal || "", style: "width:150px" }));
-    gf.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "Definir meta" }));
-    wc.appendChild(gf);
-    if (W.wordGoal) {
-      var pct = Math.min(100, Math.round(W.wordCount / W.wordGoal * 100));
-      var tr = el("div", { class: "bar-track", style: "margin-top:10px" });
-      tr.appendChild(el("div", { class: "bar-fill", style: "width:" + pct + "%;background:var(--dom-criacao)" }));
-      wc.appendChild(tr);
-      wc.appendChild(el("div", { class: "row-meta", style: "margin-top:5px", text: W.wordCount.toLocaleString("pt-BR") + " de " + W.wordGoal.toLocaleString("pt-BR") + " palavras (" + pct + "%)" }));
-    } else wc.appendChild(el("div", { class: "row-meta", style: "margin-top:8px", text: W.wordCount.toLocaleString("pt-BR") + " palavras no total" }));
-    var sf = el("form", { class: "inline", style: "margin-top:10px", onsubmit: function (e) {
-      e.preventDefault();
-      var wd = parseInt(sf.querySelector("[name=w]").value, 10);
-      var mn = parseInt(sf.querySelector("[name=m]").value, 10) || 0;
-      if (isNaN(wd)) return;
-      W.sessions.unshift({ id: uid(), date: todayKey(), words: wd, min: mn, note: sf.querySelector("[name=n]").value.trim() });
-      W.wordCount = Math.max(0, W.wordCount + wd);
-      sf.reset(); save(); render();
-    } });
-    sf.appendChild(el("input", { class: "field", name: "w", inputmode: "numeric", placeholder: "+palavras", style: "width:100px" }));
-    sf.appendChild(el("input", { class: "field", name: "m", inputmode: "numeric", placeholder: "min", style: "width:60px" }));
-    sf.appendChild(el("input", { class: "field grow", name: "n", placeholder: "nota da sessão" }));
-    sf.appendChild(el("button", { class: "btn sm", type: "submit", text: "Registrar" }));
-    wc.appendChild(sf);
-    var weekW = W.sessions.filter(function (s) { return s.date >= todayKey(-6); }).reduce(function (a, s) { return a + s.words; }, 0);
-    wc.appendChild(el("div", { class: "row-meta", style: "margin-top:8px", text: "Esta semana: " + weekW.toLocaleString("pt-BR") + " palavras" }));
-    (W.sessions || []).slice(0, 8).forEach(function (s) {
-      wc.appendChild(el("div", { class: "row" }, [
-        el("div", { class: "row-body" }, [
-          el("div", { class: "row-title", text: (s.words >= 0 ? "+" : "") + s.words.toLocaleString("pt-BR") + " palavras" }),
-          el("div", { class: "row-meta", text: relDay(s.date) + (s.min ? " · " + s.min + " min" : "") + (s.note ? " · " + s.note : "") })
-        ]),
-        delBtn(function () { W.wordCount = Math.max(0, W.wordCount - s.words); W.sessions = W.sessions.filter(function (x) { return x.id !== s.id; }); save(); render(); })
-      ]));
-    });
-    v.appendChild(wc);
+    tc.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "＋ nova temporada", style: "margin-top:6px", onclick: function () {
+      var nm = window.prompt("Nome da temporada (ex: Livro 2, Arco 3, Spin-off — A Queda…):");
+      if (nm == null) return;
+      var ns = { id: uid(), name: nm.trim() || ("Temporada " + (fr.seasons.length + 1)), synopsis: "", status: "Em andamento", roster: [], scenes: [], writing: { wordGoal: 0, wordCount: 0, sessions: [] } };
+      fr.seasons.push(ns); save();
+      wbGo({ view: "franchiseSeason", frId: fr.id, seasonId: ns.id, uniId: fr.universeId, seasonTab: "visao", justEntered: true });
+    } }));
+    v.appendChild(tc);
 
     v.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Excluir obra", style: "color:var(--neg);border-color:var(--neg);margin-top:14px", onclick: function () {
-      if (!window.confirm("Excluir \"" + fr.name + "\"? As entradas do universo permanecem.")) return;
+      if (!window.confirm("Excluir \"" + fr.name + "\" e todas as suas temporadas? As entradas do universo permanecem.")) return;
       C().entries.forEach(function (e) { e.franchiseIds = e.franchiseIds.filter(function (id) { return id !== fr.id; }); });
       C().franchises = C().franchises.filter(function (x) { return x.id !== fr.id; });
       save(); wbGo({ view: "universe", uniId: fr.universeId, uniTab: "franquias" });
@@ -4050,12 +4140,123 @@
     return v;
   }
 
+  function wbFranchiseSeasonView(v) {
+    var w = wbState(), fr = C().franchises.filter(function (f) { return f.id === w.frId; })[0];
+    if (!fr) { wbGo({ view: "home" }); return v; }
+    var se = (fr.seasons || []).filter(function (x) { return x.id === w.seasonId; })[0];
+    if (!se) { wbGo({ view: "franchise", frId: fr.id, uniId: fr.universeId }); return v; }
+    var f = flowerById(fr.universeId);
+    function touch(re) { save(); if (re) render(); }
+
+    v.appendChild(el("div", { class: "wb-unihead" }, [
+      el("button", { class: "link", type: "button", text: "← " + fr.name, onclick: function () { wbGo({ view: "franchise", frId: fr.id, uniId: fr.universeId }); } })
+    ]));
+    var card = el("div", { class: "card wb-read" + (w.justEntered ? " wb-enter" : "") });
+    w.justEntered = false;
+    card.appendChild(editable({ tag: "h1", value: se.name && se.name !== "Temporada" ? se.name : "", placeholder: "Nome da temporada", autoedit: w.focusTitle, commit: function (nv) { se.name = nv.trim() || "Temporada"; touch(true); } }));
+    w.focusTitle = false;
+    card.appendChild(el("p", { class: "hint", style: "margin-top:0", text: fr.name + " · universo " + f.name }));
+
+    var tab = ["visao", "elenco", "cenas"].indexOf(w.seasonTab) === -1 ? "visao" : w.seasonTab;
+    card.appendChild(segControl([["visao", "Visão"], ["elenco", "Elenco"], ["cenas", "Cenas"]], tab, function (t) { wbGo({ seasonTab: t }); }));
+
+    if (tab === "visao") {
+      card.appendChild(el("div", { class: "cathead", text: "Sinopse" }));
+      var sy = el("textarea", { class: "field", text: se.synopsis, style: "min-height:70px" });
+      sy.addEventListener("change", function () { se.synopsis = sy.value; save(); });
+      card.appendChild(sy);
+
+      var W = se.writing;
+      card.appendChild(el("div", { class: "cathead", style: "margin-top:16px", text: "Progresso de escrita" }));
+      var gf = el("form", { class: "inline", onsubmit: function (e) { e.preventDefault(); W.wordGoal = parseInt(gf.querySelector("input").value, 10) || 0; save(); render(); } });
+      gf.appendChild(el("input", { class: "field", inputmode: "numeric", placeholder: "meta de palavras", value: W.wordGoal || "", style: "width:150px" }));
+      gf.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "Definir meta" }));
+      card.appendChild(gf);
+      if (W.wordGoal) {
+        var pct = Math.min(100, Math.round(W.wordCount / W.wordGoal * 100));
+        var tr = el("div", { class: "bar-track", style: "margin-top:10px" });
+        tr.appendChild(el("div", { class: "bar-fill", style: "width:" + pct + "%;background:var(--dom-criacao)" }));
+        card.appendChild(tr);
+        card.appendChild(el("div", { class: "row-meta", style: "margin-top:5px", text: W.wordCount.toLocaleString("pt-BR") + " de " + W.wordGoal.toLocaleString("pt-BR") + " palavras (" + pct + "%)" }));
+      } else card.appendChild(el("div", { class: "row-meta", style: "margin-top:8px", text: W.wordCount.toLocaleString("pt-BR") + " palavras no total" }));
+      var sf = el("form", { class: "inline", style: "margin-top:10px", onsubmit: function (e) {
+        e.preventDefault();
+        var wd = parseInt(sf.querySelector("[name=w]").value, 10);
+        var mn = parseInt(sf.querySelector("[name=m]").value, 10) || 0;
+        if (isNaN(wd)) return;
+        W.sessions.unshift({ id: uid(), date: todayKey(), words: wd, min: mn, note: sf.querySelector("[name=n]").value.trim() });
+        W.wordCount = Math.max(0, W.wordCount + wd);
+        sf.reset(); save(); render();
+      } });
+      sf.appendChild(el("input", { class: "field", name: "w", inputmode: "numeric", placeholder: "+palavras", style: "width:100px" }));
+      sf.appendChild(el("input", { class: "field", name: "m", inputmode: "numeric", placeholder: "min", style: "width:60px" }));
+      sf.appendChild(el("input", { class: "field grow", name: "n", placeholder: "nota da sessão" }));
+      sf.appendChild(el("button", { class: "btn sm", type: "submit", text: "Registrar" }));
+      card.appendChild(sf);
+      var weekW = W.sessions.filter(function (s) { return s.date >= todayKey(-6); }).reduce(function (a, s) { return a + s.words; }, 0);
+      card.appendChild(el("div", { class: "row-meta", style: "margin-top:8px", text: "Esta semana: " + weekW.toLocaleString("pt-BR") + " palavras" }));
+      (W.sessions || []).slice(0, 8).forEach(function (s) {
+        card.appendChild(el("div", { class: "row" }, [
+          el("div", { class: "row-body" }, [
+            el("div", { class: "row-title", text: (s.words >= 0 ? "+" : "") + s.words.toLocaleString("pt-BR") + " palavras" }),
+            el("div", { class: "row-meta", text: relDay(s.date) + (s.min ? " · " + s.min + " min" : "") + (s.note ? " · " + s.note : "") })
+          ]),
+          delBtn(function () { W.wordCount = Math.max(0, W.wordCount - s.words); W.sessions = W.sessions.filter(function (x) { return x.id !== s.id; }); save(); render(); })
+        ]));
+      });
+    } else if (tab === "elenco") {
+      card.appendChild(el("p", { class: "hint", text: "O elenco desta temporada. Abrir leva à entrada completa no universo." }));
+      var byType = {};
+      (se.roster || []).forEach(function (id) { var en = wbEntry(id); if (en) (byType[en.type] = byType[en.type] || []).push(en); });
+      Object.keys(byType).sort().forEach(function (tp) {
+        card.appendChild(el("div", { class: "cathead", text: typeTag(tp) + " · " + byType[tp].length }));
+        byType[tp].forEach(function (en) { card.appendChild(wbCampRosterRow(en, se, "roster", touch)); });
+      });
+      if (!(se.roster || []).length) card.appendChild(el("div", { class: "empty", text: "Elenco vazio." }));
+      card.appendChild(wbEntryAdder(fr.universeId, function (en) { if (se.roster.indexOf(en.id) === -1) { se.roster.push(en.id); touch(true); } }, "ligar entrada existente"));
+    } else if (tab === "cenas") {
+      card.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "+ cena", onclick: function () {
+        se.scenes.push({ id: uid(), title: "", synopsis: "", body: "", entryIds: [], status: "rascunho" });
+        save(); wbGo({ view: "scene", frId: fr.id, seasonId: se.id, sceneId: se.scenes[se.scenes.length - 1].id, uniId: fr.universeId });
+      } }));
+      if (!se.scenes.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma cena. Monte o esqueleto da história." }));
+      se.scenes.forEach(function (s, i) {
+        var who = (s.entryIds || []).map(function (id) { var en = wbEntry(id); return en ? en.title : null; }).filter(Boolean);
+        card.appendChild(el("div", { class: "row" }, [
+          el("div", { style: "display:flex;flex-direction:column;gap:1px" }, [
+            el("button", { class: "wb-ord", type: "button", "aria-label": "Subir", text: "▲", disabled: i === 0 ? "disabled" : null, onclick: function () { var t = se.scenes[i - 1]; se.scenes[i - 1] = s; se.scenes[i] = t; save(); render(); } }),
+            el("button", { class: "wb-ord", type: "button", "aria-label": "Descer", text: "▼", disabled: i === se.scenes.length - 1 ? "disabled" : null, onclick: function () { var t = se.scenes[i + 1]; se.scenes[i + 1] = s; se.scenes[i] = t; save(); render(); } })
+          ]),
+          el("div", { class: "row-body" }, [
+            el("div", { class: "row-title", text: (i + 1) + ". " + (s.title || "(sem título)") }),
+            el("div", { class: "row-meta", text: s.status + (who.length ? " · " + who.join(", ") : "") })
+          ]),
+          el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "scene", frId: fr.id, seasonId: se.id, sceneId: s.id, uniId: fr.universeId }); } })
+        ]));
+      });
+    }
+
+    var det = el("details", { class: "detail-strip" });
+    det.appendChild(el("summary", { text: "detalhes da temporada" }));
+    det.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Excluir temporada", style: "color:var(--neg);border-color:var(--neg);margin-top:12px", onclick: function () {
+      if ((fr.seasons || []).length <= 1) { window.alert("A obra precisa de pelo menos uma temporada."); return; }
+      if (!window.confirm("Excluir a temporada \"" + se.name + "\"? As entradas do universo permanecem.")) return;
+      fr.seasons = fr.seasons.filter(function (x) { return x.id !== se.id; });
+      save(); wbGo({ view: "franchise", frId: fr.id, uniId: fr.universeId });
+    } }));
+    card.appendChild(det);
+
+    v.appendChild(card);
+    return v;
+  }
+
   function wbSceneEdit(v) {
     var w = wbState(), fr = C().franchises.filter(function (f) { return f.id === w.frId; })[0];
-    var s = fr && fr.scenes.filter(function (x) { return x.id === w.sceneId; })[0];
-    if (!s) { wbGo({ view: "franchise", frId: w.frId }); return v; }
+    var se = fr && (fr.seasons || []).filter(function (x) { return x.id === w.seasonId; })[0];
+    var s = se && se.scenes.filter(function (x) { return x.id === w.sceneId; })[0];
+    if (!s) { wbGo({ view: "franchiseSeason", frId: w.frId, seasonId: w.seasonId }); return v; }
     v.appendChild(el("div", { class: "wb-unihead" }, [
-      el("button", { class: "link", type: "button", text: "← " + fr.name, onclick: function () { save(); wbGo({ view: "franchise", frId: fr.id, uniId: fr.universeId }); } })
+      el("button", { class: "link", type: "button", text: "← " + fr.name, onclick: function () { save(); wbGo({ view: "franchiseSeason", frId: fr.id, seasonId: se.id, uniId: fr.universeId, seasonTab: "cenas" }); } })
     ]));
     var form = el("form", { class: "card" });
     form.appendChild(el("label", { class: "flab", text: "Título da cena" }));
@@ -4086,9 +4287,9 @@
     });
     form.appendChild(chips);
     form.appendChild(el("div", { class: "modal-actions" }, [
-      delBtn(function () { fr.scenes = fr.scenes.filter(function (x) { return x.id !== s.id; }); save(); wbGo({ view: "franchise", frId: fr.id, uniId: fr.universeId }); }),
+      delBtn(function () { se.scenes = se.scenes.filter(function (x) { return x.id !== s.id; }); save(); wbGo({ view: "franchiseSeason", frId: fr.id, seasonId: se.id, uniId: fr.universeId, seasonTab: "cenas" }); }),
       el("div", { style: "margin-right:auto" }),
-      el("button", { class: "btn", type: "button", text: "Concluir", onclick: function () { save(); wbGo({ view: "franchise", frId: fr.id, uniId: fr.universeId }); } })
+      el("button", { class: "btn", type: "button", text: "Concluir", onclick: function () { save(); wbGo({ view: "franchiseSeason", frId: fr.id, seasonId: se.id, uniId: fr.universeId, seasonTab: "cenas" }); } })
     ]));
     v.appendChild(form);
     return v;
@@ -4396,7 +4597,7 @@
 
     host.appendChild(sideLabel("universos"));
     worlds().forEach(function (fl) {
-      var here = w.uniId === fl.id && (w.view === "universe" || w.view === "entry" || w.view === "franchise" || w.view === "campaign" || w.view === "scene" || w.view === "compare");
+      var here = w.uniId === fl.id && (w.view === "universe" || w.view === "entry" || w.view === "franchise" || w.view === "franchiseSeason" || w.view === "campaign" || w.view === "campaignSeason" || w.view === "scene" || w.view === "compare");
       var ents = wbEntriesOf(fl.id);
       host.appendChild(el("button", { class: "side-uni" + (here ? " on" : ""), type: "button", onclick: function () {
         closeSide();
@@ -4466,7 +4667,7 @@
     var host = document.getElementById("view");
     var w = wbState();
     document.body.classList.toggle("at-home", w.view === "home");
-    var vk = (ui.env || "tree") + "|" + w.view + "|" + (w.entryId || "") + "|" + (w.uniId || "") + "|" + (w.uniTab || "") + "|" + (w.frId || "") + "|" + (w.sceneId || "") + "|" + (w.campId || "") + "|" + (w.campTab || "");
+    var vk = (ui.env || "tree") + "|" + w.view + "|" + (w.entryId || "") + "|" + (w.uniId || "") + "|" + (w.uniTab || "") + "|" + (w.frId || "") + "|" + (w.sceneId || "") + "|" + (w.campId || "") + "|" + (w.campTab || "") + "|" + (w.seasonId || "") + "|" + (w.seasonTab || "");
     var changed = vk !== _lastViewKey;
     _lastViewKey = vk;
     // Tree home is self-contained + animates on mount. Don't rebuild it on incidental
