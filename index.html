@@ -2148,7 +2148,7 @@
         if (!byTitle[name]) list.push({ e: e, msg: "menção órfã: [[" + name + "]]" });
       });
       if (!e.summary) list.push({ e: e, msg: "sem resumo" });
-      if (e.type === "Personagem" && !(e.franchiseIds || []).length && wbFranchisesOf(e.universeId).length) list.push({ e: e, msg: "personagem sem franquia" });
+      if (e.type === "Personagem" && !(e.franchiseIds || []).length && !wbCampaignsWith(e.id).length && (wbFranchisesOf(e.universeId).length || wbCampaignsOf(e.universeId).length)) list.push({ e: e, msg: "personagem sem obra" });
       if (!(e.links || []).length && !e.parentId) list.push({ e: e, msg: "sem nenhuma ligação" });
     });
     return list;
@@ -2931,13 +2931,21 @@
 
   function wbUniverseFranchises(v, uniId, f) {
     var frs = wbFranchisesOf(uniId);
+    var cps = wbCampaignsOf(uniId);
     var card = el("div", { class: "card" });
-    card.appendChild(sectionLabel("Obras / franquias"));
+    card.appendChild(sectionLabel("Obras"));
     var form = el("form", { class: "inline", onsubmit: function (e) {
       e.preventDefault();
       var name = form.querySelector("[name=name]").value.trim();
       if (!name) return;
-      C().franchises.push({ id: uid(), universeId: uniId, name: name, kind: form.querySelector("[name=kind]").value, synopsis: "", status: "Em andamento", writing: { wordGoal: 0, wordCount: 0, sessions: [] }, scenes: [] });
+      var kind = form.querySelector("[name=kind]").value;
+      if (kind === "Campanha de RPG") {
+        var cp = { id: uid(), universeId: uniId, name: name, system: "", synopsis: "", notes: "", status: "planejando", roster: [], pinned: [], sessions: [] };
+        C().campaigns.push(cp); save();
+        wbGo({ view: "campaign", campId: cp.id, uniId: uniId, campTab: "visao", justEntered: true });
+        return;
+      }
+      C().franchises.push({ id: uid(), universeId: uniId, name: name, kind: kind, synopsis: "", status: "Em andamento", writing: { wordGoal: 0, wordCount: 0, sessions: [] }, scenes: [] });
       save(); render();
     } });
     form.appendChild(el("input", { class: "field grow", name: "name", placeholder: "Nome da obra…" }));
@@ -2946,7 +2954,7 @@
     form.appendChild(ks);
     form.appendChild(el("button", { class: "btn sm", type: "submit", text: "Criar" }));
     card.appendChild(form);
-    if (!frs.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma obra neste universo ainda. Personagens e locais são do universo; a obra agrupa uma história." }));
+    if (!frs.length && !cps.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma obra neste universo ainda. Personagens e locais são do universo; a obra agrupa uma história (romance, série, campanha de RPG…)." }));
     frs.forEach(function (fr) {
       card.appendChild(el("div", { class: "row" }, [
         el("div", { class: "row-body" }, [
@@ -2954,6 +2962,16 @@
           el("div", { class: "row-meta", text: fr.kind + (fr.writing.wordCount ? " · " + fr.writing.wordCount.toLocaleString("pt-BR") + " palavras" : "") + (fr.scenes.length ? " · " + fr.scenes.length + " cenas" : "") })
         ]),
         el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "franchise", frId: fr.id, uniId: uniId }); } })
+      ]));
+    });
+    cps.forEach(function (cp) {
+      var cs = campStatusInfo(cp.status);
+      card.appendChild(el("div", { class: "row" }, [
+        el("div", { class: "row-body" }, [
+          el("div", { class: "row-title", text: cp.name || "(campanha)" }),
+          el("div", { class: "row-meta", text: "Campanha de RPG · " + cs.glyph + " " + cs.label + (cp.system ? " · " + cp.system : "") + " · " + (cp.roster || []).length + " no elenco" })
+        ]),
+        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "campaign", campId: cp.id, uniId: uniId, justEntered: true }); } })
       ]));
     });
     v.appendChild(card);
@@ -2982,13 +3000,14 @@
     var words = entries.reduce(function (a, e) { return a + (e.body || "").split(/\s+/).filter(Boolean).length; }, 0);
     var links = entries.reduce(function (a, e) { return a + (e.links || []).length; }, 0);
     var frs = wbFranchisesOf(uniId);
+    var cps = wbCampaignsOf(uniId);
     var scenes = frs.reduce(function (a, fr) { return a + fr.scenes.length; }, 0);
     var frWords = frs.reduce(function (a, fr) { return a + (fr.writing.wordCount || 0); }, 0);
     v.appendChild(el("div", { class: "tiles" }, [
       tile("Entradas", String(entries.length), Object.keys(byType).length + " tipos"),
       tile("Palavras de lore", words.toLocaleString("pt-BR"), "nas descrições"),
       tile("Ligações", String(links), "conexões"),
-      tile("Obras / cenas", frs.length + " / " + scenes, frWords ? frWords.toLocaleString("pt-BR") + " palavras" : "")
+      tile("Obras", String(frs.length + cps.length), scenes || frWords ? scenes + " cenas · " + frWords.toLocaleString("pt-BR") + " palavras" : (cps.length ? cps.length + " campanhas" : ""))
     ]));
     var card = el("div", { class: "card" });
     card.appendChild(sectionLabel("Por tipo"));
@@ -3521,39 +3540,35 @@
     if (e.events.length) evFoot.appendChild(el("button", { class: "link", type: "button", text: "ver linha do tempo de " + f.name + " →", onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: "tempo" }); } }));
     if (evFoot.childNodes.length) card.appendChild(evFoot);
 
-    // franchises
+    // obras (franquias + campanhas — campanha é um tipo de obra)
     var frs = wbFranchisesOf(e.universeId);
-    if (frs.length && (!ro || (e.franchiseIds || []).length)) {
-      card.appendChild(cat("Aparece nas obras"));
-      var fw = el("div", { class: "lens-bar" });
-      frs.forEach(function (fr) {
-        var on = (e.franchiseIds || []).indexOf(fr.id) !== -1;
-        if (ro && !on) return;
-        fw.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": on ? "true" : "false", onclick: ro ? function () { wbGo({ view: "franchise", frId: fr.id, uniId: e.universeId }); } : function () {
-          var i = e.franchiseIds.indexOf(fr.id);
-          if (i === -1) e.franchiseIds.push(fr.id); else e.franchiseIds.splice(i, 1);
-          touch(true);
-        } }, [el("span", { text: fr.name })]));
-      });
-      card.appendChild(fw);
-    }
-
-    // campanhas
     var uCamps = wbCampaignsOf(e.universeId);
     var inCamps = wbCampaignsWith(e.id);
-    if (uCamps.length && (!ro || inCamps.length)) {
-      card.appendChild(cat("Nas campanhas"));
-      var cw = el("div", { class: "lens-bar" });
-      uCamps.forEach(function (cp) {
-        var on = inCamps.indexOf(cp) !== -1;
-        if (ro && !on) return;
-        cw.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": on ? "true" : "false", onclick: ro ? function () { wbGo({ view: "campaign", campId: cp.id, uniId: e.universeId }); } : function () {
-          if (on) { cp.roster = cp.roster.filter(function (x) { return x !== e.id; }); cp.pinned = cp.pinned.filter(function (x) { return x !== e.id; }); }
-          else cp.roster.push(e.id);
-          touch(true);
-        } }, [el("span", { text: campStatusInfo(cp.status).glyph + " " + (cp.name || "campanha") })]));
-      });
-      card.appendChild(cw);
+    if (frs.length || uCamps.length) {
+      var inAnyObra = (e.franchiseIds || []).length || inCamps.length;
+      if (!ro || inAnyObra) {
+        card.appendChild(cat("Aparece nas obras"));
+        var ow = el("div", { class: "lens-bar" });
+        frs.forEach(function (fr) {
+          var on = (e.franchiseIds || []).indexOf(fr.id) !== -1;
+          if (ro && !on) return;
+          ow.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": on ? "true" : "false", onclick: ro ? function () { wbGo({ view: "franchise", frId: fr.id, uniId: e.universeId }); } : function () {
+            var i = e.franchiseIds.indexOf(fr.id);
+            if (i === -1) e.franchiseIds.push(fr.id); else e.franchiseIds.splice(i, 1);
+            touch(true);
+          } }, [el("span", { text: fr.name })]));
+        });
+        uCamps.forEach(function (cp) {
+          var on = inCamps.indexOf(cp) !== -1;
+          if (ro && !on) return;
+          ow.appendChild(el("button", { class: "chip", type: "button", "aria-pressed": on ? "true" : "false", onclick: ro ? function () { wbGo({ view: "campaign", campId: cp.id, uniId: e.universeId }); } : function () {
+            if (on) { cp.roster = cp.roster.filter(function (x) { return x !== e.id; }); cp.pinned = (cp.pinned || []).filter(function (x) { return x !== e.id; }); }
+            else cp.roster.push(e.id);
+            touch(true);
+          } }, [el("span", { text: "🎲 " + campStatusInfo(cp.status).glyph + " " + (cp.name || "campanha") })]));
+        });
+        card.appendChild(ow);
+      }
     }
 
     // contém
@@ -3789,6 +3804,16 @@
       delBtn(function () { cp[key] = (cp[key] || []).filter(function (x) { return x !== en.id; }); touch(true); })
     ]);
   }
+  function wbCastRow(en, fr, touch) {
+    return el("div", { class: "row wb-rel" }, [
+      el("div", { class: "row-body" }, [
+        el("div", { class: "row-title", style: "font-size:14px", text: (typeIcon(en.type) ? typeIcon(en.type) + " " : "") + (en.title || "(sem título)") }),
+        el("div", { class: "row-meta", text: (en.summary || en.type || "").replace(/\n/g, " ").slice(0, 90) })
+      ]),
+      el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(en); } }),
+      delBtn(function () { en.franchiseIds = (en.franchiseIds || []).filter(function (x) { return x !== fr.id; }); touch(true); })
+    ]);
+  }
   function wbUniverseCampaigns(v, uniId, f) {
     v.appendChild(el("button", { class: "btn", type: "button", text: "＋ nova campanha", style: "margin-bottom:12px", onclick: function () {
       var nm = window.prompt("Nome da campanha:");
@@ -3931,6 +3956,25 @@
     sy.addEventListener("change", function () { fr.synopsis = sy.value; save(); });
     sc.appendChild(sy);
     v.appendChild(sc);
+
+    // Elenco — entradas que participam desta obra (uma entrada pode estar em várias obras)
+    function frTouch(re) { save(); if (re) render(); }
+    var pc = el("div", { class: "card" });
+    pc.appendChild(sectionLabel("Elenco"));
+    var cast = C().entries.filter(function (en) { return en.universeId === fr.universeId && (en.franchiseIds || []).indexOf(fr.id) !== -1; });
+    if (!cast.length) pc.appendChild(el("div", { class: "empty", text: "Nenhuma entrada nesta obra ainda." }));
+    var byType = {};
+    cast.forEach(function (en) { (byType[en.type] = byType[en.type] || []).push(en); });
+    Object.keys(byType).sort().forEach(function (tp) {
+      pc.appendChild(el("div", { class: "cathead", text: typeTag(tp) + " · " + byType[tp].length }));
+      byType[tp].forEach(function (en) { pc.appendChild(wbCastRow(en, fr, frTouch)); });
+    });
+    pc.appendChild(wbEntryAdder(fr.universeId, function (en) {
+      en.franchiseIds = en.franchiseIds || [];
+      if (en.franchiseIds.indexOf(fr.id) === -1) en.franchiseIds.push(fr.id);
+      frTouch(true);
+    }, "ligar entrada existente"));
+    v.appendChild(pc);
 
     // Cenas / outline
     var cc = el("div", { class: "card" });
