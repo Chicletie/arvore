@@ -2591,7 +2591,18 @@
     }
     v.appendChild(card);
     var sugCard = el("div", { class: "card" });
-    sugCard.appendChild(sectionLabel("Sugestões dos jogadores"));
+    sugCard.appendChild(sectionLabel("Sugestões dos jogadores", "🧹 limpar resolvidas", function () {
+      if (!fbFs) return;
+      if (!window.confirm("Excluir todas as sugestões já aceitas/rejeitadas? Isso não afeta as pendentes.")) return;
+      fbFs.collection("wikiSuggestions").where("status", "in", ["aceita", "rejeitada"]).get().then(function (snap) {
+        if (snap.empty) return Promise.resolve();
+        var batch = fbFs.batch();
+        snap.docs.forEach(function (d) { batch.delete(d.ref); });
+        return batch.commit();
+      }).then(function () {
+        sugList.querySelectorAll('.row[data-resolved="1"]').forEach(function (r) { r.remove(); });
+      }).catch(function () { window.alert("Não consegui limpar agora — tenta de novo em instantes."); });
+    }));
     var sugList = el("div", {}, [el("div", { class: "empty", text: "carregando…" })]);
     sugCard.appendChild(sugList);
     v.appendChild(sugCard);
@@ -2602,7 +2613,8 @@
         snap.docs.forEach(function (doc) {
           var s = doc.data();
           var target = wbFindPublishedByWikiId(s.wikiId);
-          var row = el("div", { class: "row", style: s.status && s.status !== "pendente" ? "opacity:.55" : "" });
+          var resolved = !!(s.status && s.status !== "pendente");
+          var row = el("div", { class: "row", style: resolved ? "opacity:.55" : "", "data-resolved": resolved ? "1" : "0" });
           row.appendChild(el("div", { class: "row-body" }, [
             el("div", { class: "row-title", text: (s.pageTitle || "?") + (s.tab && s.tab !== "Geral" ? " · " + s.tab : "") }),
             el("div", { class: "row-meta", text: (s.authorEmail || "?") + (s.createdAt ? " · " + s.createdAt.slice(0, 10) : "") + (s.status && s.status !== "pendente" ? " · " + s.status : "") }),
@@ -2617,24 +2629,35 @@
               }
             }));
           }
-          if (!s.status || s.status === "pendente") {
-            row.appendChild(el("button", {
-              class: "btn ghost sm act", type: "button", text: "aceitar", onclick: function () {
-                doc.ref.update({ status: "aceita" }).then(function () { row.style.opacity = ".55"; row.querySelectorAll("button.act").forEach(function (b) { b.remove(); }); });
-              }
-            }));
-            row.appendChild(el("button", {
-              class: "btn ghost sm act", type: "button", text: "rejeitar", onclick: function () {
-                doc.ref.update({ status: "rejeitada" }).then(function () { row.style.opacity = ".55"; row.querySelectorAll("button.act").forEach(function (b) { b.remove(); }); });
-              }
-            }));
-          } else {
+          function addDeleteBtn() {
             row.appendChild(el("button", {
               class: "btn ghost sm", type: "button", text: "excluir", onclick: function () {
                 if (!window.confirm("Excluir esta sugestão?")) return;
                 doc.ref.delete().then(function () { row.remove(); });
               }
             }));
+          }
+          if (!s.status || s.status === "pendente") {
+            row.appendChild(el("button", {
+              class: "btn ghost sm act", type: "button", text: "aceitar", onclick: function () {
+                doc.ref.update({ status: "aceita" }).then(function () {
+                  row.style.opacity = ".55"; row.setAttribute("data-resolved", "1");
+                  row.querySelectorAll("button.act").forEach(function (b) { b.remove(); });
+                  addDeleteBtn();
+                });
+              }
+            }));
+            row.appendChild(el("button", {
+              class: "btn ghost sm act", type: "button", text: "rejeitar", onclick: function () {
+                doc.ref.update({ status: "rejeitada" }).then(function () {
+                  row.style.opacity = ".55"; row.setAttribute("data-resolved", "1");
+                  row.querySelectorAll("button.act").forEach(function (b) { b.remove(); });
+                  addDeleteBtn();
+                });
+              }
+            }));
+          } else {
+            addDeleteBtn();
           }
           sugList.appendChild(row);
         });

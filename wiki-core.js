@@ -590,19 +590,33 @@
     }
 
     // Novidades — as páginas mais recentemente publicadas/atualizadas primeiro, pra quem não
-    // fica checando toda hora ter como ver rápido o que mudou desde a última visita.
-    var recent = entries.slice().sort(function (a, b) { return (b.updatedAt || "").localeCompare(a.updatedAt || ""); }).slice(0, 8);
-    if (recent.length) {
-      wrap.appendChild(el("div", { class: "home-unihead", text: "🕓 Novidades" }));
+    // fica checando toda hora ter como ver rápido o que mudou desde a última visita. Some
+    // enquanto uma busca está ativa (não faz sentido mostrar "o que mudou" no meio de um
+    // resultado de busca) e pagina de 8 em 8 em vez de cortar o resto fora sem aviso.
+    var NEWS_PAGE = 8;
+    var newsShown = NEWS_PAGE;
+    var newsSection = el("div");
+    wrap.appendChild(newsSection);
+    var recentAll = entries.slice().sort(function (a, b) { return (b.updatedAt || "").localeCompare(a.updatedAt || ""); });
+    function paintNews() {
+      newsSection.textContent = "";
+      if (!recentAll.length) return;
+      newsSection.appendChild(el("div", { class: "home-unihead", text: "🕓 Novidades" }));
       var newsGrid = el("div", { class: "links-grid" });
-      recent.forEach(function (e) {
+      recentAll.slice(0, newsShown).forEach(function (e) {
         newsGrid.appendChild(el("a", { class: "link-card", href: wikiHref(e.id) }, [
           el("span", { class: "link-card-label", text: (e.updatedAt || "") + (e.type ? " · " + e.type : "") }),
           el("span", { class: "link-card-title", text: e.title || "(sem título)" })
         ]));
       });
-      wrap.appendChild(newsGrid);
+      newsSection.appendChild(newsGrid);
+      if (recentAll.length > newsShown) {
+        var moreBtn = el("button", { class: "home-random", type: "button", style: "margin-top:10px", text: "ver mais novidades" });
+        moreBtn.addEventListener("click", function () { newsShown += NEWS_PAGE; paintNews(); });
+        newsSection.appendChild(moreBtn);
+      }
     }
+    paintNews();
 
     var randomBtn = el("button", { class: "home-random", type: "button", text: "🎲 página aleatória" });
     randomBtn.addEventListener("click", function () {
@@ -627,6 +641,7 @@
     function renderList(filterText) {
       listWrap.textContent = "";
       var q = (filterText || "").toLowerCase().trim();
+      newsSection.hidden = !!q;
       var filtered = entries.filter(function (e) {
         return !q || (e.title + " " + e.type + " " + e.universe + " " + (e.tags || []).join(" ") + " " + (e.search || "")).toLowerCase().indexOf(q) !== -1;
       });
