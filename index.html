@@ -697,13 +697,13 @@
   .wb-graph:active { cursor: grabbing; }
   .wb-edge { stroke: color-mix(in srgb, var(--ink) 42%, transparent); stroke-width: 1.2; }
   .wb-edge.weak { stroke-dasharray: 2 4; stroke-opacity: 0.45; }
-  .wb-edge-label { fill: var(--faint); font-family: var(--font-mono); font-size: 9px; text-anchor: middle; }
+  .wb-edge-label { fill: var(--faint); font-family: var(--font-mono); font-size: 9px; text-anchor: middle; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
   .wb-node { cursor: pointer; }
   .wb-node circle { stroke: var(--surface); stroke-width: 2; transition: filter 0.15s; }
   :root[data-theme="dark"] .wb-node circle, :root:not([data-theme="light"]) .wb-node circle { filter: drop-shadow(0 0 4px currentColor); }
   .wb-node:hover circle { filter: brightness(1.15); }
   .wb-node:focus-visible circle { stroke: var(--gold); }
-  .wb-node-label { text-anchor: middle; font-family: var(--font-wb); font-size: 11px; font-weight: 600; fill: var(--ink); pointer-events: none; }
+  .wb-node-label { text-anchor: middle; font-family: var(--font-wb); font-size: 11px; font-weight: 600; fill: var(--ink); pointer-events: none; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
   .wb-node--hub .wb-node-label { font-size: 13px; }
   .wb-node--hub circle { stroke: var(--faint); stroke-width: 1.5; }
   .wb-node--portal circle:first-child { stroke-dasharray: 3 2; }
@@ -3246,6 +3246,28 @@
       other.links = other.links || []; other.links.push({ to: child.id, label: label, auto: true });
     });
   }
+  // Same idea for grandparents: whoever is a parent of your parent is your avô/avó, and it works
+  // both ways — a new parent link can turn that parent's OWN parents into grandparents of the
+  // child, and can also turn that parent into a grandparent of the child's existing kids.
+  function wbLinkPair(a, b, label, inv) {
+    if (!(a.links || []).some(function (l) { return l.to === b.id && (l.label === label || l.label === inv); })) {
+      a.links = a.links || []; a.links.push({ to: b.id, label: label, auto: true });
+      b.links = b.links || []; b.links.push({ to: a.id, label: inv, auto: true });
+    }
+  }
+  function wbInferGrandparents(childId) {
+    var child = wbEntry(childId);
+    if (!child) return;
+    function parentsOf(en) { return (en.links || []).filter(function (l) { return l.label === "é filho(a) de"; }).map(function (l) { return wbEntry(l.to); }).filter(Boolean); }
+    function childrenOf(en) { return C().entries.filter(function (x) { return x.universeId === en.universeId && (x.links || []).some(function (l) { return l.label === "é filho(a) de" && l.to === en.id; }); }); }
+    var parents = parentsOf(child);
+    parents.forEach(function (p) {
+      parentsOf(p).forEach(function (gp) { if (gp.id !== child.id) wbLinkPair(child, gp, "neto(a) de", "avô/avó de"); });
+    });
+    childrenOf(child).forEach(function (kid) {
+      parents.forEach(function (p) { if (p.id !== kid.id) wbLinkPair(kid, p, "neto(a) de", "avô/avó de"); });
+    });
+  }
   function wbAppearsIn(e) {
     var out = [];
     wbFranchisesOf(e.universeId).forEach(function (fr) {
@@ -3753,8 +3775,8 @@
         e.links.push({ to: to, label: label });
         var inv = linkInverseOf(label), tgt = wbEntry(to);
         if (inv && tgt && !(tgt.links || []).some(function (l) { return l.to === e.id && l.label === inv; })) { tgt.links = tgt.links || []; tgt.links.push({ to: e.id, label: inv }); }
-        if (label === "é filho(a) de") wbInferSiblings(e.id);
-        else if (label === "é pai/mãe de") wbInferSiblings(to);
+        if (label === "é filho(a) de") { wbInferSiblings(e.id); wbInferGrandparents(e.id); }
+        else if (label === "é pai/mãe de") { wbInferSiblings(to); wbInferGrandparents(to); }
         touch(true);
       } });
       var toSel = el("select", { class: "field grow", name: "to" });
@@ -4596,7 +4618,7 @@
     }
     function tick() {
       raf = null;
-      var krep = 4800, kspring = 0.05, klen = 92, kcen = 0.008, damp = 0.85, maxv = 16;
+      var krep = 6400, kspring = 0.05, klen = 112, kcen = 0.008, damp = 0.85, maxv = 16;
       var i, j, a, b, dx, dy, d2, d, ux, uy, fv;
       for (i = 0; i < nodes.length; i++) {
         a = nodes[i];
