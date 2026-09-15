@@ -1528,7 +1528,12 @@
           if (typeof sx.recap !== "string") sx.recap = "";
           if (typeof sx.notes !== "string") sx.notes = "";
           if (!Array.isArray(sx.present)) sx.present = [];
+          if (WB_VIS.indexOf(sx.vis) === -1) sx.vis = "publico";
+          if (!Array.isArray(sx.allow)) sx.allow = [];
         });
+        if (typeof se.wikiId !== "string") se.wikiId = null;
+        if (se.wikiId === undefined) se.wikiId = null;
+        if (typeof se.wikiPublishedAt !== "string") se.wikiPublishedAt = "";
       });
     });
   }
@@ -2548,8 +2553,10 @@
     var card = el("div", { class: "card" });
     card.appendChild(sectionLabel("Painel de publicação"));
     var published = C().entries.filter(function (e) { return e.wikiId; });
-    if (!published.length) {
-      card.appendChild(el("div", { class: "empty", text: "Nenhuma entrada publicada ainda." }));
+    var publishedSeasons = [];
+    C().campaigns.forEach(function (cp) { (cp.seasons || []).forEach(function (se) { if (se.wikiId) publishedSeasons.push({ cp: cp, se: se }); }); });
+    if (!published.length && !publishedSeasons.length) {
+      card.appendChild(el("div", { class: "empty", text: "Nada publicado ainda." }));
       v.appendChild(card);
       return v;
     }
@@ -2567,6 +2574,21 @@
         el("button", { class: "btn ghost sm", type: "button", text: stale ? "republicar" : "atualizar", onclick: function () { wbPublishWiki(e, touch); } })
       ]));
     });
+    if (publishedSeasons.length) {
+      card.appendChild(el("div", { class: "cathead", text: "Temporadas (recaps)" }));
+      publishedSeasons.forEach(function (pair) {
+        var cp = pair.cp, se = pair.se;
+        card.appendChild(el("div", { class: "row" }, [
+          el("div", { class: "row-body" }, [
+            el("div", { class: "row-title", text: (cp.name || "Campanha") + " — " + (se.name || "Temporada") }),
+            el("div", { class: "row-meta", text: flowerById(cp.universeId).name + " · publicado em " + se.wikiPublishedAt })
+          ]),
+          el("a", { class: "btn ghost sm", href: wbWikiUrl(se.wikiId), target: "_blank", rel: "noopener", text: "ver" }),
+          el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "campaignSeason", campId: cp.id, seasonId: se.id, uniId: cp.universeId, seasonTab: "sessoes" }); } }),
+          el("button", { class: "btn ghost sm", type: "button", text: "atualizar", onclick: function () { wbPublishSeason(cp, se, touch); } })
+        ]));
+      });
+    }
     v.appendChild(card);
     return v;
   }
@@ -4231,6 +4253,83 @@
     }
     return row;
   }
+  // Recaps de sessão publicáveis: mesma coleção wikiPublic, mesmo mecanismo de slug/índice/
+  // subcoleção restrita de tudo mais — só que o snapshot é de uma TEMPORADA de campanha (uma
+  // lista de sessões), não de uma entrada. wiki-core.js reconhece pelo campo "kind".
+  function wbBuildSeasonSnapshot(cp, se) {
+    var f = flowerById(cp.universeId);
+    var sessions = (se.sessions || []).filter(function (sx) { return wbWikiVisible(sx.vis || "publico"); })
+      .slice().sort(function (a, b) { return (a.date || "").localeCompare(b.date || ""); })
+      .map(function (sx) { return { title: sx.title || "", date: sx.date || "", recap: sx.recap || "", vis: sx.vis || "publico" }; });
+    return {
+      kind: "temporada",
+      title: (cp.name || "Campanha") + " — " + (se.name || "Temporada"),
+      campaignName: cp.name || "",
+      seasonName: se.name || "",
+      universe: f ? f.name : "",
+      sessions: sessions,
+      publishedAt: todayKey()
+    };
+  }
+  function wbSeasonRestritoItems(se) {
+    var items = [];
+    (se.sessions || []).forEach(function (sx) {
+      if (sx.vis === "restrito") items.push({ id: "sessao-" + sx.id, kind: "sessao", title: sx.title || "", date: sx.date || "", recap: sx.recap || "", permitidos: sx.allow || [] });
+    });
+    return items;
+  }
+  function wbUniqueSeasonSlug(cp, se) {
+    var base = wbSlugify((cp.name || "campanha") + "-" + (se.name || "temporada")), slug = base, n = 2;
+    function taken(s) {
+      return C().campaigns.some(function (c) { return (c.seasons || []).some(function (x) { return x.id !== se.id && x.wikiId === s; }); });
+    }
+    while (taken(slug)) { slug = base + "-" + n; n++; }
+    return slug;
+  }
+  function wbPublishSeason(cp, se, touch) {
+    if (!fbFs) { window.alert("Sem conexão com a nuvem agora — tente de novo em instantes."); return; }
+    if (!fbUser) { window.alert("Entre na sua conta pra publicar (menu ⋯ › sincronização)."); return; }
+    var id = se.wikiId || wbUniqueSeasonSlug(cp, se);
+    fbFs.collection("wikiPublic").doc(id).set(wbBuildSeasonSnapshot(cp, se)).then(function () {
+      var idxUpdate = {}; idxUpdate["entries." + id] = { title: (cp.name || "Campanha") + " — " + (se.name || "Temporada"), type: "Temporada", universe: flowerById(cp.universeId) ? flowerById(cp.universeId).name : "", universeId: cp.universeId, franchiseIds: [], tags: [], updatedAt: todayKey() };
+      return fbFs.collection("wikiPublic").doc("_index").set({ entries: {} }, { merge: true }).then(function () {
+        return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate);
+      });
+    }).then(function () {
+      return wbSyncRestrito(id, wbSeasonRestritoItems(se));
+    }).then(function () {
+      se.wikiId = id; se.wikiPublishedAt = todayKey(); touch(true);
+    }).catch(function (err) {
+      window.alert("Não consegui publicar: " + (err && err.message ? err.message : err));
+    });
+  }
+  function wbUnpublishSeason(se, touch) {
+    if (!se.wikiId || !fbFs) return;
+    if (!window.confirm("Despublicar essa temporada? O link para de funcionar.")) return;
+    var id = se.wikiId;
+    var idxUpdate = {}; idxUpdate["entries." + id] = firebase.firestore.FieldValue.delete();
+    fbFs.collection("wikiPublic").doc(id).delete().then(function () {
+      return wbSyncRestrito(id, []);
+    }).then(function () {
+      return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate).catch(function () {});
+    }).then(function () {
+      se.wikiId = null; se.wikiPublishedAt = ""; touch(true);
+    }).catch(function (err) { window.alert("Não consegui despublicar: " + (err && err.message ? err.message : err)); });
+  }
+  function wbWikiSeasonPublishRow(cp, se, touch) {
+    var row = el("div", { class: "hint", style: "margin:6px 0 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" });
+    if (!se.wikiId) {
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "🔗 publicar recaps desta temporada", onclick: function () { wbPublishSeason(cp, se, touch); } }));
+    } else {
+      var url = wbWikiUrl(se.wikiId);
+      row.appendChild(el("span", { text: "recaps publicados" + (se.wikiPublishedAt ? " em " + se.wikiPublishedAt : "") + ":" }));
+      row.appendChild(el("code", { style: "font-size:11px;word-break:break-all", text: url }));
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "copiar link", onclick: function () { if (navigator.clipboard) navigator.clipboard.writeText(url); } }));
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "atualizar", onclick: function () { wbPublishSeason(cp, se, touch); } }));
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "despublicar", onclick: function () { wbUnpublishSeason(se, touch); } }));
+    }
+    return row;
+  }
   // Renders one variant's own summary/body/campos/seções — reuses the exact same field/section
   // renderers as the base entry (they only ever touch .fields/.fieldMeta/.sections/.universeId
   // on whatever object they're given, so a variant works as a drop-in "entry-shaped" argument).
@@ -5024,22 +5123,25 @@
       card.appendChild(wbEntryAdder(cp.universeId, function (en) { if (se.roster.indexOf(en.id) === -1) { se.roster.push(en.id); touch(true); } }, "ligar entrada existente"));
       card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ criar entrada nova nesta temporada", style: "margin-top:10px", onclick: function () { wbNewEntry(cp.universeId, null, null, null, cp.id, se.id); } }));
     } else if (tab === "sessoes") {
+      card.appendChild(wbWikiSeasonPublishRow(cp, se, touch));
       card.appendChild(el("button", { class: "btn", type: "button", text: "＋ nova sessão", onclick: function () {
-        se.sessions.push({ id: uid(), date: todayKey(), title: "", recap: "", notes: "", present: [] });
+        se.sessions.push({ id: uid(), date: todayKey(), title: "", recap: "", notes: "", present: [], vis: "publico", allow: [] });
         touch(true);
       } }));
       var sess = se.sessions.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
       if (!sess.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma sessão registrada." }));
       sess.forEach(function (sx) {
         var n = se.sessions.indexOf(sx) + 1;
-        var box = el("div", { class: "wb-sec" });
+        var box = el("div", { class: "wb-sec" + (wbVisBgClass(sx.vis, "wb-sec") ? " " + wbVisBgClass(sx.vis, "wb-sec") : "") });
         var head = el("div", { class: "wb-sec-head" });
         head.appendChild(el("span", { class: "wb-lfield-lab", text: "sessão " + n }));
         var di = el("input", { class: "field", type: "date", value: sx.date || "", style: "width:auto;padding:4px 8px" });
         di.addEventListener("change", function () { sx.date = di.value; touch(false); });
         head.appendChild(di);
+        head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Wiki: " + visInfo(sx.vis).label + " (toque p/ mudar)", text: visInfo(sx.vis).glyph, onclick: function () { sx.vis = nextVis(sx.vis); touch(true); } }));
         head.appendChild(delBtn(function () { if (window.confirm("Excluir a sessão " + n + "?")) { se.sessions = se.sessions.filter(function (x) { return x.id !== sx.id; }); touch(true); } }));
         box.appendChild(head);
+        if (sx.vis === "restrito") box.appendChild(wbAllowEditor(sx.allow, touch));
         box.appendChild(editable({ tag: "div", className: "wb-ev-label", value: sx.title, placeholder: "título da sessão…", commit: function (nv) { sx.title = nv.trim(); touch(false); } }));
         box.appendChild(el("div", { class: "wb-lfield-lab", style: "margin-top:10px", text: "o que rolou" }));
         box.appendChild(mdBox(function () { return sx.recap; }, function (val) { sx.recap = val; touch(false); }, cp.universeId, { placeholder: "Resumo da sessão…", minHeight: "20vh", dropcap: false }));

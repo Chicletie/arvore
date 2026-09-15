@@ -221,6 +221,9 @@
             slot.appendChild(fig);
           } else if (it.kind === "capa") {
             slot.appendChild(el("img", { class: "cover", style: "max-width:250px;display:block;margin-bottom:10px", src: it.url, alt: "" }));
+          } else if (it.kind === "sessao") {
+            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: (it.title || "Sessão") + (it.date ? " · " + it.date : "") }));
+            slot.appendChild(renderMarkdown(it.recap));
           }
         });
       }).catch(function () { /* not signed in as anyone with access to this item — nothing to show */ });
@@ -420,6 +423,35 @@
     page.appendChild(el("div", { class: "foot", text: "página isolada, gerada a partir de uma entrada do tree" + (data.publishedAt ? " · " + data.publishedAt : "") }));
   }
 
+  // Recaps de sessão de uma temporada de campanha — mesma casca (topbar, login, restrito), mas
+  // o conteúdo é uma lista de sessões em vez de campos/seções de uma entrada.
+  function renderSeason(data, wikiId) {
+    var page = document.getElementById("page");
+    page.textContent = "";
+    document.title = data.title || "wiki";
+    mountLoginBar(page);
+    var topbar = el("div", { class: "topbar" }, [el("a", { href: ROOT + "wiki.html", text: "🌿 Herbário do Multiverso" })]);
+    if (data.universe) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
+    page.appendChild(topbar);
+    var card = el("div", { class: "card" });
+    card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: "TEMPORADA · " + (data.universe || "") })]));
+    card.appendChild(el("h1", { text: data.title || "(sem título)" }));
+
+    var sessions = data.sessions || [];
+    if (!sessions.length) {
+      card.appendChild(el("div", { class: "empty", text: "Nenhum recap público ainda." }));
+    } else {
+      sessions.forEach(function (sx, i) {
+        card.appendChild(el("div", { class: "cathead", id: "s" + i, text: (sx.title || "Sessão " + (i + 1)) + (sx.date ? " · " + sx.date : "") + (sx.vis === "spoiler" ? " 🙈" : "") }));
+        if (sx.vis === "spoiler") card.appendChild(spoilerCover(function () { return renderMarkdown(sx.recap); }));
+        else card.appendChild(renderMarkdown(sx.recap));
+      });
+    }
+    mountRestrito(card, wikiId);
+    page.appendChild(card);
+    page.appendChild(el("div", { class: "foot", text: "página isolada, gerada a partir de uma temporada do tree" + (data.publishedAt ? " · " + data.publishedAt : "") }));
+  }
+
   function renderHome(indexData) {
     var page = document.getElementById("page");
     page.textContent = "";
@@ -497,7 +529,9 @@
     } else {
       fs.collection("wikiPublic").doc(slug).get().then(function (snap) {
         if (!snap.exists) { showMessage("Essa página não existe mais (o link pode ter sido despublicado)."); return; }
-        renderEntry(snap.data(), slug);
+        var data = snap.data();
+        if (data.kind === "temporada") renderSeason(data, slug);
+        else renderEntry(data, slug);
       }).catch(function () { showMessage("Não consegui carregar essa página agora. Tente de novo mais tarde."); });
     }
   }
