@@ -24,6 +24,8 @@
 
 <style>
   :root { color-scheme: light dark; }
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
   *, *::before, *::after { box-sizing: border-box; }
   img { max-width: 100%; }
   [hidden] { display: none !important; }
@@ -387,9 +389,17 @@
   .field.grow { flex: 1; min-width: 140px; }
   textarea.field { width: 100%; resize: vertical; min-height: 74px; line-height: 1.6; font-family: var(--font-wb); font-size: 16px; }
   select.field {
-    appearance: none; padding-right: 28px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%2398876a' stroke-width='1.6'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+    appearance: none; padding-right: 28px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%236a5940' stroke-width='1.6'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
     background-repeat: no-repeat; background-position: right 11px center;
+  }
+  :root[data-theme="dark"] select.field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%23ac9e80' stroke-width='1.6'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) select.field {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%23ac9e80' stroke-width='1.6'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+    }
   }
   label.flab { font-size: 11.5px; color: var(--muted); font-weight: 600; display: block; margin: 0 0 5px 2px; text-transform: uppercase; letter-spacing: 0.06em; }
   .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -809,6 +819,13 @@
   .wb-ac-item.on { background: var(--accent-wash); }
   .wb-ac-item .wb-ac-meta { font-size: 11px; color: var(--faint); margin-left: auto; }
   .wb-ac-item .wb-ac-new { color: var(--gold-ink); font-style: italic; }
+  .wb-ac-group { padding: 7px 11px 2px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); }
+
+  /* ---- searchable combobox (replaces <select> for long entry lists) ---- */
+  .wb-combo { position: relative; min-width: 0; }
+  .wb-combo.grow { flex: 1; min-width: 140px; }
+  .wb-combo-input { width: 100%; cursor: text; }
+  .wb-combo .wb-ac { right: 0; }
 
   /* ---- infobox / typed fields ---- */
   .wb-cover { width: 100%; max-height: 340px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); box-shadow: var(--shadow); margin-bottom: 12px; display: block; }
@@ -1173,21 +1190,56 @@
     { label: "meio-irmão/meia-irmã de", inverse: "meio-irmão/meia-irmã de", style: "family" },
     { label: "avô/avó de", inverse: "neto(a) de", style: "family" },
     { label: "neto(a) de", inverse: "avô/avó de", style: "family" },
+    { label: "tio/tia de", inverse: "sobrinho(a) de", style: "family" },
+    { label: "sobrinho(a) de", inverse: "tio/tia de", style: "family" },
+    { label: "primo(a) de", inverse: "primo(a) de", style: "family" },
+    { label: "padrinho/madrinha de", inverse: "afilhado(a) de", style: "family" },
+    { label: "afilhado(a) de", inverse: "padrinho/madrinha de", style: "family" },
+    { label: "padrasto/madrasta de", inverse: "enteado(a) de", style: "family" },
+    { label: "enteado(a) de", inverse: "padrasto/madrasta de", style: "family" },
+    { label: "sogro/sogra de", inverse: "genro/nora de", style: "family" },
+    { label: "genro/nora de", inverse: "sogro/sogra de", style: "family" },
+    { label: "cunhado(a) de", inverse: "cunhado(a) de", style: "family" },
     { label: "casado(a) com", inverse: "casado(a) com", style: "family" },
+    { label: "namorado(a) de", inverse: "namorado(a) de", style: "romance" },
+    { label: "noivo(a) de", inverse: "noivo(a) de", style: "romance" },
+    { label: "ex de", inverse: "ex de", style: "romance" },
+    { label: "amante de", inverse: "amante de", style: "romance" },
+    { label: "amigo(a) de", inverse: "amigo(a) de", style: "friend" },
+    { label: "confidente de", inverse: "confidente de", style: "friend" },
     { label: "serve a", inverse: "é servido(a) por", style: "neutral" },
     { label: "mentor de", inverse: "aprendiz de", style: "neutral" },
     { label: "criou", inverse: "criado(a) por", style: "neutral" },
+    { label: "chefe de", inverse: "subordinado(a) de", style: "bond" },
+    { label: "empregador(a) de", inverse: "empregado(a) de", style: "bond" },
+    { label: "sócio(a) de", inverse: "sócio(a) de", style: "bond" },
+    { label: "é dono(a) de", inverse: "é propriedade de", style: "bond" },
+    { label: "tutor(a) de", inverse: "animal de estimação de", style: "bond" },
     { label: "faz parte de", inverse: "tem como membro", style: "faction" },
     { label: "lidera", inverse: "é liderado(a) por", style: "faction" },
     { label: "pertence a", inverse: "contém", style: "neutral" },
     { label: "fica em", inverse: "abriga", style: "neutral" },
+    { label: "nasceu em", inverse: "é terra natal de", style: "location" },
+    { label: "vive em", inverse: "é lar de", style: "location" },
+    { label: "morreu em", inverse: "é local da morte de", style: "location" },
+    { label: "governa", inverse: "é governado(a) por", style: "location" },
+    { label: "cultua", inverse: "é cultuado(a) por", style: "narrative" },
+    { label: "inspirado(a) em", inverse: "inspira", style: "narrative" },
+    { label: "guarda", inverse: "é guardado(a) por", style: "narrative" },
+    { label: "amaldiçoa", inverse: "é amaldiçoado(a) por", style: "narrative" },
+    { label: "profetiza", inverse: "é profetizado(a) por", style: "narrative" },
     { label: "manifesta-se como", inverse: "manifestação de", style: "multiversal" }
   ];
   var EDGE_STYLE = {
     ally: { color: "#3f9d5f", dash: "" },
     rival: { color: "#d05a45", dash: "" },
     family: { color: "#b58a2e", dash: "" },
+    romance: { color: "#c9527a", dash: "" },
+    friend: { color: "#8a9d3f", dash: "" },
+    bond: { color: "#a67c3d", dash: "" },
     faction: { color: "#3f7d94", dash: "" },
+    location: { color: "#4a8f7d", dash: "" },
+    narrative: { color: "#7d6a9d", dash: "4 3" },
     multiversal: { color: "#8f5cc9", dash: "6 4" },
     neutral: { color: "var(--border-strong)", dash: "" }
   };
@@ -1529,6 +1581,66 @@
     return wrap;
   }
   function delBtn(fn) { return el("button", { class: "icon-btn", type: "button", "aria-label": "Remover", html: I_TRASH, onclick: fn }); }
+  // Searchable combobox — swaps a giant <select> of entries for a type-ahead text field.
+  // opts: { items:[{id,label,meta,group}], value, placeholder, emptyLabel, allowEmpty, wrapClass, onChange(id) }
+  function wbCombo(opts) {
+    opts = opts || {};
+    var wrap = el("div", { class: "wb-combo" + (opts.wrapClass ? " " + opts.wrapClass : "") });
+    var input = el("input", { class: "field wb-combo-input", type: "text", autocomplete: "off", placeholder: opts.placeholder || "buscar…" });
+    var box = null, cur = opts.value || "", activeIdx = -1, rows = [];
+    function items() { return opts.items || []; }
+    function labelFor(id) { var it = items().filter(function (x) { return x.id === id; })[0]; return it ? it.label : ""; }
+    input.value = cur ? labelFor(cur) : "";
+    function close() { if (box) { box.parentNode && box.parentNode.removeChild(box); box = null; } rows = []; activeIdx = -1; }
+    function pick(id) {
+      cur = id || "";
+      input.value = cur ? labelFor(cur) : "";
+      close();
+      if (opts.onChange) opts.onChange(cur);
+    }
+    function setActive(i) {
+      rows.forEach(function (r) { r.classList.remove("on"); });
+      activeIdx = i;
+      if (rows[i]) { rows[i].classList.add("on"); rows[i].scrollIntoView({ block: "nearest" }); }
+    }
+    function draw(q) {
+      close();
+      var ql = (q || "").trim().toLowerCase();
+      var pool = items().filter(function (it) { return !ql || it.label.toLowerCase().indexOf(ql) !== -1; });
+      box = el("div", { class: "wb-ac" });
+      if (opts.allowEmpty !== false) {
+        var row0 = el("div", { class: "wb-ac-item", "data-id": "" }, [el("span", { text: opts.emptyLabel || "— nenhum(a) —" })]);
+        row0.addEventListener("mousedown", function (ev) { ev.preventDefault(); pick(""); });
+        box.appendChild(row0); rows.push(row0);
+      }
+      var lastGroup = null, shown = pool.slice(0, 80);
+      if (!shown.length) box.appendChild(el("div", { class: "wb-ac-item", style: "color:var(--faint);cursor:default", text: "nada encontrado" }));
+      shown.forEach(function (it) {
+        if (it.group && it.group !== lastGroup) { box.appendChild(el("div", { class: "wb-ac-group", text: it.group })); lastGroup = it.group; }
+        var row = el("div", { class: "wb-ac-item", "data-id": it.id }, [
+          el("span", { text: it.label }),
+          it.meta ? el("span", { class: "wb-ac-meta", text: it.meta }) : null
+        ]);
+        row.addEventListener("mousedown", function (ev) { ev.preventDefault(); pick(it.id); });
+        box.appendChild(row); rows.push(row);
+      });
+      wrap.appendChild(box);
+    }
+    input.addEventListener("focus", function () { draw(""); });
+    input.addEventListener("input", function () { draw(input.value); });
+    input.addEventListener("blur", function () { setTimeout(function () { close(); input.value = cur ? labelFor(cur) : ""; }, 140); });
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") { close(); input.blur(); return; }
+      if (!box) { if (ev.key === "ArrowDown" || ev.key === "Enter") draw(input.value); return; }
+      if (ev.key === "ArrowDown") { ev.preventDefault(); setActive(Math.min(rows.length - 1, activeIdx + 1)); }
+      else if (ev.key === "ArrowUp") { ev.preventDefault(); setActive(Math.max(0, activeIdx - 1)); }
+      else if (ev.key === "Enter") { ev.preventDefault(); if (activeIdx >= 0 && rows[activeIdx]) pick(rows[activeIdx].getAttribute("data-id")); }
+    });
+    wrap.appendChild(input);
+    Object.defineProperty(wrap, "value", { get: function () { return cur; }, set: function (v) { cur = v || ""; input.value = cur ? labelFor(cur) : ""; } });
+    wrap.refreshItems = function (list) { opts.items = list; if (cur && !labelFor(cur)) { cur = ""; input.value = ""; } };
+    return wrap;
+  }
   var SVGNS = "http://www.w3.org/2000/svg";
   function svgEl(name, attrs) {
     var e = document.createElementNS(SVGNS, name);
@@ -2653,7 +2765,7 @@
       e.type = g("type").value;
       e.status = "rascunho";
       e.summary = g("summary").value.trim();
-      e.parentId = g("parent").value || null;
+      e.parentId = parCombo.value || null;
       if (x != null) e.x = x;
       if (y != null) e.y = y;
       if (g("tmpl") && g("tmpl").checked) (C().templates[e.type] || []).forEach(function (k) { if (!(k in e.fields)) { e.fields[k] = ""; e.fieldMeta[k] = { type: guessFieldType(k), opts: [], secret: false }; } });
@@ -2669,11 +2781,9 @@
     C().types.forEach(function (t) { typeSel.appendChild(el("option", { value: t, text: typeTag(t), selected: t === (type || C().types[0]) ? "selected" : null })); });
     var uniSel = el("select", { class: "field", name: "universe", style: "width:100%" });
     worlds().forEach(function (fl) { uniSel.appendChild(el("option", { value: fl.id, text: fl.name, selected: fl.id === uniId ? "selected" : null })); });
-    var parSel = el("select", { class: "field", name: "parent", style: "width:100%" });
+    var parCombo = wbCombo({ items: [], placeholder: "buscar entrada…", emptyLabel: "— (raiz do universo) —" });
     function fillParents() {
-      parSel.textContent = "";
-      parSel.appendChild(el("option", { value: "", text: "— (raiz do universo)" }));
-      wbEntriesOf(uniSel.value).forEach(function (x2) { parSel.appendChild(el("option", { value: x2.id, text: x2.title || "(sem título)" })); });
+      parCombo.refreshItems(wbEntriesOf(uniSel.value).map(function (x2) { return { id: x2.id, label: x2.title || "(sem título)" }; }));
     }
     fillParents();
     uniSel.addEventListener("change", fillParents);
@@ -2683,7 +2793,7 @@
       el("div", { class: "full" }, [el("label", { class: "flab", text: "Título" }), el("input", { class: "field", name: "title", style: "width:100%", autofocus: "autofocus", placeholder: "pode deixar em branco e nomear depois" })]),
       el("div", {}, [el("label", { class: "flab", text: "Tipo" }), typeSel]),
       el("div", {}, [el("label", { class: "flab", text: "Universo" }), uniSel]),
-      el("div", { class: "full" }, [el("label", { class: "flab", text: "Dentro de (opcional)" }), parSel]),
+      el("div", { class: "full" }, [el("label", { class: "flab", text: "Dentro de (opcional)" }), parCombo]),
       el("div", { class: "full" }, [el("label", { class: "flab", text: "Resumo (opcional)" }), el("input", { class: "field", name: "summary", style: "width:100%" })])
     ]));
     form.appendChild(el("label", { class: "hint", style: "display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer" }, [tmplChk, el("span", { text: "já criar os campos do modelo deste tipo" })]));
@@ -3134,14 +3244,14 @@
       var g = function (n) { return form.querySelector("[name=" + n + "]").value; };
       var txt = g("text").trim();
       if (!txt) return;
-      C().quotes.unshift({ id: uid(), universeId: uniId, text: txt, speakerId: g("speaker") || "", contextId: g("context") || "", note: g("note").trim() });
-      form.reset(); save(); render();
+      C().quotes.unshift({ id: uid(), universeId: uniId, text: txt, speakerId: spCombo.value || "", contextId: cxCombo.value || "", note: g("note").trim() });
+      form.reset(); spCombo.value = ""; cxCombo.value = ""; save(); render();
     } });
     form.appendChild(el("textarea", { class: "field", name: "text", placeholder: "\"A fala, a descrição, o trecho…\"", style: "min-height:70px;width:100%" }));
-    var sp = el("select", { class: "field", name: "speaker" }); sp.appendChild(el("option", { value: "", text: "quem diz / de quem é… (opcional)" }));
-    var cx = el("select", { class: "field", name: "context" }); cx.appendChild(el("option", { value: "", text: "onde / contexto… (opcional)" }));
-    opts.forEach(function (e) { sp.appendChild(el("option", { value: e.id, text: e.title })); cx.appendChild(el("option", { value: e.id, text: e.title })); });
-    form.appendChild(el("div", { class: "inline", style: "margin-top:8px" }, [sp, cx]));
+    var comboItems = opts.map(function (e) { return { id: e.id, label: e.title || "(sem título)" }; });
+    var spCombo = wbCombo({ items: comboItems, placeholder: "quem diz / de quem é… (opcional)", wrapClass: "grow" });
+    var cxCombo = wbCombo({ items: comboItems, placeholder: "onde / contexto… (opcional)", wrapClass: "grow" });
+    form.appendChild(el("div", { class: "inline", style: "margin-top:8px" }, [spCombo, cxCombo]));
     form.appendChild(el("input", { class: "field", name: "note", placeholder: "nota", style: "width:100%;margin-top:8px" }));
     form.appendChild(el("button", { class: "btn sm", type: "submit", text: "Guardar", style: "margin-top:8px" }));
     card.appendChild(form);
@@ -3404,18 +3514,15 @@
       dd.appendChild(el("div", { class: "wb-fld-progress" }, [track, editable({ tag: "span", value: String(n), placeholder: "0", display: function (x) { return (x || "0") + "%"; }, commit: function (nv) { var m = Math.max(0, Math.min(100, parseInt(nv, 10) || 0)); e.fields[k] = String(m); touch(true); } })]));
     } else if (fm.type === "ligacao") {
       var tgt = wbEntry(val);
-      var lsel = el("select", { class: "field", style: "padding:4px 8px;max-width:100%" });
-      lsel.appendChild(el("option", { value: "", text: "— ligar —" }));
+      var linkItems = [];
       worlds().forEach(function (fl) {
-        var grp = C().entries.filter(function (x) { return x.universeId === fl.id && x.id !== e.id; });
-        if (!grp.length) return;
-        var og = el("optgroup", { label: fl.name });
-        grp.forEach(function (x) { og.appendChild(el("option", { value: x.id, text: x.title || "(sem título)", selected: x.id === val ? "selected" : null })); });
-        lsel.appendChild(og);
+        C().entries.filter(function (x) { return x.universeId === fl.id && x.id !== e.id; }).forEach(function (x) {
+          linkItems.push({ id: x.id, label: x.title || "(sem título)", group: fl.name });
+        });
       });
-      lsel.addEventListener("change", function () { e.fields[k] = lsel.value; touch(true); });
+      var lcombo = wbCombo({ items: linkItems, value: val, placeholder: "buscar entrada…", emptyLabel: "— ligar —", onChange: function (id) { e.fields[k] = id; touch(true); } });
       if (tgt) dd.appendChild(el("span", { class: "wl", text: tgt.title || "(sem título)", style: "margin-right:8px", onclick: function () { wbOpen(tgt); } }));
-      dd.appendChild(lsel);
+      dd.appendChild(lcombo);
     } else if (fm.type === "data") {
       dd.appendChild(editable({ tag: "span", value: val, placeholder: "ano ou ano-mês-dia", display: function (x) { return x ? wbFmtWorldDate(x, e.universeId) : null; }, commit: function (nv) { e.fields[k] = nv.trim(); touch(true); } }));
     } else if (fm.type === "numero") {
@@ -3769,7 +3876,7 @@
     if (others.length && !ro) {
       var lf = el("form", { class: "inline", style: "margin-top:8px", onsubmit: function (ev) {
         ev.preventDefault();
-        var to = lf.querySelector("[name=to]").value;
+        var to = toCombo.value;
         var label = lf.querySelector("[name=label]").value.trim();
         if (!to) return;
         e.links.push({ to: to, label: label });
@@ -3779,18 +3886,14 @@
         else if (label === "é pai/mãe de") { wbInferSiblings(to); wbInferGrandparents(to); }
         touch(true);
       } });
-      var toSel = el("select", { class: "field grow", name: "to" });
-      toSel.appendChild(el("option", { value: "", text: "ligar a…" }));
+      var toItems = [];
       worlds().forEach(function (fl) {
-        var grp = others.filter(function (x) { return x.universeId === fl.id; });
-        if (!grp.length) return;
-        var og = el("optgroup", { label: fl.name });
-        grp.forEach(function (x) { og.appendChild(el("option", { value: x.id, text: x.title || "(sem título)" })); });
-        toSel.appendChild(og);
+        others.filter(function (x) { return x.universeId === fl.id; }).forEach(function (x) { toItems.push({ id: x.id, label: x.title || "(sem título)", group: fl.name }); });
       });
+      var toCombo = wbCombo({ items: toItems, placeholder: "ligar a…", emptyLabel: "ligar a…", wrapClass: "grow" });
       var dlst = el("datalist", { id: "wblabels" });
       LINK_TYPES.forEach(function (l) { dlst.appendChild(el("option", { value: l.label })); });
-      lf.appendChild(toSel); lf.appendChild(dlst);
+      lf.appendChild(toCombo); lf.appendChild(dlst);
       lf.appendChild(el("input", { class: "field", name: "label", list: "wblabels", placeholder: "relação", style: "width:150px" }));
       lf.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "+ ligar" }));
       card.appendChild(lf);
@@ -3859,13 +3962,14 @@
     var uniSel = el("select", { class: "field", style: "width:100%" });
     worlds().forEach(function (fl) { uniSel.appendChild(el("option", { value: fl.id, text: fl.name, selected: fl.id === e.universeId ? "selected" : null })); });
     uniSel.addEventListener("change", function () { e.universeId = uniSel.value; touch(true); });
-    var parSel = el("select", { class: "field", style: "width:100%" });
-    parSel.appendChild(el("option", { value: "", text: "— (raiz do universo)" }));
-    wbEntriesOf(e.universeId).filter(function (x) { return x.id !== e.id; }).forEach(function (x) { parSel.appendChild(el("option", { value: x.id, text: x.title || "(sem título)", selected: x.id === e.parentId ? "selected" : null })); });
-    parSel.addEventListener("change", function () { e.parentId = parSel.value || null; touch(true); });
+    var parCombo = wbCombo({
+      items: wbEntriesOf(e.universeId).filter(function (x) { return x.id !== e.id; }).map(function (x) { return { id: x.id, label: x.title || "(sem título)" }; }),
+      value: e.parentId || "", placeholder: "buscar entrada…", emptyLabel: "— (raiz do universo) —",
+      onChange: function (id) { e.parentId = id || null; touch(true); }
+    });
     det.appendChild(el("div", { class: "field-grid" }, [
       el("div", {}, [el("label", { class: "flab", text: "Universo" }), uniSel]),
-      el("div", {}, [el("label", { class: "flab", text: "Dentro de" }), parSel])
+      el("div", {}, [el("label", { class: "flab", text: "Dentro de" }), parCombo])
     ]));
     det.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Excluir entrada", style: "color:var(--neg);border-color:var(--neg);margin-top:12px", onclick: function () {
       if (!window.confirm("Excluir esta entrada?")) return;
@@ -3941,15 +4045,13 @@
   /* ---- Campaigns (mesas de RPG situadas num universo) ---- */
   function wbEntryAdder(uniId, onPick, label) {
     var f = el("form", { class: "inline", style: "margin-top:8px", onsubmit: function (ev) {
-      ev.preventDefault(); var id = sel.value; if (!id) return;
-      var en = wbEntry(id); if (en) onPick(en); sel.value = "";
+      ev.preventDefault(); var id = combo.value; if (!id) return;
+      var en = wbEntry(id); if (en) onPick(en); combo.value = "";
     } });
-    var sel = el("select", { class: "field grow" });
-    sel.appendChild(el("option", { value: "", text: label || "ligar entrada…" }));
-    wbEntriesOf(uniId).slice().sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); }).forEach(function (en) {
-      sel.appendChild(el("option", { value: en.id, text: (en.title || "(sem título)") + " · " + en.type }));
-    });
-    f.appendChild(sel);
+    var items = wbEntriesOf(uniId).slice().sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); })
+      .map(function (en) { return { id: en.id, label: (en.title || "(sem título)") + " · " + en.type }; });
+    var combo = wbCombo({ items: items, placeholder: label || "ligar entrada…", emptyLabel: label || "ligar entrada…", wrapClass: "grow" });
+    f.appendChild(combo);
     f.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "＋" }));
     return f;
   }
