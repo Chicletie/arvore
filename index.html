@@ -3977,6 +3977,59 @@
     });
     return out;
   }
+  // "Ver como wiki" — the owner's own reading view, same visual style as the published pages
+  // but reusing wiki-core.js/wiki-style.css directly against LIVE local data instead of a
+  // Firestore round-trip. No filtering by vis at all: mestre-tier content included, spoilers
+  // shown unfolded, restrito shown regardless of allow-list — it's for nobody's eyes but the
+  // owner's, already looking at it from inside their own logged-in app. Rendered inside an
+  // <iframe> (not injected into the page directly) specifically so wiki-style.css's classes
+  // (.card, .tag, .eyebrow…) can never collide with index.html's own same-named classes.
+  function wbBuildFullSnapshot(e) {
+    var f = flowerById(e.universeId);
+    var fields = Object.keys(e.fields || {}).map(function (k) {
+      var fm = wbFieldMeta(e, k);
+      return { key: k, type: fm.type, value: e.fields[k] || "", vis: "publico", opts: fm.opts || [] };
+    });
+    var sections = (e.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
+    var gallery = (e.gallery || []).filter(function (g) { return g.url; }).map(function (g) { return { group: g.group || "", url: g.url, caption: g.caption || "", vis: "publico" }; });
+    var links = (e.links || []).map(function (lk) {
+      var t = wbEntry(lk.to);
+      return t ? { label: lk.label || "", targetId: t.wikiId || null, targetTitle: wbDisplayName(t, lk.dispAs) } : null;
+    }).filter(Boolean);
+    return {
+      title: e.title || "(sem título)",
+      type: e.type || "",
+      universe: f ? f.name : "",
+      aliases: (e.aliases || []).map(function (a) { return { text: a, vis: "publico" }; }),
+      tags: (e.tags || []).map(function (t) { return { text: t, vis: "publico" }; }),
+      summary: e.summary || "",
+      body: e.body || "",
+      cover: e.cover || "",
+      coverVis: "publico",
+      fields: fields,
+      sections: sections,
+      gallery: gallery,
+      links: links,
+      backlinks: [],
+      publishedAt: "prévia local (só você vê) — " + todayKey()
+    };
+  }
+  function wbShowAsWiki(e) {
+    var root = document.getElementById("modalRoot");
+    var wrap = el("div", { class: "modal-wrap", style: "padding:0", onclick: function (ev) { if (ev.target === wrap) root.innerHTML = ""; } });
+    var closeBtn = el("button", { class: "btn ghost sm", type: "button", text: "✕ fechar", style: "position:fixed;top:12px;right:12px;z-index:5", onclick: function () { root.innerHTML = ""; } });
+    var iframe = el("iframe", { style: "border:0;width:100%;height:100%;position:fixed;inset:0;background:#e8dcbf" });
+    wrap.appendChild(iframe); wrap.appendChild(closeBtn);
+    root.appendChild(wrap);
+    var data = wbBuildFullSnapshot(e);
+    var html = "<!doctype html><html><head><meta charset=\"utf-8\"><base href=\"./\">" +
+      "<link rel=\"stylesheet\" href=\"wiki-style.css\">" +
+      "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>" +
+      "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&display=swap\">" +
+      "</head><body><div class=\"page\" id=\"page\"></div><script src=\"wiki-core.js\"><\/script>" +
+      "<script>wikiCoreRenderStatic(" + JSON.stringify(data) + ");<\/script></body></html>";
+    iframe.srcdoc = html;
+  }
   // Everything marked "restrito" goes here instead — each becomes its OWN Firestore document
   // (wikiRestrito/<wikiId>/itens/<itemId>) with its own "permitidos" (allowed emails), because
   // Firestore security rules can only grant or deny a whole document, never one field inside a
@@ -4084,6 +4137,7 @@
   }
   function wbWikiPublishRow(e, touch) {
     var row = el("div", { class: "hint", style: "margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" });
+    row.appendChild(el("button", { class: "btn ghost sm", type: "button", title: "Prévia bonita com tudo, inclusive infos de mestre — só você vê, nada é publicado", text: "🌿 ver como wiki", onclick: function () { wbShowAsWiki(e); } }));
     if (e.secret) {
       row.appendChild(el("span", { text: "Secreta — não publicável como wiki." }));
       if (e.wikiId) row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "despublicar link antigo", onclick: function () { wbUnpublishWiki(e, touch); } }));

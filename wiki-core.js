@@ -357,28 +357,23 @@
     }
 
     // ligações — só aparece pra quem também está publicado; o resto fica de fora de propósito
-    // (a wiki é um grafo só do que é público, nunca uma menção morta a algo nunca publicado)
+    // (a wiki é um grafo só do que é público, nunca uma menção morta a algo nunca publicado).
+    // targetId ausente (ex: na prévia local de mestre) vira um cartão sem link, não um link morto.
+    function linkCard(lk) {
+      var kids = [el("span", { class: "link-card-label", text: lk.label || "ligação" }), el("span", { class: "link-card-title", text: lk.targetTitle })];
+      return lk.targetId ? el("a", { class: "link-card", href: wikiHref(lk.targetId) }, kids) : el("div", { class: "link-card", style: "cursor:default", "aria-disabled": "true" }, kids);
+    }
     if (hasLinks) {
       var lwrap = el("div", { class: "links-wrap" });
       lwrap.appendChild(el("div", { class: "cathead", id: "ligacoes", text: "Ligações" }));
       var lrow = el("div", { class: "links-grid" });
-      (data.links || []).forEach(function (lk) {
-        lrow.appendChild(el("a", { class: "link-card", href: wikiHref(lk.targetId) }, [
-          el("span", { class: "link-card-label", text: lk.label || "ligação" }),
-          el("span", { class: "link-card-title", text: lk.targetTitle })
-        ]));
-      });
+      (data.links || []).forEach(function (lk) { lrow.appendChild(linkCard(lk)); });
       card.appendChild(lwrap);
       lwrap.appendChild(lrow);
       if (data.backlinks && data.backlinks.length) {
         lwrap.appendChild(el("div", { class: "links-subhead", text: "Mencionado em" }));
         var browrap = el("div", { class: "links-grid" });
-        data.backlinks.forEach(function (lk) {
-          browrap.appendChild(el("a", { class: "link-card", href: wikiHref(lk.targetId) }, [
-            el("span", { class: "link-card-label", text: lk.label || "ligação" }),
-            el("span", { class: "link-card-title", text: lk.targetTitle })
-          ]));
-        });
+        data.backlinks.forEach(function (lk) { browrap.appendChild(linkCard(lk)); });
         lwrap.appendChild(browrap);
       }
     }
@@ -479,5 +474,11 @@
     }
   }
 
+  // Used by index.html's "ver como wiki" preview (an iframe with no Firebase scripts loaded at
+  // all — mountLoginBar/mountRestrito both no-op harmlessly since `firebase` is undefined there):
+  // renders already-complete local data with zero network fetch, for the owner's own reading.
+  function wikiCoreRenderStatic(data) { renderEntry(data, null); }
+
   window.wikiCoreBoot = wikiCoreBoot;
+  window.wikiCoreRenderStatic = wikiCoreRenderStatic;
 })();
