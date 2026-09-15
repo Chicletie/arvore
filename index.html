@@ -2590,7 +2590,71 @@
       });
     }
     v.appendChild(card);
+    var sugCard = el("div", { class: "card" });
+    sugCard.appendChild(sectionLabel("Sugestões dos jogadores"));
+    var sugList = el("div", {}, [el("div", { class: "empty", text: "carregando…" })]);
+    sugCard.appendChild(sugList);
+    v.appendChild(sugCard);
+    if (fbFs) {
+      fbFs.collection("wikiSuggestions").orderBy("createdAt", "desc").get().then(function (snap) {
+        sugList.textContent = "";
+        if (snap.empty) { sugList.appendChild(el("div", { class: "empty", text: "Nenhuma sugestão ainda." })); return; }
+        snap.docs.forEach(function (doc) {
+          var s = doc.data();
+          var target = wbFindPublishedByWikiId(s.wikiId);
+          var row = el("div", { class: "row", style: s.status && s.status !== "pendente" ? "opacity:.55" : "" });
+          row.appendChild(el("div", { class: "row-body" }, [
+            el("div", { class: "row-title", text: (s.pageTitle || "?") + (s.tab && s.tab !== "Geral" ? " · " + s.tab : "") }),
+            el("div", { class: "row-meta", text: (s.authorEmail || "?") + (s.createdAt ? " · " + s.createdAt.slice(0, 10) : "") + (s.status && s.status !== "pendente" ? " · " + s.status : "") }),
+            el("div", { style: "margin-top:4px;white-space:pre-wrap", text: s.text || "" })
+          ]));
+          if (s.wikiId) row.appendChild(el("a", { class: "btn ghost sm", href: wbWikiUrl(s.wikiId), target: "_blank", rel: "noopener", text: "ver" }));
+          if (target) {
+            row.appendChild(el("button", {
+              class: "btn ghost sm", type: "button", text: "abrir", onclick: function () {
+                if (target.kind === "entry") wbOpen(target.entry);
+                else wbGo({ view: "campaignSeason", campId: target.cp.id, seasonId: target.se.id, uniId: target.cp.universeId, seasonTab: "sessoes" });
+              }
+            }));
+          }
+          if (!s.status || s.status === "pendente") {
+            row.appendChild(el("button", {
+              class: "btn ghost sm act", type: "button", text: "aceitar", onclick: function () {
+                doc.ref.update({ status: "aceita" }).then(function () { row.style.opacity = ".55"; row.querySelectorAll("button.act").forEach(function (b) { b.remove(); }); });
+              }
+            }));
+            row.appendChild(el("button", {
+              class: "btn ghost sm act", type: "button", text: "rejeitar", onclick: function () {
+                doc.ref.update({ status: "rejeitada" }).then(function () { row.style.opacity = ".55"; row.querySelectorAll("button.act").forEach(function (b) { b.remove(); }); });
+              }
+            }));
+          } else {
+            row.appendChild(el("button", {
+              class: "btn ghost sm", type: "button", text: "excluir", onclick: function () {
+                if (!window.confirm("Excluir esta sugestão?")) return;
+                doc.ref.delete().then(function () { row.remove(); });
+              }
+            }));
+          }
+          sugList.appendChild(row);
+        });
+      }).catch(function () {
+        sugList.textContent = "";
+        sugList.appendChild(el("div", { class: "empty", text: "Não consegui carregar as sugestões agora." }));
+      });
+    } else {
+      sugList.textContent = "";
+      sugList.appendChild(el("div", { class: "empty", text: "Sem conexão com a nuvem agora." }));
+    }
     return v;
+  }
+  function wbFindPublishedByWikiId(wikiId) {
+    if (!wikiId) return null;
+    var e = C().entries.filter(function (x) { return x.wikiId === wikiId; })[0];
+    if (e) return { kind: "entry", entry: e };
+    var found = null;
+    C().campaigns.forEach(function (cp) { (cp.seasons || []).forEach(function (se) { if (se.wikiId === wikiId) found = { kind: "season", cp: cp, se: se }; }); });
+    return found;
   }
 
   /* ---- Consistency check ---- */

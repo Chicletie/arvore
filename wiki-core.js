@@ -140,23 +140,82 @@
   function mountLoginBar(host) {
     if (typeof firebase === "undefined" || !firebase.auth) return;
     var bar = el("div", { class: "login-bar" });
+    // The auth UI lives in its own slot, separate from `bar` itself — mountSuggestBox appends a
+    // sibling button straight into `bar`, and paint() used to `bar.textContent = ""` on every
+    // auth change, silently deleting that sibling the first time a reader logged in or out.
+    var authSlot = el("span");
+    bar.appendChild(authSlot);
     function paint() {
-      bar.textContent = "";
+      authSlot.textContent = "";
       var u = firebase.auth().currentUser;
       if (u) {
-        bar.appendChild(el("span", { text: "logado como " + u.email + " · " }));
+        authSlot.appendChild(el("span", { text: "logado como " + u.email + " · " }));
         var out = el("button", { class: "linklike", type: "button", text: "sair" });
         out.addEventListener("click", function () { firebase.auth().signOut(); });
-        bar.appendChild(out);
+        authSlot.appendChild(out);
       } else {
         var inBtn = el("button", { class: "linklike", type: "button", text: "entrar (pra ver conteúdo restrito)" });
         inBtn.addEventListener("click", openLoginModal);
-        bar.appendChild(inBtn);
+        authSlot.appendChild(inBtn);
       }
     }
     paint();
     firebase.auth().onAuthStateChanged(paint);
     host.appendChild(bar);
+    return bar;
+  }
+  // A small "💡 sugerir alteração" trigger appended into the SAME bar mountLoginBar returns, so
+  // it inherits the bar's existing button styling for free and sits right next to entrar/sair.
+  // Only shown to a signed-in reader (the wikiSuggestions Firestore rule requires auth anyway).
+  // Records which page + which tab (Geral or a work variant) the reader was looking at
+  // automatically — no extra field for them to fill in beyond the suggestion text itself.
+  function mountSuggestBox(bar, wikiId, pageTitle, getTab) {
+    if (typeof firebase === "undefined" || !firebase.auth || !bar) return;
+    var btn = el("button", { class: "linklike", type: "button", style: "margin-left:10px", text: "💡 sugerir alteração" });
+    btn.hidden = true;
+    btn.addEventListener("click", function () { openSuggestModal(wikiId, pageTitle, getTab ? getTab() : ""); });
+    bar.appendChild(btn);
+    function paint() { btn.hidden = !firebase.auth().currentUser; }
+    paint();
+    firebase.auth().onAuthStateChanged(paint);
+  }
+  function openSuggestModal(wikiId, pageTitle, tab) {
+    var wrap = el("div", { class: "login-modal" });
+    var box = el("div", { class: "login-box" });
+    box.appendChild(el("h3", { text: "Sugerir alteração" }));
+    box.appendChild(el("div", { style: "font-size:12.5px;color:var(--faint);margin-bottom:8px", text: pageTitle + (tab && tab !== "Geral" ? " · " + tab : "") }));
+    var ta = el("textarea", { placeholder: "O que você acha que devia mudar ou ser adicionado?" });
+    var err = el("div", { class: "err" });
+    box.appendChild(ta); box.appendChild(err);
+    var submitBtn = el("button", { class: "submit", type: "button", text: "Enviar sugestão" });
+    function doSubmit() {
+      var text = ta.value.trim();
+      if (!text) { err.textContent = "Escreve alguma coisa antes de enviar."; return; }
+      err.textContent = ""; submitBtn.disabled = true; submitBtn.textContent = "enviando…";
+      firebase.firestore().collection("wikiSuggestions").add({
+        wikiId: wikiId, pageTitle: pageTitle || "", tab: tab || "", text: text,
+        authorEmail: firebase.auth().currentUser.email, status: "pendente", createdAt: new Date().toISOString()
+      }).then(function () {
+        box.textContent = "";
+        box.appendChild(el("h3", { text: "Enviado!" }));
+        box.appendChild(el("div", { text: "Obrigado — sua sugestão vai aparecer pro autor da wiki." }));
+        var close = el("button", { class: "submit", type: "button", style: "margin-top:10px", text: "Fechar" });
+        close.addEventListener("click", function () { wrap.remove(); });
+        box.appendChild(close);
+      }).catch(function () {
+        submitBtn.disabled = false; submitBtn.textContent = "Enviar sugestão";
+        err.textContent = "Não consegui enviar — tenta de novo em instantes.";
+      });
+    }
+    submitBtn.addEventListener("click", doSubmit);
+    box.appendChild(submitBtn);
+    var cancel = el("button", { class: "cancel", type: "button", text: "cancelar" });
+    cancel.addEventListener("click", function () { wrap.remove(); });
+    box.appendChild(cancel);
+    wrap.appendChild(box);
+    wrap.addEventListener("click", function (ev) { if (ev.target === wrap) wrap.remove(); });
+    document.body.appendChild(wrap);
+    ta.focus();
   }
   function openLoginModal() {
     var wrap = el("div", { class: "login-modal" });
@@ -236,11 +295,12 @@
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = data.title || "wiki";
-    mountLoginBar(page);
+    var loginBar = mountLoginBar(page);
     var topbar = el("div", { class: "topbar" }, [el("a", { href: ROOT + "wiki.html", text: "🌿 Herbário do Multiverso" })]);
     if (data.universe) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
     page.appendChild(topbar);
     var card = el("div", { class: "card" });
+    var currentTabLabel = "Geral";
 
     var eyebrowBits = [data.type, data.universe].filter(Boolean);
     if (eyebrowBits.length) card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: eyebrowBits.join(" · ") })]));
@@ -352,6 +412,7 @@
       function selectTab(idx) {
         tabsWrap.querySelectorAll(".work-tab").forEach(function (b, i) { b.classList.toggle("on", i === idx); });
         articles.forEach(function (a, i) { a.hidden = i !== idx; });
+        currentTabLabel = idx === 0 ? "Geral" : (data.variants[idx - 1].label || "Versão");
       }
       var geralTab = el("button", { type: "button", class: "work-tab on", text: "Geral" });
       geralTab.addEventListener("click", function () { selectTab(0); });
@@ -419,6 +480,7 @@
     }
 
     mountRestrito(card, wikiId);
+    mountSuggestBox(loginBar, wikiId, data.title, function () { return currentTabLabel; });
     page.appendChild(card);
     page.appendChild(el("div", { class: "foot", text: "página isolada, gerada a partir de uma entrada do tree" + (data.publishedAt ? " · " + data.publishedAt : "") }));
   }
@@ -429,7 +491,7 @@
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = data.title || "wiki";
-    mountLoginBar(page);
+    var loginBar = mountLoginBar(page);
     var topbar = el("div", { class: "topbar" }, [el("a", { href: ROOT + "wiki.html", text: "🌿 Herbário do Multiverso" })]);
     if (data.universe) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
     page.appendChild(topbar);
@@ -448,6 +510,7 @@
       });
     }
     mountRestrito(card, wikiId);
+    mountSuggestBox(loginBar, wikiId, data.title, function () { return ""; });
     page.appendChild(card);
     page.appendChild(el("div", { class: "foot", text: "página isolada, gerada a partir de uma temporada do tree" + (data.publishedAt ? " · " + data.publishedAt : "") }));
   }
