@@ -169,13 +169,53 @@
   // Only shown to a signed-in reader (the wikiSuggestions Firestore rule requires auth anyway).
   // Records which page + which tab (Geral or a work variant) the reader was looking at
   // automatically — no extra field for them to fill in beyond the suggestion text itself.
-  function mountSuggestBox(bar, wikiId, pageTitle, getTab) {
+  function mountSuggestBox(bar, wikiId, pageTitle, getTab, listHost) {
     if (typeof firebase === "undefined" || !firebase.auth || !bar) return;
     var btn = el("button", { class: "linklike", type: "button", style: "margin-left:10px", text: "💡 sugerir alteração" });
     btn.hidden = true;
     btn.addEventListener("click", function () { openSuggestModal(wikiId, pageTitle, getTab ? getTab() : ""); });
     bar.appendChild(btn);
-    function paint() { btn.hidden = !firebase.auth().currentUser; }
+    // "Minhas sugestões" — a signed-in reader can already read back their OWN suggestions per
+    // the Firestore rule (authorEmail == their token email); this just gives them a way to see
+    // it. Fetched fresh each time the panel is opened rather than kept live — a reader checking
+    // right after submitting will already see it since the write has landed by then.
+    var mineBtn = null, mineSlot = null, mineOpen = false;
+    if (listHost) {
+      mineBtn = el("button", { class: "linklike", type: "button", style: "margin-left:10px", text: "🗒 minhas sugestões" });
+      mineBtn.hidden = true;
+      bar.appendChild(mineBtn);
+      mineSlot = el("div", { class: "restrito-wrap" });
+      listHost.appendChild(mineSlot);
+      mineBtn.addEventListener("click", function () {
+        mineOpen = !mineOpen;
+        mineSlot.textContent = "";
+        if (!mineOpen) return;
+        mineSlot.appendChild(el("div", { class: "empty", text: "carregando…" }));
+        firebase.firestore().collection("wikiSuggestions")
+          .where("wikiId", "==", wikiId).where("authorEmail", "==", firebase.auth().currentUser.email)
+          .get().then(function (snap) {
+            mineSlot.textContent = "";
+            if (snap.empty) { mineSlot.appendChild(el("div", { class: "empty", text: "Você ainda não enviou nenhuma sugestão nesta página." })); return; }
+            mineSlot.appendChild(el("div", { class: "cathead", text: "🗒 Suas sugestões nesta página" }));
+            snap.docs.map(function (d) { return d.data(); })
+              .sort(function (a, b) { return (b.createdAt || "").localeCompare(a.createdAt || ""); })
+              .forEach(function (s) {
+                var statusLabel = s.status === "aceita" ? "✅ aceita" : s.status === "rejeitada" ? "❌ rejeitada" : "⏳ pendente";
+                var row = el("div", { style: "margin:8px 0;padding-bottom:8px;border-bottom:1px solid var(--border)" });
+                row.appendChild(el("div", { style: "font-size:11px;color:var(--faint)", text: (s.tab && s.tab !== "Geral" ? s.tab + " · " : "") + statusLabel }));
+                row.appendChild(el("div", { style: "white-space:pre-wrap", text: s.text || "" }));
+                mineSlot.appendChild(row);
+              });
+          }).catch(function () {
+            mineSlot.textContent = "";
+            mineSlot.appendChild(el("div", { class: "empty", text: "Não consegui carregar suas sugestões agora." }));
+          });
+      });
+    }
+    function paint() {
+      btn.hidden = !firebase.auth().currentUser;
+      if (mineBtn) mineBtn.hidden = !firebase.auth().currentUser;
+    }
     paint();
     firebase.auth().onAuthStateChanged(paint);
   }
@@ -238,6 +278,19 @@
     submitBtn.addEventListener("click", doSubmit);
     passInp.addEventListener("keydown", function (ev) { if (ev.key === "Enter") doSubmit(); });
     box.appendChild(submitBtn);
+    var forgot = el("button", { class: "cancel", type: "button", style: "margin-top:6px", text: "esqueci minha senha" });
+    forgot.addEventListener("click", function () {
+      var email = emailInp.value.trim();
+      if (!email) { err.textContent = "Digite seu email ali em cima primeiro."; return; }
+      err.textContent = ""; forgot.disabled = true; forgot.textContent = "enviando…";
+      firebase.auth().sendPasswordResetEmail(email).then(function () {
+        forgot.textContent = "Email enviado — confira sua caixa de entrada.";
+      }).catch(function () {
+        forgot.disabled = false; forgot.textContent = "esqueci minha senha";
+        err.textContent = "Não consegui enviar — confira o email digitado.";
+      });
+    });
+    box.appendChild(forgot);
     var cancel = el("button", { class: "cancel", type: "button", text: "cancelar" });
     cancel.addEventListener("click", function () { wrap.remove(); });
     box.appendChild(cancel);
@@ -480,7 +533,7 @@
     }
 
     mountRestrito(card, wikiId);
-    mountSuggestBox(loginBar, wikiId, data.title, function () { return currentTabLabel; });
+    mountSuggestBox(loginBar, wikiId, data.title, function () { return currentTabLabel; }, card);
     page.appendChild(card);
     page.appendChild(el("div", { class: "foot", text: "página isolada, gerada a partir de uma entrada do tree" + (data.publishedAt ? " · " + data.publishedAt : "") }));
   }
@@ -510,7 +563,7 @@
       });
     }
     mountRestrito(card, wikiId);
-    mountSuggestBox(loginBar, wikiId, data.title, function () { return ""; });
+    mountSuggestBox(loginBar, wikiId, data.title, function () { return ""; }, card);
     page.appendChild(card);
     page.appendChild(el("div", { class: "foot", text: "página isolada, gerada a partir de uma temporada do tree" + (data.publishedAt ? " · " + data.publishedAt : "") }));
   }
@@ -536,6 +589,21 @@
       return;
     }
 
+    // Novidades — as páginas mais recentemente publicadas/atualizadas primeiro, pra quem não
+    // fica checando toda hora ter como ver rápido o que mudou desde a última visita.
+    var recent = entries.slice().sort(function (a, b) { return (b.updatedAt || "").localeCompare(a.updatedAt || ""); }).slice(0, 8);
+    if (recent.length) {
+      wrap.appendChild(el("div", { class: "home-unihead", text: "🕓 Novidades" }));
+      var newsGrid = el("div", { class: "links-grid" });
+      recent.forEach(function (e) {
+        newsGrid.appendChild(el("a", { class: "link-card", href: wikiHref(e.id) }, [
+          el("span", { class: "link-card-label", text: (e.updatedAt || "") + (e.type ? " · " + e.type : "") }),
+          el("span", { class: "link-card-title", text: e.title || "(sem título)" })
+        ]));
+      });
+      wrap.appendChild(newsGrid);
+    }
+
     var randomBtn = el("button", { class: "home-random", type: "button", text: "🎲 página aleatória" });
     randomBtn.addEventListener("click", function () {
       var pick = entries[Math.floor(Math.random() * entries.length)];
@@ -546,6 +614,16 @@
     var listWrap = el("div", { class: "home-groups" });
     wrap.appendChild(listWrap);
 
+    // Se a busca só bateu dentro do texto (não no título/tipo/universo/tags), mostra um
+    // trechinho ao redor da palavra encontrada — senão a busca por corpo de texto acha a
+    // página certa mas não dá nenhuma pista de POR QUE ela apareceu no resultado.
+    function snippetFor(e, q) {
+      var hay = (e.search || "").toLowerCase();
+      var idx = hay.indexOf(q);
+      if (idx === -1) return null;
+      var start = Math.max(0, idx - 40), end = Math.min(e.search.length, idx + q.length + 40);
+      return (start > 0 ? "…" : "") + e.search.slice(start, end).trim() + (end < e.search.length ? "…" : "");
+    }
     function renderList(filterText) {
       listWrap.textContent = "";
       var q = (filterText || "").toLowerCase().trim();
@@ -562,6 +640,8 @@
           var card = el("a", { class: "home-card", href: wikiHref(e.id) });
           card.appendChild(el("div", { class: "home-card-title", text: e.title || "(sem título)" }));
           card.appendChild(el("div", { class: "home-card-meta", text: e.type || "" }));
+          var snip = q ? snippetFor(e, q) : null;
+          if (snip) card.appendChild(el("div", { class: "home-card-snippet", text: snip }));
           grid.appendChild(card);
         });
         listWrap.appendChild(grid);

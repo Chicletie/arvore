@@ -2664,7 +2664,14 @@
     var byTitle = {};
     C().entries.forEach(function (e) { byTitle[e.title.toLowerCase()] = 1; (e.aliases || []).forEach(function (a) { byTitle[a.toLowerCase()] = 1; }); });
     entries.forEach(function (e) {
-      (e.links || []).forEach(function (lk) { if (!wbEntry(lk.to)) list.push({ e: e, msg: "ligação quebrada (alvo apagado)" }); });
+      (e.links || []).forEach(function (lk) {
+        var t = wbEntry(lk.to);
+        if (!t) { list.push({ e: e, msg: "ligação quebrada (alvo apagado)" }); return; }
+        // Uma ligação só vira link de verdade na página publicada se o destino TAMBÉM estiver
+        // publicado e não for secreto — avisa aqui pra você não descobrir isso só olhando a
+        // página final (a wiki nunca falha silenciosamente, mas o link também não aparece).
+        if (e.wikiId && !e.secret && (!t.wikiId || t.secret)) list.push({ e: e, msg: "ligação da wiki aponta pra \"" + wbDisplayName(t) + "\", que ainda não foi publicada" });
+      });
       var body = e.body || "";
       (body.match(/\[\[[^\]\[]+\]\]/g) || []).forEach(function (m) {
         var name = m.slice(2, -2).split("|")[0].trim().toLowerCase();
