@@ -134,10 +134,105 @@
     return el("span", { class: "tag", text: prefix + item.text });
   }
 
-  function renderEntry(data) {
+  // Login only matters for "restrito" content — público/spoiler never need it. A signed-in
+  // session persists across page loads (Firebase's own local persistence), so a player who logs
+  // in once stays in on later visits until they sign out.
+  function mountLoginBar(host) {
+    if (typeof firebase === "undefined" || !firebase.auth) return;
+    var bar = el("div", { class: "login-bar" });
+    function paint() {
+      bar.textContent = "";
+      var u = firebase.auth().currentUser;
+      if (u) {
+        bar.appendChild(el("span", { text: "logado como " + u.email + " · " }));
+        var out = el("button", { class: "linklike", type: "button", text: "sair" });
+        out.addEventListener("click", function () { firebase.auth().signOut(); });
+        bar.appendChild(out);
+      } else {
+        var inBtn = el("button", { class: "linklike", type: "button", text: "entrar (pra ver conteúdo restrito)" });
+        inBtn.addEventListener("click", openLoginModal);
+        bar.appendChild(inBtn);
+      }
+    }
+    paint();
+    firebase.auth().onAuthStateChanged(paint);
+    host.appendChild(bar);
+  }
+  function openLoginModal() {
+    var wrap = el("div", { class: "login-modal" });
+    var box = el("div", { class: "login-box" });
+    box.appendChild(el("h3", { text: "Entrar" }));
+    var err = el("div", { class: "err" });
+    var emailInp = el("input", { type: "email", placeholder: "seu email", autocomplete: "username" });
+    var passInp = el("input", { type: "password", placeholder: "sua senha", autocomplete: "current-password" });
+    box.appendChild(emailInp); box.appendChild(passInp); box.appendChild(err);
+    var submitBtn = el("button", { class: "submit", type: "button", text: "Entrar" });
+    function doSubmit() {
+      err.textContent = ""; submitBtn.disabled = true; submitBtn.textContent = "entrando…";
+      firebase.auth().signInWithEmailAndPassword(emailInp.value.trim(), passInp.value).then(function () {
+        wrap.remove();
+      }).catch(function (e) {
+        submitBtn.disabled = false; submitBtn.textContent = "Entrar";
+        err.textContent = "Não consegui entrar — confira email e senha.";
+      });
+    }
+    submitBtn.addEventListener("click", doSubmit);
+    passInp.addEventListener("keydown", function (ev) { if (ev.key === "Enter") doSubmit(); });
+    box.appendChild(submitBtn);
+    var cancel = el("button", { class: "cancel", type: "button", text: "cancelar" });
+    cancel.addEventListener("click", function () { wrap.remove(); });
+    box.appendChild(cancel);
+    wrap.appendChild(box);
+    wrap.addEventListener("click", function (ev) { if (ev.target === wrap) wrap.remove(); });
+    document.body.appendChild(wrap);
+    emailInp.focus();
+  }
+  // Renders whatever "restrito" items the signed-in viewer is allowed to see for this entry —
+  // Firestore itself filters the list down to only the docs their email is on, nothing extra
+  // ever reaches this code. Re-runs on every login/logout so the unlocked section appears or
+  // clears live without a page reload.
+  function mountRestrito(host, wikiId) {
+    if (typeof firebase === "undefined" || !firebase.auth) return;
+    var slot = el("div", { class: "restrito-wrap" });
+    host.appendChild(slot);
+    function refresh() {
+      slot.textContent = "";
+      if (!firebase.auth().currentUser) return;
+      firebase.firestore().collection("wikiRestrito").doc(wikiId).collection("itens").get().then(function (snap) {
+        var items = snap.docs.map(function (d) { return d.data(); });
+        if (!items.length) return;
+        slot.appendChild(el("div", { class: "cathead", text: "🔐 Desbloqueado pra você" }));
+        items.forEach(function (it) {
+          if (it.kind === "campo") {
+            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: it.key }));
+            slot.appendChild(renderMarkdown(it.value));
+          } else if (it.kind === "secao") {
+            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: it.title || "Seção" }));
+            slot.appendChild(renderMarkdown(it.body));
+          } else if (it.kind === "tag") {
+            slot.appendChild(el("span", { class: "tag", style: "margin-right:6px", text: "#" + it.text }));
+          } else if (it.kind === "alias") {
+            slot.appendChild(el("div", { class: "aliases", text: "também: " + it.text }));
+          } else if (it.kind === "galeria") {
+            var fig = el("figure", { class: "gal-item", style: "display:inline-block;width:140px;margin:0 8px 8px 0" });
+            fig.appendChild(el("img", { src: it.url, alt: it.caption || "" }));
+            if (it.caption) fig.appendChild(el("figcaption", { text: it.caption }));
+            slot.appendChild(fig);
+          } else if (it.kind === "capa") {
+            slot.appendChild(el("img", { class: "cover", style: "max-width:250px;display:block;margin-bottom:10px", src: it.url, alt: "" }));
+          }
+        });
+      }).catch(function () { /* not signed in as anyone with access to this item — nothing to show */ });
+    }
+    refresh();
+    firebase.auth().onAuthStateChanged(refresh);
+  }
+
+  function renderEntry(data, wikiId) {
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = data.title || "wiki";
+    mountLoginBar(page);
     var topbar = el("div", { class: "topbar" }, [el("a", { href: ROOT + "wiki.html", text: "🌿 Herbário do Multiverso" })]);
     if (data.universe) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
     page.appendChild(topbar);
@@ -297,6 +392,7 @@
       card.appendChild(tagWrap);
     }
 
+    mountRestrito(card, wikiId);
     page.appendChild(card);
     page.appendChild(el("div", { class: "foot", text: "página isolada, gerada a partir de uma entrada do tree" + (data.publishedAt ? " · " + data.publishedAt : "") }));
   }
@@ -305,6 +401,7 @@
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = "Herbário do Multiverso — Wiki";
+    mountLoginBar(page);
     var wrap = el("div", { class: "card" });
     wrap.appendChild(el("div", { class: "home-title", text: "🌿 Herbário do Multiverso" }));
     wrap.appendChild(el("div", { class: "home-sub", text: "Wiki pública — navegue pelas páginas publicadas." }));
@@ -377,7 +474,7 @@
     } else {
       fs.collection("wikiPublic").doc(slug).get().then(function (snap) {
         if (!snap.exists) { showMessage("Essa página não existe mais (o link pode ter sido despublicado)."); return; }
-        renderEntry(snap.data());
+        renderEntry(snap.data(), slug);
       }).catch(function () { showMessage("Não consegui carregar essa página agora. Tente de novo mais tarde."); });
     }
   }

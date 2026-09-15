@@ -5685,6 +5685,39 @@
     };
     return m[code] || ("Erro: " + code);
   }
+  // Creates a real Firebase Auth account for a player (so they can log in on the public wiki
+  // and unlock content marked "restrito" for them), WITHOUT ever touching the GM's own signed-in
+  // session — createUserWithEmailAndPassword on the normal firebase.auth() would sign the GM out
+  // and sign in as the new player instead, which is exactly the bug this sidesteps by doing the
+  // creation on a throwaway secondary app instance. The player never learns the random password
+  // this generates (nobody needs to relay it) — they get Firebase's own "escolha sua senha" email
+  // instead and pick their own.
+  function wbInvitePlayer(email, onDone) {
+    if (typeof firebase === "undefined" || !fbAuth) { onDone(new Error("Sem conexão com a nuvem agora.")); return; }
+    var tempPass = uid() + uid() + "Aa1!";
+    var secondaryApp;
+    try {
+      secondaryApp = (firebase.apps || []).filter(function (a) { return a.name === "invite"; })[0] || firebase.initializeApp(FIREBASE_CONFIG, "invite");
+    } catch (err) { onDone(err); return; }
+    var secondaryAuth = secondaryApp.auth();
+    secondaryAuth.createUserWithEmailAndPassword(email, tempPass).then(function () {
+      return secondaryAuth.signOut();
+    }).then(function () {
+      return secondaryApp.delete();
+    }).then(function () {
+      return fbAuth.sendPasswordResetEmail(email);
+    }).then(function () { onDone(null); }).catch(function (err) {
+      if (err && err.code === "auth/email-already-in-use") {
+        // Already has an account (maybe invited before, maybe something else) — nothing to
+        // create, just make sure they have a fresh way in.
+        secondaryApp.delete().catch(function () {});
+        fbAuth.sendPasswordResetEmail(email).then(function () { onDone(null); }).catch(function (e2) { onDone(e2); });
+        return;
+      }
+      secondaryApp.delete().catch(function () {});
+      onDone(err);
+    });
+  }
   function openAuthModal() {
     var root = document.getElementById("modalRoot");
     var m = el("div", { class: "modal-wrap", onclick: function (e) { if (e.target === m) root.innerHTML = ""; } });
@@ -5843,19 +5876,29 @@
         })
       ]));
     });
+    var addErr = el("div", { style: "color:var(--neg);font-size:12px;min-height:16px;margin-top:4px" });
     var addForm = el("form", { class: "inline", style: "margin-top:6px", onsubmit: function (ev) {
       ev.preventDefault();
+      addErr.textContent = "";
       var email = (addForm.querySelector("[name=email]").value || "").trim().toLowerCase();
       var label = (addForm.querySelector("[name=label]").value || "").trim();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { window.alert("Email inválido."); return; }
-      if ((state.wikiPlayers || []).some(function (p) { return p.email === email; })) { window.alert("Esse email já está na lista."); return; }
-      state.wikiPlayers = (state.wikiPlayers || []).concat([{ email: email, label: label, addedAt: todayKey() }]);
-      save(); root.innerHTML = ""; document.getElementById("menuBtn").click();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { addErr.textContent = "Email inválido."; return; }
+      if ((state.wikiPlayers || []).some(function (p) { return p.email === email; })) { addErr.textContent = "Esse email já está na lista."; return; }
+      var submitBtn = addForm.querySelector("[type=submit]");
+      submitBtn.disabled = true; submitBtn.textContent = "convidando…";
+      wbInvitePlayer(email, function (err) {
+        submitBtn.disabled = false; submitBtn.textContent = "+ convidar";
+        if (err) { addErr.textContent = "Não consegui criar o convite: " + (err.message || err); return; }
+        state.wikiPlayers = (state.wikiPlayers || []).concat([{ email: email, label: label, addedAt: todayKey() }]);
+        save(); root.innerHTML = ""; document.getElementById("menuBtn").click();
+      });
     } });
     addForm.appendChild(el("input", { class: "field", name: "label", placeholder: "nome/apelido (opcional)", style: "width:40%" }));
     addForm.appendChild(el("input", { class: "field grow", name: "email", type: "email", placeholder: "email do jogador" }));
-    addForm.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "+ adicionar" }));
+    addForm.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "+ convidar" }));
     box.appendChild(addForm);
+    box.appendChild(addErr);
+    box.appendChild(el("div", { class: "hint", style: "margin:-2px 0 0", text: "Cria a conta do jogador e manda um email pra ele escolher a própria senha — você nunca vê nem passa senha nenhuma." }));
     box.appendChild(el("button", { class: "mini-btn", type: "button", style: "margin-top:8px", text: "📋 painel de publicação", onclick: function () { root.innerHTML = ""; wbGo({ view: "wikipanel" }); } }));
 
     box.appendChild(el("div", { class: "section-label", style: "margin-top:14px", text: "Aparência" }));
