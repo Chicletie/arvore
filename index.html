@@ -1400,6 +1400,39 @@
         });
       });
       if (typeof e.dispAlias !== "string") e.dispAlias = "";
+      // Variantes por obra/campanha ("abas" tipo Luzes / PG: Genesis): cada uma é um pacote
+      // paralelo de resumo+corpo+campos+seções, só que ligado a UMA obra específica — tudo
+      // dentro da mesma entrada/link. Título, apelidos, tags, ligações e publicação continuam
+      // sendo da entrada inteira, nunca por variante.
+      if (!Array.isArray(e.variants)) e.variants = [];
+      e.variants = e.variants.filter(function (x) { return x && typeof x === "object"; });
+      e.variants.forEach(function (variant) {
+        if (variant.id == null) variant.id = uid();
+        if (typeof variant.workId !== "string") variant.workId = "";
+        if (typeof variant.label !== "string" || !variant.label) variant.label = "Versão";
+        if (typeof variant.universeId !== "string") variant.universeId = e.universeId;
+        if (typeof variant.summary !== "string") variant.summary = "";
+        if (typeof variant.body !== "string") variant.body = "";
+        if (!variant.fields || typeof variant.fields !== "object") variant.fields = {};
+        if (!variant.fieldMeta || typeof variant.fieldMeta !== "object") variant.fieldMeta = {};
+        Object.keys(variant.fieldMeta).forEach(function (k) {
+          var fm = variant.fieldMeta[k]; if (!fm || typeof fm !== "object") { delete variant.fieldMeta[k]; return; }
+          if (FIELD_TYPES.map(function (x) { return x.id; }).indexOf(fm.type) === -1) fm.type = "texto";
+          if (!Array.isArray(fm.opts)) fm.opts = [];
+          fm.vis = wbMigrateVis(fm.vis, false);
+          if (!Array.isArray(fm.allow)) fm.allow = [];
+        });
+        if (!Array.isArray(variant.sections)) variant.sections = [];
+        variant.sections = variant.sections.filter(function (s) { return s && typeof s === "object"; });
+        variant.sections.forEach(function (s) {
+          if (s.id == null) s.id = uid();
+          if (typeof s.title !== "string") s.title = "";
+          if (typeof s.body !== "string") s.body = "";
+          s.vis = wbMigrateVis(s.vis, false);
+          if (!Array.isArray(s.allow)) s.allow = [];
+          s.collapsed = !!s.collapsed;
+        });
+      });
       if (!Array.isArray(e.gallery)) e.gallery = [];
       e.gallery = e.gallery.filter(function (g) { return g && typeof g === "object"; });
       e.gallery.forEach(function (g) {
@@ -2015,6 +2048,20 @@
   function wbCampaign(id) { return C().campaigns.filter(function (c) { return c.id === id; })[0]; }
   function wbCampaignsOf(u) { return C().campaigns.filter(function (c) { return c.universeId === u; }); }
   function wbCampaignsWith(entryId) { return C().campaigns.filter(function (c) { return (c.seasons || []).some(function (se) { return (se.roster || []).indexOf(entryId) !== -1; }); }); }
+  // Every obra/campanha an entry actually belongs to — the pool a new "variante" (aba) can be
+  // created for. Franchise membership and campaign membership are tracked completely differently
+  // (see the 2026-09-11 unification: franchiseIds[] vs. scanning every season's roster), so this
+  // is the one place that treats them the same for the purpose of "which works can this
+  // character have a version for".
+  function wbWorksOf(e) {
+    var out = [];
+    (e.franchiseIds || []).forEach(function (id) {
+      var fr = C().franchises.filter(function (f) { return f.id === id; })[0];
+      if (fr) out.push({ id: fr.id, name: fr.name || "(obra)" });
+    });
+    wbCampaignsWith(e.id).forEach(function (cp) { out.push({ id: cp.id, name: (cp.name || "(campanha)") + " 🎲" }); });
+    return out;
+  }
   function wbCampSeasonsWith(entryId) {
     var out = [];
     C().campaigns.forEach(function (c) { (c.seasons || []).forEach(function (se) { if ((se.roster || []).indexOf(entryId) !== -1) out.push({ cp: c, se: se }); }); });
@@ -2233,7 +2280,7 @@
 
   /* ---- [[ ]] autocomplete for a textarea ---- */
   function wbStubEntry(uniId, title) {
-    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
+    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
     C().entries.push(e); save();
     return e;
   }
@@ -3933,6 +3980,18 @@
     var gallery = (e.gallery || []).filter(function (g) { return wbWikiVisible(g.vis) && g.url; }).map(function (g) {
       return { group: g.group || "", url: g.url, caption: g.caption || "", vis: g.vis };
     });
+    var variants = (e.variants || []).map(function (variant) {
+      var vfields = [];
+      Object.keys(variant.fields || {}).forEach(function (k) {
+        var fm = variant.fieldMeta[k] || { type: "texto", vis: "publico", opts: [] };
+        if (!wbWikiVisible(fm.vis)) return;
+        vfields.push({ key: k, type: fm.type, value: variant.fields[k] || "", vis: fm.vis, opts: fm.opts || [] });
+      });
+      var vsections = (variant.sections || []).filter(function (s) { return wbWikiVisible(s.vis); }).map(function (s) {
+        return { title: s.title || "", body: s.body || "", vis: s.vis };
+      });
+      return { label: variant.label, summary: variant.summary || "", body: variant.body || "", fields: vfields, sections: vsections };
+    });
     return {
       title: e.title || "(sem título)",
       type: e.type || "",
@@ -3946,6 +4005,7 @@
       fields: fields,
       sections: sections,
       gallery: gallery,
+      variants: variants,
       links: wbWikiLinks(e),
       backlinks: wbWikiBacklinks(e),
       publishedAt: todayKey()
@@ -3996,6 +4056,14 @@
       var t = wbEntry(lk.to);
       return t ? { label: lk.label || "", targetId: t.wikiId || null, targetTitle: wbDisplayName(t, lk.dispAs) } : null;
     }).filter(Boolean);
+    var variants = (e.variants || []).map(function (variant) {
+      var vfields = Object.keys(variant.fields || {}).map(function (k) {
+        var fm = variant.fieldMeta[k] || { type: "texto", opts: [] };
+        return { key: k, type: fm.type, value: variant.fields[k] || "", vis: "publico", opts: fm.opts || [] };
+      });
+      var vsections = (variant.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
+      return { label: variant.label, summary: variant.summary || "", body: variant.body || "", fields: vfields, sections: vsections };
+    });
     return {
       title: e.title || "(sem título)",
       type: e.type || "",
@@ -4009,6 +4077,7 @@
       fields: fields,
       sections: sections,
       gallery: gallery,
+      variants: variants,
       links: links,
       backlinks: [],
       publishedAt: "prévia local (só você vê) — " + todayKey()
@@ -4055,6 +4124,15 @@
       if (g.vis === "restrito" && g.url) items.push({ id: "galeria-" + g.id, kind: "galeria", group: g.group || "", url: g.url, caption: g.caption || "", permitidos: g.allow || [] });
     });
     if (e.coverVis === "restrito" && e.cover) items.push({ id: "capa", kind: "capa", url: e.cover, permitidos: e.coverAllow || [] });
+    (e.variants || []).forEach(function (variant) {
+      Object.keys(variant.fields || {}).forEach(function (k) {
+        var fm = variant.fieldMeta[k] || {};
+        if (fm.vis === "restrito") items.push({ id: "campo-" + variant.id + "-" + wbSlugify(k), kind: "campo", key: k, type: fm.type, value: variant.fields[k] || "", opts: fm.opts || [], variant: variant.label, permitidos: fm.allow || [] });
+      });
+      (variant.sections || []).forEach(function (s) {
+        if (s.vis === "restrito") items.push({ id: "secao-" + variant.id + "-" + s.id, kind: "secao", title: s.title || "", body: s.body || "", variant: variant.label, permitidos: s.allow || [] });
+      });
+    });
     return items;
   }
   // Syncs the subcollection to exactly match `items` — anything currently in Firestore that's
@@ -4152,6 +4230,51 @@
       row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "despublicar", onclick: function () { wbUnpublishWiki(e, touch); } }));
     }
     return row;
+  }
+  // Renders one variant's own summary/body/campos/seções — reuses the exact same field/section
+  // renderers as the base entry (they only ever touch .fields/.fieldMeta/.sections/.universeId
+  // on whatever object they're given, so a variant works as a drop-in "entry-shaped" argument).
+  // `touch` is the SAME touch() from the base entry's wbEntryRead — it always bumps the real
+  // entry's `updated` regardless of which bundle's data actually changed, which is exactly what
+  // the publish dashboard's staleness check needs.
+  function wbRenderVariantContent(card, e, variant, opts) {
+    var touch = opts.touch, ro = opts.ro, hideSecret = opts.hideSecret;
+    if (!ro) {
+      card.appendChild(editable({
+        tag: "p", className: "wb-summary", value: variant.summary, placeholder: "Resumo desta versão…", multiline: true,
+        display: function (val) { if (!val) return null; var s = el("span"); mdInline(s, val); return s; },
+        commit: function (nv) { variant.summary = nv.trim(); touch(false); }
+      }));
+    } else if (variant.summary) {
+      var sp = el("p", { className: "wb-summary" }); mdInline(sp, variant.summary); card.appendChild(sp);
+    }
+
+    var bodyEl = mdField(variant, function () { touch(false); });
+    card.appendChild(bodyEl);
+
+    wbRenderSections(card, variant, { hideSecret: hideSecret, ro: ro, touch: touch, cat: opts.cat });
+
+    var fkeys = Object.keys(variant.fields || {}).filter(function (k) { return !(hideSecret && wbFieldMeta(variant, k).vis === "mestre"); });
+    var shortKeys = fkeys.filter(function (k) { return wbFieldMeta(variant, k).type !== "nota"; });
+    var longKeys = fkeys.filter(function (k) { return wbFieldMeta(variant, k).type === "nota"; });
+    if (shortKeys.length) {
+      var dl = el("dl", { class: "wb-fields" });
+      shortKeys.forEach(function (k) { wbRenderField(dl, variant, k, { hideSecret: hideSecret, ro: ro, touch: touch }); });
+      card.appendChild(dl);
+    }
+    longKeys.forEach(function (k) {
+      if (ro && !(variant.fields[k] || "").trim()) return;
+      card.appendChild(wbRenderLongField(variant, k, { hideSecret: hideSecret, ro: ro, touch: touch }));
+    });
+
+    if (!ro) {
+      var tray = el("div", { class: "ghost-tray" });
+      tray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ campo livre", style: "font-style:italic", onclick: function () {
+        var k = window.prompt("Nome do campo:");
+        if (k) wbAddField(variant, k, touch);
+      } }));
+      card.appendChild(tray);
+    }
   }
   function wbEntryRead(v, e) {
     var w = wbState();
@@ -4278,6 +4401,53 @@
       card.appendChild(dispRow);
     }
 
+    // variantes por obra/campanha ("abas" tipo Luzes / PG: Genesis) — só aparecem se a entrada
+    // participa de alguma obra, ou já tem alguma aba criada. Título/apelidos/tags/ligações
+    // continuam da entrada inteira; só resumo/corpo/campos/seções mudam por aba.
+    var works = wbWorksOf(e);
+    var usedWorkIds = (e.variants || []).map(function (x) { return x.workId; });
+    var availableWorks = works.filter(function (wk) { return usedWorkIds.indexOf(wk.id) === -1; });
+    var activeVariant = w.activeVariant ? (e.variants || []).filter(function (x) { return x.id === w.activeVariant; })[0] : null;
+    if ((e.variants || []).length || availableWorks.length) {
+      var tabs = el("div", { class: "seg", style: "margin:10px 0" });
+      tabs.appendChild(el("button", { class: "seg-btn" + (!activeVariant ? " on" : ""), type: "button", text: "Geral", onclick: function () { wbGo({ activeVariant: null }); } }));
+      (e.variants || []).forEach(function (variant) {
+        tabs.appendChild(el("button", { class: "seg-btn" + (activeVariant && activeVariant.id === variant.id ? " on" : ""), type: "button", text: variant.label, onclick: function () { wbGo({ activeVariant: variant.id }); } }));
+      });
+      card.appendChild(tabs);
+      if (!ro) {
+        var tabCtl = el("div", { class: "hint", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-4px 0 10px" });
+        if (availableWorks.length) {
+          var addSel = el("select", { class: "field", style: "padding:3px 6px;font-size:12px" });
+          addSel.appendChild(el("option", { value: "", text: "＋ aba pra obra…" }));
+          availableWorks.forEach(function (wk) { addSel.appendChild(el("option", { value: wk.id, text: wk.name })); });
+          addSel.addEventListener("change", function () {
+            if (!addSel.value) return;
+            var wk = availableWorks.filter(function (x) { return x.id === addSel.value; })[0];
+            var nv = { id: uid(), workId: wk.id, label: wk.name, universeId: e.universeId, summary: "", body: "", fields: {}, fieldMeta: {}, sections: [] };
+            e.variants = (e.variants || []).concat([nv]);
+            w.activeVariant = nv.id;
+            touch(true);
+          });
+          tabCtl.appendChild(addSel);
+        }
+        if (activeVariant) {
+          tabCtl.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "renomear aba", onclick: function () {
+            var nv = window.prompt("Nome da aba:", activeVariant.label);
+            if (nv && nv.trim()) { activeVariant.label = nv.trim(); touch(true); }
+          } }));
+          tabCtl.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "excluir aba", onclick: function () {
+            if (!window.confirm("Excluir a aba \"" + activeVariant.label + "\"? O conteúdo dela se perde.")) return;
+            e.variants = e.variants.filter(function (x) { return x.id !== activeVariant.id; });
+            w.activeVariant = null;
+            touch(true);
+          } }));
+        }
+        card.appendChild(tabCtl);
+      }
+    }
+
+    if (!activeVariant) {
     // summary
     card.appendChild(editable({
       tag: "p", className: "wb-summary", value: e.summary, placeholder: "Uma linha que resume esta entrada…", multiline: true,
@@ -4325,6 +4495,9 @@
         if (k) wbAddField(e, k, touch);
       } }));
       card.appendChild(tray);
+    }
+    } else {
+      wbRenderVariantContent(card, e, activeVariant, { hideSecret: hideSecret, ro: ro, touch: touch, cat: cat });
     }
 
     // galeria — imagens agrupadas por "temporada"/rótulo livre, exportadas do mesmo jeito na wiki

@@ -203,11 +203,12 @@
         if (!items.length) return;
         slot.appendChild(el("div", { class: "cathead", text: "🔐 Desbloqueado pra você" }));
         items.forEach(function (it) {
+          var heading = (it.key || it.title || "Seção") + (it.variant ? " (" + it.variant + ")" : "");
           if (it.kind === "campo") {
-            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: it.key }));
+            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: heading }));
             slot.appendChild(renderMarkdown(it.value));
           } else if (it.kind === "secao") {
-            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: it.title || "Seção" }));
+            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: heading }));
             slot.appendChild(renderMarkdown(it.body));
           } else if (it.kind === "tag") {
             slot.appendChild(el("span", { class: "tag", style: "margin-right:6px", text: "#" + it.text }));
@@ -252,7 +253,6 @@
     }
 
     var shortFields = (data.fields || []).filter(function (f) { return f.type !== "nota"; });
-    var longFields = (data.fields || []).filter(function (f) { return f.type === "nota"; });
     var galGroups = [];
     (data.gallery || []).forEach(function (g) { if (galGroups.indexOf(g.group) === -1) galGroups.push(g.group); });
 
@@ -304,37 +304,65 @@
       card.appendChild(info);
     }
 
-    var article = el("div", { class: "article" });
-    if (data.summary) { var sp = el("p", { class: "summary" }); mdInline(sp, data.summary); article.appendChild(sp); }
-    if (data.body) article.appendChild(renderMarkdown(data.body));
+    // Uma "aba" (Geral, ou uma variante por obra/campanha) é seu próprio resumo+corpo+TOC+campos
+    // longos+seções, montados aqui e trocados por visibilidade (não reconstruídos a cada clique).
+    function buildArticle(bundle, anchorPrefix, extraToc) {
+      var article = el("div", { class: "article" });
+      if (bundle.summary) { var sp = el("p", { class: "summary" }); mdInline(sp, bundle.summary); article.appendChild(sp); }
+      if (bundle.body) article.appendChild(renderMarkdown(bundle.body));
 
-    // índice — pula pra cada seção/campo longo/galeria, só aparece se houver o que listar
-    var tocEntries = [];
-    longFields.forEach(function (f, i) { var id = slugifyAnchor(f.key, "lf" + i); f._anchor = id; tocEntries.push({ id: id, label: f.key }); });
-    (data.sections || []).forEach(function (s, i) { var id = slugifyAnchor(s.title || "Seção", "sc" + i); s._anchor = id; tocEntries.push({ id: id, label: s.title || "Seção" }); });
-    if (data.gallery && data.gallery.length) tocEntries.push({ id: "galeria", label: "Galeria" });
-    var hasLinks = (data.links && data.links.length) || (data.backlinks && data.backlinks.length);
-    if (hasLinks) tocEntries.push({ id: "ligacoes", label: "Ligações" });
-    if (tocEntries.length > 1) {
-      var toc = el("div", { class: "toc" });
-      toc.appendChild(el("div", { class: "toc-head", text: "Índice" }));
-      var ol = el("ol");
-      tocEntries.forEach(function (t) { ol.appendChild(el("li", {}, [el("a", { href: "#" + t.id, text: t.label })])); });
-      toc.appendChild(ol);
-      article.appendChild(toc);
+      var bLongFields = (bundle.fields || []).filter(function (f) { return f.type === "nota"; });
+      var tocEntries = [];
+      bLongFields.forEach(function (f, i) { var id = slugifyAnchor(f.key, anchorPrefix + "lf" + i); f._anchor = id; tocEntries.push({ id: id, label: f.key }); });
+      (bundle.sections || []).forEach(function (s, i) { var id = slugifyAnchor(s.title || "Seção", anchorPrefix + "sc" + i); s._anchor = id; tocEntries.push({ id: id, label: s.title || "Seção" }); });
+      (extraToc || []).forEach(function (t) { tocEntries.push(t); });
+      if (tocEntries.length > 1) {
+        var toc = el("div", { class: "toc" });
+        toc.appendChild(el("div", { class: "toc-head", text: "Índice" }));
+        var ol = el("ol");
+        tocEntries.forEach(function (t) { ol.appendChild(el("li", {}, [el("a", { href: "#" + t.id, text: t.label })])); });
+        toc.appendChild(ol);
+        article.appendChild(toc);
+      }
+
+      bLongFields.forEach(function (f) {
+        article.appendChild(el("div", { class: "cathead", id: f._anchor, text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
+        if (f.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
+        else article.appendChild(renderMarkdown(f.value));
+      });
+      (bundle.sections || []).forEach(function (s) {
+        article.appendChild(el("div", { class: "cathead", id: s._anchor, text: (s.title || "Seção") + (s.vis === "spoiler" ? " 🙈" : "") }));
+        if (s.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(s.body); }));
+        else article.appendChild(renderMarkdown(s.body));
+      });
+      return article;
     }
+    var hasLinks = (data.links && data.links.length) || (data.backlinks && data.backlinks.length);
+    var sharedToc = [];
+    if (data.gallery && data.gallery.length) sharedToc.push({ id: "galeria", label: "Galeria" });
+    if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
-    longFields.forEach(function (f) {
-      article.appendChild(el("div", { class: "cathead", id: f._anchor, text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
-      if (f.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
-      else article.appendChild(renderMarkdown(f.value));
-    });
-    (data.sections || []).forEach(function (s) {
-      article.appendChild(el("div", { class: "cathead", id: s._anchor, text: (s.title || "Seção") + (s.vis === "spoiler" ? " 🙈" : "") }));
-      if (s.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(s.body); }));
-      else article.appendChild(renderMarkdown(s.body));
-    });
-    card.appendChild(article);
+    if (data.variants && data.variants.length) {
+      var tabsWrap = el("div", { class: "work-tabs" });
+      var articles = [buildArticle(data, "geral-", sharedToc)];
+      data.variants.forEach(function (variant, vi) { articles.push(buildArticle(variant, "v" + vi + "-", [])); });
+      function selectTab(idx) {
+        tabsWrap.querySelectorAll(".work-tab").forEach(function (b, i) { b.classList.toggle("on", i === idx); });
+        articles.forEach(function (a, i) { a.hidden = i !== idx; });
+      }
+      var geralTab = el("button", { type: "button", class: "work-tab on", text: "Geral" });
+      geralTab.addEventListener("click", function () { selectTab(0); });
+      tabsWrap.appendChild(geralTab);
+      data.variants.forEach(function (variant, vi) {
+        var tb = el("button", { type: "button", class: "work-tab", text: variant.label || "Versão" });
+        tb.addEventListener("click", function () { selectTab(vi + 1); });
+        tabsWrap.appendChild(tb);
+      });
+      card.appendChild(tabsWrap);
+      articles.forEach(function (a, i) { a.hidden = i !== 0; card.appendChild(a); });
+    } else {
+      card.appendChild(buildArticle(data, "geral-", sharedToc));
+    }
 
     // galeria — agrupada por rótulo livre (ex: "Primeira Temporada", "Segunda Temporada")
     if (data.gallery && data.gallery.length) {
