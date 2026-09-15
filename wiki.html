@@ -43,6 +43,11 @@
   .infobox { float: none; width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin: 0 0 18px; overflow: hidden; }
   @media (min-width: 620px) { .infobox { float: right; width: 250px; margin: 0 0 16px 22px; } }
   .infobox .cover { width: 100%; display: block; max-height: 280px; object-fit: cover; }
+  .infobox-portrait { position: relative; }
+  .infobox-tabs { display: flex; }
+  .infobox-tab { flex: 1; border: 0; background: var(--surface-2); color: var(--muted); font-family: var(--font-body); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 4px; cursor: pointer; border-bottom: 2px solid transparent; }
+  .infobox-tab.on { color: var(--gold-ink); border-bottom-color: var(--gold); background: var(--surface); }
+  .infobox-tab:hover { color: var(--ink); }
   .infobox-facts { width: 100%; border-collapse: collapse; font-size: 13px; }
   .infobox-facts tr { border-top: 1px solid var(--border); }
   .infobox-facts tr:first-child { border-top: 0; }
@@ -234,11 +239,44 @@
 
     var shortFields = (data.fields || []).filter(function (f) { return f.type !== "nota"; });
     var longFields = (data.fields || []).filter(function (f) { return f.type === "nota"; });
+    var galGroups = [];
+    (data.gallery || []).forEach(function (g) { if (galGroups.indexOf(g.group) === -1) galGroups.push(g.group); });
 
-    // infobox — cover + short facts, floats beside the article on wide screens
-    if (data.cover || shortFields.length) {
+    // infobox — cover + short facts, floats beside the article on wide screens. When there's a
+    // gallery, the portrait becomes switchable: one tab per group (ex: "Primeira Temporada",
+    // "Segunda Temporada"), each showing that group's first image — same idea as a fandom
+    // infobox's season-switcher, tabs sit right above the picture.
+    if (data.cover || shortFields.length || galGroups.length) {
       var info = el("div", { class: "infobox" });
-      if (data.cover) info.appendChild(el("img", { class: "cover", src: data.cover, alt: "" }));
+      var portraitOptions = [];
+      if (data.cover) portraitOptions.push({ label: "Capa", url: data.cover, vis: data.coverVis || "publico" });
+      galGroups.forEach(function (grp) {
+        var first = data.gallery.filter(function (g) { return g.group === grp; })[0];
+        if (first) portraitOptions.push({ label: grp || "Geral", url: first.url, vis: first.vis });
+      });
+      if (portraitOptions.length) {
+        var portraitSlot = el("div", { class: "infobox-portrait" });
+        function paintPortrait(opt) {
+          portraitSlot.textContent = "";
+          if (opt.vis === "spoiler") portraitSlot.appendChild(spoilerCover(function () { return el("img", { class: "cover", src: opt.url, alt: "" }); }));
+          else portraitSlot.appendChild(el("img", { class: "cover", src: opt.url, alt: "" }));
+        }
+        paintPortrait(portraitOptions[0]);
+        if (portraitOptions.length > 1) {
+          var tabsRow = el("div", { class: "infobox-tabs" });
+          portraitOptions.forEach(function (opt, i) {
+            var tabBtn = el("button", { type: "button", class: "infobox-tab" + (i === 0 ? " on" : ""), text: opt.label });
+            tabBtn.addEventListener("click", function () {
+              tabsRow.querySelectorAll(".infobox-tab").forEach(function (c) { c.classList.remove("on"); });
+              tabBtn.classList.add("on");
+              paintPortrait(opt);
+            });
+            tabsRow.appendChild(tabBtn);
+          });
+          info.appendChild(tabsRow);
+        }
+        info.appendChild(portraitSlot);
+      }
       if (shortFields.length) {
         var itable = el("table", { class: "infobox-facts" });
         shortFields.forEach(function (f) {
@@ -286,9 +324,7 @@
     if (data.gallery && data.gallery.length) {
       var gwrap = el("div", { class: "gallery-wrap" });
       gwrap.appendChild(el("div", { class: "cathead", id: "galeria", text: "Galeria" }));
-      var groups = [];
-      data.gallery.forEach(function (g) { if (groups.indexOf(g.group) === -1) groups.push(g.group); });
-      groups.forEach(function (grp) {
+      galGroups.forEach(function (grp) {
         var items = data.gallery.filter(function (g) { return g.group === grp; });
         gwrap.appendChild(el("div", { class: "gal-grouphead", text: grp || "Geral" }));
         var grid = el("div", { class: "gal-grid" });

@@ -1980,6 +1980,15 @@
     if (!entry) return "(removida)";
     return (dispAs && dispAs.trim()) || (entry.dispAlias && entry.dispAlias.trim()) || entry.title || "(sem título)";
   }
+  // Reorders one gallery image within its own group (swaps with the neighbor above/below in
+  // that group's own sub-list, leaving other groups' order untouched). No-op at either edge.
+  function wbMoveGalleryItem(e, item, dir) {
+    var groupItems = e.gallery.filter(function (x) { return x.group === item.group; });
+    var swapWith = groupItems[groupItems.indexOf(item) + dir];
+    if (!swapWith) return;
+    var i1 = e.gallery.indexOf(item), i2 = e.gallery.indexOf(swapWith);
+    var tmp = e.gallery[i1]; e.gallery[i1] = e.gallery[i2]; e.gallery[i2] = tmp;
+  }
   function wbTouch(id) {
     var r = C().recent.filter(function (x) { return x !== id; });
     r.unshift(id); C().recent = r.slice(0, 12);
@@ -2194,7 +2203,7 @@
         var row = el("div", { class: "wb-ac-item" + (i === active ? " on" : "") });
         if (it.create) row.appendChild(el("span", { class: "wb-ac-new", text: "criar “" + it.create + "”" }));
         else {
-          row.appendChild(el("span", { text: (it.entry.title || "(sem título)") }));
+          row.appendChild(el("span", { text: wbDisplayName(it.entry) }));
           row.appendChild(el("span", { class: "wb-ac-meta", text: flowerById(it.entry.universeId).name + " · " + it.entry.type }));
         }
         row.addEventListener("mousedown", function (ev) { ev.preventDefault(); choose(i); });
@@ -2205,7 +2214,7 @@
     }
     function choose(i) {
       var it = items[i]; if (!it) return;
-      var title = it.create ? wbStubEntry(uniId, it.create).title : it.entry.title;
+      var title = it.create ? wbStubEntry(uniId, it.create).title : wbDisplayName(it.entry);
       var pos = ta.selectionStart;
       var before = ta.value.slice(0, anchor), after = ta.value.slice(pos);
       var ins = "[[" + title + "]] ";
@@ -2749,7 +2758,7 @@
     var f = flowerById(e.universeId);
     return el("div", { class: "row" }, [
       el("div", { class: "row-body" }, [
-        el("div", { class: "row-title", text: (e.favorite ? "★ " : "") + (e.title || "(sem título)") }),
+        el("div", { class: "row-title", text: (e.favorite ? "★ " : "") + wbDisplayName(e) }),
         el("div", { class: "row-meta", text: (showUniverse ? f.name + " · " : "") + e.type })
       ]),
       el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
@@ -2997,7 +3006,7 @@
     v.appendChild(el("div", { style: "display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center" }, [
       el("button", { class: "btn", type: "button", text: "+ Nova entrada", onclick: function () { wbNewEntry(uniId); } }),
       el("button", { class: "btn ghost", type: "button", "aria-pressed": w.mapExplore ? "true" : "false", text: w.mapExplore ? "explorar: ligado" : "explorar conexões", onclick: function () { w.mapExplore = !w.mapExplore; w.mapFocus = null; render(); } }),
-      focusEnt ? el("button", { class: "btn ghost", type: "button", text: "abrir " + focusEnt.title, onclick: function () { wbOpen(focusEnt); } }) : null,
+      focusEnt ? el("button", { class: "btn ghost", type: "button", text: "abrir " + wbDisplayName(focusEnt), onclick: function () { wbOpen(focusEnt); } }) : null,
       el("div", { class: "hint", style: "margin:0", text: w.mapExplore ? "Toque num nó pra ver só ele e as conexões diretas." : "Toque num nó abre · arraste pra mover · toque duplo no vazio cria." })
     ]));
   }
@@ -3048,7 +3057,7 @@
           if (e.cover) cd.appendChild(el("div", { class: "wb-card2-img", style: "background-image:url('" + e.cover.replace(/'/g, "%27") + "')" }));
           else cd.appendChild(el("div", { class: "wb-card2-img", style: "background:linear-gradient(135deg," + typeColor(e.type) + "44," + typeColor(e.type) + "18)" }));
           cd.appendChild(el("div", { class: "wb-card2-body" }, [
-            el("div", { class: "wb-card2-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
+            el("div", { class: "wb-card2-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + wbDisplayName(e) }),
             el("div", { class: "wb-card2-meta", text: statusInfo(e.status).glyph + " " + typeTag(e.type) })
           ]));
           grid.appendChild(cd);
@@ -3067,7 +3076,7 @@
           any = true;
           card.appendChild(el("div", { class: "row", style: "padding-left:" + (depth * 16) + "px" }, [
             el("div", { class: "row-body" }, [
-              el("div", { class: "row-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
+              el("div", { class: "row-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + wbDisplayName(e) }),
               el("div", { class: "row-meta", text: statusInfo(e.status).glyph + " " + typeTag(e.type) + (kids.length ? " · " + kids.length + " dentro" : "") })
             ]),
             el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
@@ -3090,7 +3099,7 @@
             card.appendChild(el("div", { class: "row" }, [
               el("button", { class: "wb-star" + (e.favorite ? " on" : ""), type: "button", "aria-label": "Favoritar", text: "★", onclick: function () { e.favorite = !e.favorite; save(); renderList(); } }),
               el("div", { class: "row-body" }, [
-                el("div", { class: "row-title", text: (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
+                el("div", { class: "row-title", text: (e.secret ? "🔒 " : "") + wbDisplayName(e) }),
                 el("div", { class: "row-meta", text: statusInfo(e.status).glyph + " " + (e.summary || (e.body || "").slice(0, 70)).replace(/\n/g, " ") })
               ]),
               el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
@@ -3274,7 +3283,7 @@
     issues.forEach(function (it) {
       card.appendChild(el("div", { class: "row" }, [
         el("div", { class: "row-body" }, [
-          el("div", { class: "row-title", text: it.e.title || "(sem título)" }),
+          el("div", { class: "row-title", text: wbDisplayName(it.e) }),
           el("div", { class: "row-meta", style: "color:var(--warn)", text: it.msg })
         ]),
         el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(it.e); } })
@@ -3659,7 +3668,7 @@
         });
       });
       var lcombo = wbCombo({ items: linkItems, value: val, placeholder: "buscar entrada…", emptyLabel: "— ligar —", onChange: function (id) { e.fields[k] = id; touch(true); } });
-      if (tgt) dd.appendChild(el("span", { class: "wl", text: tgt.title || "(sem título)", style: "margin-right:8px", onclick: function () { wbOpen(tgt); } }));
+      if (tgt) dd.appendChild(el("span", { class: "wl", text: wbDisplayName(tgt), style: "margin-right:8px", onclick: function () { wbOpen(tgt); } }));
       dd.appendChild(lcombo);
     } else if (fm.type === "data") {
       dd.appendChild(editable({ tag: "span", value: val, placeholder: "ano ou ano-mês-dia", display: function (x) { return x ? wbFmtWorldDate(x, e.universeId) : null; }, commit: function (nv) { e.fields[k] = nv.trim(); touch(true); } }));
@@ -3892,7 +3901,7 @@
       crumb.forEach(function (c, i) {
         if (i) bc.appendChild(el("span", { text: " › " }));
         if (c.id === e.id) bc.appendChild(el("span", { text: c.title }));
-        else bc.appendChild(el("span", { class: "wl", text: c.title, onclick: (function (cc) { return function () { wbOpen(cc); }; })(c) }));
+        else bc.appendChild(el("span", { class: "wl", text: wbDisplayName(c), onclick: (function (cc) { return function () { wbOpen(cc); }; })(c) }));
       });
       card.appendChild(bc);
     }
@@ -4036,6 +4045,8 @@
           if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
           if (!ro) {
             fig.appendChild(el("div", { class: "wb-gal-ctl" }, [
+              el("button", { type: "button", title: "Mover pra cima", text: "▲", onclick: function () { wbMoveGalleryItem(e, g, -1); touch(true); } }),
+              el("button", { type: "button", title: "Mover pra baixo", text: "▼", onclick: function () { wbMoveGalleryItem(e, g, 1); touch(true); } }),
               el("button", { type: "button", title: "Legenda", text: "✎", onclick: function () { var c = window.prompt("Legenda:", g.caption || ""); if (c != null) { g.caption = c.trim(); touch(true); } } }),
               el("button", { type: "button", title: "Wiki: " + visInfo(g.vis).label + " (toque p/ mudar)", text: visInfo(g.vis).glyph, onclick: function () { g.vis = nextVis(g.vis); touch(true); } }),
               el("button", { type: "button", title: "Remover", text: "✕", onclick: function () { e.gallery = e.gallery.filter(function (x) { return x.id !== g.id; }); touch(true); } })
@@ -4216,7 +4227,7 @@
       card.appendChild(cat("Manifestações nos universos"));
       manifest.forEach(function (lk) { var t = wbEntry(lk.to); card.appendChild(el("div", { class: "row wb-rel" }, [
         el("span", { style: "width:8px;height:8px;border-radius:50%;background:" + flowerById(t.universeId).color }),
-        el("div", { class: "row-body" }, [el("div", { class: "row-title", style: "font-size:14px", text: t.title }), el("div", { class: "row-meta", text: flowerById(t.universeId).name })]),
+        el("div", { class: "row-body" }, [el("div", { class: "row-title", style: "font-size:14px", text: wbDisplayName(t) }), el("div", { class: "row-meta", text: flowerById(t.universeId).name })]),
         el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(t); } })
       ])); });
       card.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Comparar lado a lado", style: "margin-top:6px", onclick: function () { wbGo({ view: "compare", entryId: e.id, uniId: e.universeId }); } }));
@@ -4319,7 +4330,7 @@
   }
   function wbMiniRow(e) {
     return el("div", { class: "row wb-rel" }, [
-      el("div", { class: "row-body" }, [el("div", { class: "row-title", text: e.title || "(sem título)" }), el("div", { class: "row-meta", text: flowerById(e.universeId).name + " · " + e.type })]),
+      el("div", { class: "row-body" }, [el("div", { class: "row-title", text: wbDisplayName(e) }), el("div", { class: "row-meta", text: flowerById(e.universeId).name + " · " + e.type })]),
       el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
     ]);
   }
@@ -4369,7 +4380,7 @@
   function wbCampRosterRow(en, cp, key, touch) {
     return el("div", { class: "row wb-rel" }, [
       el("div", { class: "row-body" }, [
-        el("div", { class: "row-title", style: "font-size:14px", text: (typeIcon(en.type) ? typeIcon(en.type) + " " : "") + (en.title || "(sem título)") }),
+        el("div", { class: "row-title", style: "font-size:14px", text: (typeIcon(en.type) ? typeIcon(en.type) + " " : "") + wbDisplayName(en) }),
         el("div", { class: "row-meta", text: (en.summary || en.type || "").replace(/\n/g, " ").slice(0, 90) })
       ]),
       el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(en); } }),
@@ -4379,7 +4390,7 @@
   function wbCastRow(en, fr, touch) {
     return el("div", { class: "row wb-rel" }, [
       el("div", { class: "row-body" }, [
-        el("div", { class: "row-title", style: "font-size:14px", text: (typeIcon(en.type) ? typeIcon(en.type) + " " : "") + (en.title || "(sem título)") }),
+        el("div", { class: "row-title", style: "font-size:14px", text: (typeIcon(en.type) ? typeIcon(en.type) + " " : "") + wbDisplayName(en) }),
         el("div", { class: "row-meta", text: (en.summary || en.type || "").replace(/\n/g, " ").slice(0, 90) })
       ]),
       el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(en); } }),
@@ -4556,7 +4567,7 @@
         box.appendChild(mdBox(function () { return sx.recap; }, function (val) { sx.recap = val; touch(false); }, cp.universeId, { placeholder: "Resumo da sessão…", minHeight: "20vh", dropcap: false }));
         box.appendChild(el("div", { class: "note-tags", style: "margin-top:10px" }, (sx.present || []).map(function (id) {
           var en = wbEntry(id); if (!en) return null;
-          return el("button", { class: "ntag", type: "button", title: "tirar", text: en.title + "  ✕", onclick: function () { sx.present = sx.present.filter(function (x) { return x !== id; }); touch(true); } });
+          return el("button", { class: "ntag", type: "button", title: "tirar", text: wbDisplayName(en) + "  ✕", onclick: function () { sx.present = sx.present.filter(function (x) { return x !== id; }); touch(true); } });
         }).filter(Boolean)));
         box.appendChild(wbEntryAdder(cp.universeId, function (en) {
           if ((sx.present || []).indexOf(en.id) === -1) { sx.present = (sx.present || []).concat([en.id]); if (se.roster.indexOf(en.id) === -1) se.roster.push(en.id); touch(true); }
@@ -4871,7 +4882,7 @@
       forces.forEach(function (e) {
         var n = (e.links || []).filter(function (l) { return l.label === "manifesta-se como"; }).length;
         fc.appendChild(el("div", { class: "row" }, [
-          el("div", { class: "row-body" }, [el("div", { class: "row-title", text: e.title }), el("div", { class: "row-meta", text: n + " manifestações" })]),
+          el("div", { class: "row-body" }, [el("div", { class: "row-title", text: wbDisplayName(e) }), el("div", { class: "row-meta", text: n + " manifestações" })]),
           el("button", { class: "btn ghost sm", type: "button", text: "comparar", onclick: function () { wbGo({ view: "compare", entryId: e.id, uniId: "raiz" }); } })
         ]));
       });
@@ -4893,7 +4904,7 @@
       var f = flowerById(t.universeId);
       var col = el("div", { class: "wb-comp-col" });
       col.appendChild(el("div", { class: "wb-comp-head", style: "color:" + f.color, text: f.name }));
-      col.appendChild(el("div", { style: "font-family:var(--font-wb);font-weight:600;font-size:17px", text: t.title }));
+      col.appendChild(el("div", { style: "font-family:var(--font-wb);font-weight:600;font-size:17px", text: wbDisplayName(t) }));
       if (t.summary) col.appendChild(el("div", { class: "row-meta", style: "margin:4px 0", text: t.summary }));
       Object.keys(t.fields || {}).filter(function (k) { return t.fields[k]; }).slice(0, 6).forEach(function (k) {
         col.appendChild(el("div", { style: "margin-top:6px" }, [el("div", { class: "wb-eyebrow", text: k }), el("div", { class: "row-meta", style: "color:var(--ink)", text: t.fields[k] })]));
@@ -5091,7 +5102,7 @@
   function sideEntryRow(e) {
     return el("button", { class: "side-erow", type: "button", onclick: function () { closeSide(); wbOpen(e); } }, [
       el("span", { class: "side-mini-glyph", text: e.secret ? "🔒" : (statusInfo(e.status).glyph || "•") }),
-      el("span", { class: "side-erow-name", text: e.title || "(sem título)" })
+      el("span", { class: "side-erow-name", text: wbDisplayName(e) })
     ]);
   }
   function renderSidebar() {
