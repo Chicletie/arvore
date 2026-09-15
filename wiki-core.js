@@ -218,6 +218,8 @@
     longFields.forEach(function (f, i) { var id = slugifyAnchor(f.key, "lf" + i); f._anchor = id; tocEntries.push({ id: id, label: f.key }); });
     (data.sections || []).forEach(function (s, i) { var id = slugifyAnchor(s.title || "Seção", "sc" + i); s._anchor = id; tocEntries.push({ id: id, label: s.title || "Seção" }); });
     if (data.gallery && data.gallery.length) tocEntries.push({ id: "galeria", label: "Galeria" });
+    var hasLinks = (data.links && data.links.length) || (data.backlinks && data.backlinks.length);
+    if (hasLinks) tocEntries.push({ id: "ligacoes", label: "Ligações" });
     if (tocEntries.length > 1) {
       var toc = el("div", { class: "toc" });
       toc.appendChild(el("div", { class: "toc-head", text: "Índice" }));
@@ -259,9 +261,39 @@
       card.appendChild(gwrap);
     }
 
+    // ligações — só aparece pra quem também está publicado; o resto fica de fora de propósito
+    // (a wiki é um grafo só do que é público, nunca uma menção morta a algo nunca publicado)
+    if (hasLinks) {
+      var lwrap = el("div", { class: "links-wrap" });
+      lwrap.appendChild(el("div", { class: "cathead", id: "ligacoes", text: "Ligações" }));
+      var lrow = el("div", { class: "links-grid" });
+      (data.links || []).forEach(function (lk) {
+        lrow.appendChild(el("a", { class: "link-card", href: wikiHref(lk.targetId) }, [
+          el("span", { class: "link-card-label", text: lk.label || "ligação" }),
+          el("span", { class: "link-card-title", text: lk.targetTitle })
+        ]));
+      });
+      card.appendChild(lwrap);
+      lwrap.appendChild(lrow);
+      if (data.backlinks && data.backlinks.length) {
+        lwrap.appendChild(el("div", { class: "links-subhead", text: "Mencionado em" }));
+        var browrap = el("div", { class: "links-grid" });
+        data.backlinks.forEach(function (lk) {
+          browrap.appendChild(el("a", { class: "link-card", href: wikiHref(lk.targetId) }, [
+            el("span", { class: "link-card-label", text: lk.label || "ligação" }),
+            el("span", { class: "link-card-title", text: lk.targetTitle })
+          ]));
+        });
+        lwrap.appendChild(browrap);
+      }
+    }
+
     if (data.tags && data.tags.length) {
       var tagWrap = el("div", { class: "tags" });
-      data.tags.forEach(function (t) { tagWrap.appendChild(chip("#", t)); });
+      data.tags.forEach(function (t) {
+        if (t.vis === "spoiler") { tagWrap.appendChild(chip("#", t)); return; }
+        tagWrap.appendChild(el("a", { class: "tag", href: ROOT + "wiki.html?q=" + encodeURIComponent(t.text), text: "#" + t.text }));
+      });
       card.appendChild(tagWrap);
     }
 
@@ -320,7 +352,9 @@
         listWrap.appendChild(grid);
       });
     }
-    renderList("");
+    var initialQ = new URLSearchParams(location.search).get("q") || "";
+    searchBox.value = initialQ;
+    renderList(initialQ);
     searchBox.addEventListener("input", function () { renderList(searchBox.value); });
     page.appendChild(wrap);
   }

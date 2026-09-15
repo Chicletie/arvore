@@ -2487,8 +2487,42 @@
     if (w.view === "multirules") return wbMultiRulesView(v);
     if (w.view === "compare" && wbEntry(w.entryId)) return wbCompareView(v);
     if (w.view === "settings") return wbSettingsView(v);
+    if (w.view === "wikipanel") return wbWikiPanelView(v);
     return isMesa() ? wbMesaHome(v) : wbHomeView(v);
   };
+  // Dashboard of every published entry across BOTH worlds (tree + mesa share the same
+  // wikiPublic collection) — since publishing is per-entry and manual, this is the one place
+  // that shows what's live, when, and whether it's gone stale (edited since last publish, at
+  // day granularity — same precision "updated" already uses everywhere else in the app).
+  function wbWikiPanelView(v) {
+    v.appendChild(el("div", { class: "wb-unihead" }, [
+      el("button", { class: "link", type: "button", text: "← voltar", onclick: function () { wbGo({ view: "home" }); } })
+    ]));
+    var card = el("div", { class: "card" });
+    card.appendChild(sectionLabel("Painel de publicação"));
+    var published = C().entries.filter(function (e) { return e.wikiId; });
+    if (!published.length) {
+      card.appendChild(el("div", { class: "empty", text: "Nenhuma entrada publicada ainda." }));
+      v.appendChild(card);
+      return v;
+    }
+    published.sort(function (a, b) { return (b.wikiPublishedAt || "").localeCompare(a.wikiPublishedAt || ""); });
+    function touch(re) { save(); if (re) render(); }
+    published.forEach(function (e) {
+      var stale = e.updated > e.wikiPublishedAt;
+      card.appendChild(el("div", { class: "row" }, [
+        el("div", { class: "row-body" }, [
+          el("div", { class: "row-title", text: wbDisplayName(e) }),
+          el("div", { class: "row-meta", style: stale ? "color:var(--warn)" : "", text: flowerById(e.universeId).name + " · publicado em " + e.wikiPublishedAt + (stale ? " · editado depois — considere republicar" : "") })
+        ]),
+        el("a", { class: "btn ghost sm", href: wbWikiUrl(e.wikiId), target: "_blank", rel: "noopener", text: "ver" }),
+        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } }),
+        el("button", { class: "btn ghost sm", type: "button", text: stale ? "republicar" : "atualizar", onclick: function () { wbPublishWiki(e, touch); } })
+      ]));
+    });
+    v.appendChild(card);
+    return v;
+  }
 
   /* ---- Consistency check ---- */
   function wbIssues(uniId) {
@@ -3912,8 +3946,36 @@
       fields: fields,
       sections: sections,
       gallery: gallery,
+      links: wbWikiLinks(e),
+      backlinks: wbWikiBacklinks(e),
       publishedAt: todayKey()
     };
+  }
+  // A link/backlink only makes it into the snapshot if its OTHER side is ALSO published (has
+  // its own wikiId) and not secret — the wiki is a graph of only what's actually public, never
+  // a dead mention of something that was deliberately never published. This means a link can go
+  // stale (point nowhere new) until the far side gets published and THIS entry is republished —
+  // an accepted tradeoff, discussed with the user, in exchange for staying a static snapshot
+  // instead of a live per-link Firestore check on every page view.
+  function wbWikiLinks(e) {
+    var out = [];
+    (e.links || []).forEach(function (lk) {
+      var t = wbEntry(lk.to);
+      if (!t || !t.wikiId || t.secret) return;
+      out.push({ label: lk.label || "", style: linkStyleOf(lk.label), targetId: t.wikiId, targetTitle: wbDisplayName(t, lk.dispAs) });
+    });
+    return out;
+  }
+  function wbWikiBacklinks(e) {
+    var out = [];
+    C().entries.forEach(function (other) {
+      if (other.id === e.id || !other.wikiId || other.secret) return;
+      (other.links || []).forEach(function (lk) {
+        if (lk.to !== e.id) return;
+        out.push({ label: lk.label || "", style: linkStyleOf(lk.label), targetId: other.wikiId, targetTitle: wbDisplayName(other) });
+      });
+    });
+    return out;
   }
   // Everything marked "restrito" goes here instead — each becomes its OWN Firestore document
   // (wikiRestrito/<wikiId>/itens/<itemId>) with its own "permitidos" (allowed emails), because
@@ -5794,6 +5856,7 @@
     addForm.appendChild(el("input", { class: "field grow", name: "email", type: "email", placeholder: "email do jogador" }));
     addForm.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "+ adicionar" }));
     box.appendChild(addForm);
+    box.appendChild(el("button", { class: "mini-btn", type: "button", style: "margin-top:8px", text: "📋 painel de publicação", onclick: function () { root.innerHTML = ""; wbGo({ view: "wikipanel" }); } }));
 
     box.appendChild(el("div", { class: "section-label", style: "margin-top:14px", text: "Aparência" }));
     var sw = el("div", { class: "accent-swatches" });
