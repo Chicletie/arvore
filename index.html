@@ -4191,7 +4191,50 @@
   }
   // Metadata kept in the shared wikiPublic/_index doc — powers the wiki home page, search and
   // cross-entry links, without every visitor having to fetch every published entry to browse.
-  function wbIndexEntry(e) {
+  // Strips common markdown syntax down to plain text for search indexing — doesn't need to be
+  // pretty, just needs to turn "**Nome** vive em ||a Cripta||" into "Nome vive em a Cripta" so a
+  // substring search on the word "Cripta" works.
+  function wbMdToPlain(s) {
+    return String(s || "")
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+      .replace(/^\s{0,3}>\s?/gm, "")
+      .replace(/^\s*[-*+]\s+/gm, "")
+      .replace(/^\s*\d+\.\s+/gm, "")
+      .replace(/\|\|([\s\S]*?)\|\|/g, "$1")
+      .replace(/[*_~`#]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  // Total chars of searchable text kept per published page — bounds how much the shared _index
+  // doc can grow (Firestore's per-document cap is 1 MiB); a few thousand published pages of a
+  // few thousand chars each stays far under that, but if the wiki ever grows huge this is the
+  // knob to shrink, or the index doc to shard by first letter.
+  var WB_SEARCH_CAP = 3000;
+  // Only ever fed already-vis-filtered snapshot data (wbBuildWikiSnapshot/wbBuildSeasonSnapshot
+  // already drop restrito/mestre content) — so full-text search can never leak what a visitor
+  // isn't allowed to see; spoiler text is included because it's already downloaded to every
+  // visitor's browser today (just UI-hidden behind a reveal button), so indexing it adds no new
+  // exposure.
+  function wbEntrySearchText(snap) {
+    var parts = [snap.title, (snap.aliases || []).map(function (a) { return a.text; }).join(" "), snap.summary, snap.body];
+    (snap.fields || []).forEach(function (f) { parts.push(f.value); });
+    (snap.sections || []).forEach(function (s) { parts.push(s.title, s.body); });
+    (snap.variants || []).forEach(function (v) {
+      parts.push(v.label, v.summary, v.body);
+      (v.fields || []).forEach(function (f) { parts.push(f.value); });
+      (v.sections || []).forEach(function (s) { parts.push(s.title, s.body); });
+    });
+    return wbMdToPlain(parts.join(" ")).slice(0, WB_SEARCH_CAP);
+  }
+  function wbSeasonSearchText(snap) {
+    var parts = [snap.title];
+    (snap.sessions || []).forEach(function (sx) { parts.push(sx.title, sx.recap); });
+    return wbMdToPlain(parts.join(" ")).slice(0, WB_SEARCH_CAP);
+  }
+  function wbIndexEntry(e, snap) {
     var f = flowerById(e.universeId);
     return {
       title: e.title || "(sem título)",
@@ -4200,6 +4243,7 @@
       universeId: e.universeId,
       franchiseIds: e.franchiseIds || [],
       tags: (e.tags || []).filter(function (t) { return ((e.tagVis[t] || {}).vis || "publico") === "publico"; }),
+      search: wbEntrySearchText(snap),
       updatedAt: todayKey()
     };
   }
@@ -4209,8 +4253,9 @@
     if (!fbFs) { window.alert("Sem conexão com a nuvem agora — tente de novo em instantes."); return; }
     if (!fbUser) { window.alert("Entre na sua conta pra publicar (menu ⋯ › sincronização)."); return; }
     var id = e.wikiId || wbUniqueWikiSlug(e);
-    fbFs.collection("wikiPublic").doc(id).set(wbBuildWikiSnapshot(e)).then(function () {
-      var idxUpdate = {}; idxUpdate["entries." + id] = wbIndexEntry(e);
+    var snap = wbBuildWikiSnapshot(e);
+    fbFs.collection("wikiPublic").doc(id).set(snap).then(function () {
+      var idxUpdate = {}; idxUpdate["entries." + id] = wbIndexEntry(e, snap);
       return fbFs.collection("wikiPublic").doc("_index").set({ entries: {} }, { merge: true }).then(function () {
         return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate);
       });
@@ -4290,8 +4335,9 @@
     if (!fbFs) { window.alert("Sem conexão com a nuvem agora — tente de novo em instantes."); return; }
     if (!fbUser) { window.alert("Entre na sua conta pra publicar (menu ⋯ › sincronização)."); return; }
     var id = se.wikiId || wbUniqueSeasonSlug(cp, se);
-    fbFs.collection("wikiPublic").doc(id).set(wbBuildSeasonSnapshot(cp, se)).then(function () {
-      var idxUpdate = {}; idxUpdate["entries." + id] = { title: (cp.name || "Campanha") + " — " + (se.name || "Temporada"), type: "Temporada", universe: flowerById(cp.universeId) ? flowerById(cp.universeId).name : "", universeId: cp.universeId, franchiseIds: [], tags: [], updatedAt: todayKey() };
+    var snap = wbBuildSeasonSnapshot(cp, se);
+    fbFs.collection("wikiPublic").doc(id).set(snap).then(function () {
+      var idxUpdate = {}; idxUpdate["entries." + id] = { title: (cp.name || "Campanha") + " — " + (se.name || "Temporada"), type: "Temporada", universe: flowerById(cp.universeId) ? flowerById(cp.universeId).name : "", universeId: cp.universeId, franchiseIds: [], tags: [], search: wbSeasonSearchText(snap), updatedAt: todayKey() };
       return fbFs.collection("wikiPublic").doc("_index").set({ entries: {} }, { merge: true }).then(function () {
         return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate);
       });

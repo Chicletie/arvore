@@ -487,7 +487,7 @@
       listWrap.textContent = "";
       var q = (filterText || "").toLowerCase().trim();
       var filtered = entries.filter(function (e) {
-        return !q || (e.title + " " + e.type + " " + e.universe + " " + (e.tags || []).join(" ")).toLowerCase().indexOf(q) !== -1;
+        return !q || (e.title + " " + e.type + " " + e.universe + " " + (e.tags || []).join(" ") + " " + (e.search || "")).toLowerCase().indexOf(q) !== -1;
       });
       if (!filtered.length) { listWrap.appendChild(el("div", { class: "empty", text: "Nada encontrado." })); return; }
       var byUni = {};
