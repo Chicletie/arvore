@@ -3167,8 +3167,12 @@
     w.mapHide = w.mapHide || { types: {}, tags: {}, fr: {} };
     var colorBy = w.mapColorBy || "tipo";
 
-    // filter bar
-    var typesPresent = [], tagsPresent = [], frs = wbFranchisesOf(uniId);
+    // filter bar — "obra" here means franchise OR campaign (wbWorksOf's unification): a campanha
+    // is an obra just as much as a livro/franquia, so it needs to show up in both the colorBy
+    // grouping and the filter chips, not just the franchise-only Obras tab elsewhere.
+    var typesPresent = [], tagsPresent = [];
+    var frs = wbFranchisesOf(uniId).map(function (fr) { return { id: fr.id, name: fr.name || "(obra)" }; })
+      .concat(wbCampaignsOf(uniId).map(function (cp) { return { id: cp.id, name: (cp.name || "(campanha)") + " 🎲" }; }));
     entries.forEach(function (e) {
       if (typesPresent.indexOf(e.type) === -1) typesPresent.push(e.type);
       (e.tags || []).forEach(function (t) { if (tagsPresent.indexOf(t) === -1) tagsPresent.push(t); });
@@ -3213,7 +3217,8 @@
 
     var visible = entries.filter(function (e) {
       if (w.mapHide.types[e.type]) return false;
-      if ((e.franchiseIds || []).length && (e.franchiseIds || []).every(function (id) { return w.mapHide.fr[id]; })) return false;
+      var eObraIds = wbWorksOf(e).map(function (o) { return o.id; });
+      if (eObraIds.length && eObraIds.every(function (id) { return w.mapHide.fr[id]; })) return false;
       return true;
     });
 
@@ -3225,8 +3230,9 @@
       card.appendChild(host);
       var vis = {}; visible.forEach(function (e) { vis[e.id] = 1; });
       var nodes = visible.map(function (e) {
-        var col = colorBy === "franquia" ? (((e.franchiseIds || [])[0] && !w.mapHide.fr[e.franchiseIds[0]]) ? franchiseColor(e.franchiseIds[0]) : "var(--faint)") : typeColor(e.type);
-        return { id: e.id, label: wbDisplayName(e), color: col, r: 19, x: e.x, y: e.y, kind: "entry", ref: e, group: colorBy === "franquia" ? ((e.franchiseIds || [])[0] || "—") : e.type };
+        var eObras = wbWorksOf(e);
+        var col = colorBy === "franquia" ? ((eObras[0] && !w.mapHide.fr[eObras[0].id]) ? franchiseColor(eObras[0].id) : "var(--faint)") : typeColor(e.type);
+        return { id: e.id, label: wbDisplayName(e), color: col, r: 19, x: e.x, y: e.y, kind: "entry", ref: e, group: colorBy === "franquia" ? ((eObras[0] && eObras[0].id) || "—") : e.type };
       });
       var edges = [], localCands = {}, portalSeen = {};
       visible.forEach(function (e) {
