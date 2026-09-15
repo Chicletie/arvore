@@ -3819,13 +3819,46 @@
       publishedAt: todayKey()
     };
   }
-  function wbWikiUrl(id) { return location.origin + location.pathname.replace(/index\.html$/, "") + "wiki.html?id=" + id; }
+  // Wiki id = a slug of the title (not a random uid) so the link reads as "wiki/leonel-bianchi"
+  // instead of a random string — generated once at first publish and kept stable afterwards
+  // (republishing never reslugs, so an already-shared link never breaks).
+  function wbSlugify(s) {
+    var base = String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-+|-+$)/g, "").slice(0, 60);
+    return base || "entrada";
+  }
+  function wbUniqueWikiSlug(e) {
+    var base = wbSlugify(e.title), slug = base, n = 2;
+    function taken(s) { return C().entries.some(function (x) { return x.id !== e.id && x.wikiId === s; }); }
+    while (taken(slug)) { slug = base + "-" + n; n++; }
+    return slug;
+  }
+  // Metadata kept in the shared wikiPublic/_index doc — powers the wiki home page, search and
+  // cross-entry links, without every visitor having to fetch every published entry to browse.
+  function wbIndexEntry(e) {
+    var f = flowerById(e.universeId);
+    return {
+      title: e.title || "(sem título)",
+      type: e.type || "",
+      universe: f ? f.name : "",
+      universeId: e.universeId,
+      franchiseIds: e.franchiseIds || [],
+      tags: (e.tags || []).filter(function (t) { return (e.tagVis[t] || "publico") === "publico"; }),
+      updatedAt: todayKey()
+    };
+  }
+  function wbWikiUrl(id) { return location.origin + location.pathname.replace(/index\.html$/, "") + "wiki/" + id; }
   function wbPublishWiki(e, touch) {
     if (e.secret) { window.alert("Esta entrada está marcada como secreta — torne-a pública primeiro (botão 🔒 no topo)."); return; }
     if (!fbFs) { window.alert("Sem conexão com a nuvem agora — tente de novo em instantes."); return; }
     if (!fbUser) { window.alert("Entre na sua conta pra publicar (menu ⋯ › sincronização)."); return; }
-    var id = e.wikiId || uid();
+    var id = e.wikiId || wbUniqueWikiSlug(e);
     fbFs.collection("wikiPublic").doc(id).set(wbBuildWikiSnapshot(e)).then(function () {
+      var idxUpdate = {}; idxUpdate["entries." + id] = wbIndexEntry(e);
+      return fbFs.collection("wikiPublic").doc("_index").set({ entries: {} }, { merge: true }).then(function () {
+        return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate);
+      });
+    }).then(function () {
       e.wikiId = id; e.wikiPublishedAt = todayKey(); touch(true);
     }).catch(function (err) {
       window.alert("Não consegui publicar: " + (err && err.message ? err.message : err) + "\n\nSe for erro de permissão, a coleção \"wikiPublic\" ainda não tem a regra de leitura pública no Firestore.");
@@ -3834,7 +3867,11 @@
   function wbUnpublishWiki(e, touch) {
     if (!e.wikiId || !fbFs) return;
     if (!window.confirm("Despublicar essa wiki? O link para de funcionar.")) return;
-    fbFs.collection("wikiPublic").doc(e.wikiId).delete().then(function () {
+    var id = e.wikiId;
+    var idxUpdate = {}; idxUpdate["entries." + id] = firebase.firestore.FieldValue.delete();
+    fbFs.collection("wikiPublic").doc(id).delete().then(function () {
+      return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate).catch(function () {});
+    }).then(function () {
       e.wikiId = null; e.wikiPublishedAt = ""; touch(true);
     }).catch(function (err) { window.alert("Não consegui despublicar: " + (err && err.message ? err.message : err)); });
   }
