@@ -1170,10 +1170,15 @@
     { label: "é pai/mãe de", inverse: "é filho(a) de", style: "family" },
     { label: "é filho(a) de", inverse: "é pai/mãe de", style: "family" },
     { label: "irmão/irmã de", inverse: "irmão/irmã de", style: "family" },
+    { label: "meio-irmão/meia-irmã de", inverse: "meio-irmão/meia-irmã de", style: "family" },
+    { label: "avô/avó de", inverse: "neto(a) de", style: "family" },
+    { label: "neto(a) de", inverse: "avô/avó de", style: "family" },
     { label: "casado(a) com", inverse: "casado(a) com", style: "family" },
     { label: "serve a", inverse: "é servido(a) por", style: "neutral" },
     { label: "mentor de", inverse: "aprendiz de", style: "neutral" },
     { label: "criou", inverse: "criado(a) por", style: "neutral" },
+    { label: "faz parte de", inverse: "tem como membro", style: "faction" },
+    { label: "lidera", inverse: "é liderado(a) por", style: "faction" },
     { label: "pertence a", inverse: "contém", style: "neutral" },
     { label: "fica em", inverse: "abriga", style: "neutral" },
     { label: "manifesta-se como", inverse: "manifestação de", style: "multiversal" }
@@ -1182,6 +1187,7 @@
     ally: { color: "#3f9d5f", dash: "" },
     rival: { color: "#d05a45", dash: "" },
     family: { color: "#b58a2e", dash: "" },
+    faction: { color: "#3f7d94", dash: "" },
     multiversal: { color: "#8f5cc9", dash: "6 4" },
     neutral: { color: "var(--border-strong)", dash: "" }
   };
@@ -1192,6 +1198,33 @@
   function linkInverseOf(label) {
     var lt = LINK_TYPES.filter(function (l) { return l.label === label; })[0];
     return lt ? lt.inverse : null;
+  }
+  // Canonical direction for an edge shown between two entries that link to each other both ways
+  // (auto-reciprocal pairs like "é pai/mãe de" / "é filho(a) de"): whichever label was declared
+  // first above wins, so the SAME pair always renders with the SAME label everywhere, instead of
+  // depending on entry array order (which is what caused the map to flip depending on which side
+  // you looked from).
+  var LABEL_PRIORITY = {};
+  LINK_TYPES.forEach(function (l, i) {
+    if (LABEL_PRIORITY[l.label] === undefined) LABEL_PRIORITY[l.label] = i * 2;
+    if (l.inverse && LABEL_PRIORITY[l.inverse] === undefined) LABEL_PRIORITY[l.inverse] = i * 2 + 1;
+  });
+  function labelPriority(label) { var p = LABEL_PRIORITY[label]; return p === undefined ? 9999 : p; }
+  // Dedupe a set of entries' links into one canonical edge per pair (regardless of which side
+  // stores which direction), picking the lower-priority label so the result is deterministic.
+  function wbGraphEdges(entries, allowed) {
+    var cands = {};
+    entries.forEach(function (e) {
+      (e.links || []).forEach(function (lk) {
+        if (!allowed(lk.to)) return;
+        var key = [e.id, lk.to].sort().join("|");
+        var pr = labelPriority(lk.label);
+        if (!cands[key] || pr < cands[key].priority) {
+          cands[key] = { from: e.id, to: lk.to, label: lk.label || "", style: linkStyleOf(lk.label), priority: pr };
+        }
+      });
+    });
+    return Object.keys(cands).map(function (k) { return cands[k]; });
   }
   var SABBATS = [
     { name: "Samhain", md: [4, 30], meaning: "O véu se afina. Honrar ancestrais, encerrar ciclos, adivinhação." },
@@ -2730,27 +2763,29 @@
         var col = colorBy === "franquia" ? (((e.franchiseIds || [])[0] && !w.mapHide.fr[e.franchiseIds[0]]) ? franchiseColor(e.franchiseIds[0]) : "var(--faint)") : typeColor(e.type);
         return { id: e.id, label: e.title || "(sem título)", color: col, r: 19, x: e.x, y: e.y, kind: "entry", ref: e, group: colorBy === "franquia" ? ((e.franchiseIds || [])[0] || "—") : e.type };
       });
-      var edges = [], seen = {}, portalSeen = {};
+      var edges = [], localCands = {}, portalSeen = {};
       visible.forEach(function (e) {
         (e.links || []).forEach(function (lk) {
           var target = wbEntry(lk.to);
           if (!target) return;
-          var style = linkStyleOf(lk.label);
           if (target.universeId === uniId) {
             if (!vis[target.id]) return;
             var key = [e.id, lk.to].sort().join("|");
-            if (seen[key]) return; seen[key] = 1;
-            edges.push({ from: e.id, to: lk.to, label: lk.label || "", style: style });
+            var pr = labelPriority(lk.label);
+            if (!localCands[key] || pr < localCands[key].priority) {
+              localCands[key] = { from: e.id, to: lk.to, label: lk.label || "", style: linkStyleOf(lk.label), priority: pr };
+            }
           } else {
             var pid = "portal:" + lk.to;
             if (!portalSeen[pid]) {
               nodes.push({ id: pid, label: target.title + " ↗", color: flowerById(target.universeId).color, r: 14, kind: "portal", ref: target });
               portalSeen[pid] = 1;
             }
-            edges.push({ from: e.id, to: pid, label: lk.label || "", style: style });
+            edges.push({ from: e.id, to: pid, label: lk.label || "", style: linkStyleOf(lk.label) });
           }
         });
       });
+      Object.keys(localCands).forEach(function (k) { edges.push(localCands[k]); });
       var legendGroups = {};
       nodes.forEach(function (n) { if (n.kind === "entry") legendGroups[n.group] = n.color; });
       var legendGroups2 = legendGroups;
@@ -2790,13 +2825,13 @@
     var entries = wbEntriesOf(uniId);
     if (!entries.length) { v.appendChild(el("div", { class: "empty", text: "Nenhuma entrada neste universo." })); return; }
 
-    var q = (w.wbQuery || "").toLowerCase();
-    var search = el("input", { class: "field", placeholder: "Buscar (título, apelido, texto, tag)…", value: w.wbQuery || "", style: "width:100%;margin-bottom:10px", oninput: function () { w.wbQuery = search.value; render(); } });
+    var search = el("input", { class: "field", placeholder: "Buscar (título, apelido, texto, tag)…", value: w.wbQuery || "", style: "width:100%;margin-bottom:10px" });
+    search.addEventListener("input", function () { w.wbQuery = search.value; renderList(); });
     v.appendChild(search);
     w.entStatusHide = w.entStatusHide || { arquivado: true };
     var stbar = el("div", { class: "lens-bar", style: "margin-bottom:12px" });
     ENTRY_STATUS.forEach(function (s) {
-      stbar.appendChild(el("button", { class: "chip sm", type: "button", "aria-pressed": w.entStatusHide[s.id] ? "false" : "true", onclick: function () { w.entStatusHide[s.id] = !w.entStatusHide[s.id]; render(); } }, [el("span", { text: s.glyph + " " + s.label })]));
+      stbar.appendChild(el("button", { class: "chip sm", type: "button", "aria-pressed": w.entStatusHide[s.id] ? "false" : "true", onclick: function () { w.entStatusHide[s.id] = !w.entStatusHide[s.id]; renderList(); } }, [el("span", { text: s.glyph + " " + s.label })]));
     });
     v.appendChild(stbar);
     if (w.typeFilter) {
@@ -2804,72 +2839,81 @@
         el("button", { class: "chip", type: "button", "aria-pressed": "true", onclick: function () { wbGo({ typeFilter: null }); } }, [el("span", { text: (typeIcon(w.typeFilter) || "") + " " + w.typeFilter + "  ✕" })])
       ]));
     }
+    var listHost = el("div");
+    v.appendChild(listHost);
+
     function match(e) {
+      var q = (w.wbQuery || "").toLowerCase();
       if (w.typeFilter && e.type !== w.typeFilter) return false;
       if (w.entStatusHide[e.status]) return false;
       if (!q) return true;
       return (e.title + " " + (e.aliases || []).join(" ") + " " + e.summary + " " + e.body + " " + e.tags.join(" ")).toLowerCase().indexOf(q) !== -1;
     }
-    if (mode === "cartoes") {
-      var grid = el("div", { class: "wb-cards" });
-      var shown = entries.filter(match);
-      if (!shown.length) { v.appendChild(el("div", { class: "empty", text: "Nada encontrado." })); return; }
-      shown.forEach(function (e) {
-        var cd = el("div", { class: "wb-card2", onclick: function () { wbOpen(e); } });
-        if (e.cover) cd.appendChild(el("div", { class: "wb-card2-img", style: "background-image:url('" + e.cover.replace(/'/g, "%27") + "')" }));
-        else cd.appendChild(el("div", { class: "wb-card2-img", style: "background:linear-gradient(135deg," + typeColor(e.type) + "44," + typeColor(e.type) + "18)" }));
-        cd.appendChild(el("div", { class: "wb-card2-body" }, [
-          el("div", { class: "wb-card2-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
-          el("div", { class: "wb-card2-meta", text: statusInfo(e.status).glyph + " " + typeTag(e.type) })
-        ]));
-        grid.appendChild(cd);
-      });
-      v.appendChild(grid);
-      return;
-    }
-    var card = el("div", { class: "card" });
-    if (mode === "arvore") {
-      var roots = entries.filter(function (e) { return !e.parentId || !wbEntry(e.parentId) || wbEntry(e.parentId).universeId !== uniId; });
-      var any = false;
-      function renderNode(e, depth) {
-        if (depth > 8) return;
-        var kids = entries.filter(function (c) { return c.parentId === e.id; });
-        if (!match(e) && !kids.some(function (k) { return match(k); })) return;
-        any = true;
-        card.appendChild(el("div", { class: "row", style: "padding-left:" + (depth * 16) + "px" }, [
-          el("div", { class: "row-body" }, [
-            el("div", { class: "row-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
-            el("div", { class: "row-meta", text: statusInfo(e.status).glyph + " " + typeTag(e.type) + (kids.length ? " · " + kids.length + " dentro" : "") })
-          ]),
-          el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
-        ]));
-        kids.forEach(function (k) { renderNode(k, depth + 1); });
+
+    function renderList() {
+      listHost.textContent = "";
+      if (mode === "cartoes") {
+        var grid = el("div", { class: "wb-cards" });
+        var shown = entries.filter(match);
+        if (!shown.length) { listHost.appendChild(el("div", { class: "empty", text: "Nada encontrado." })); return; }
+        shown.forEach(function (e) {
+          var cd = el("div", { class: "wb-card2", onclick: function () { wbOpen(e); } });
+          if (e.cover) cd.appendChild(el("div", { class: "wb-card2-img", style: "background-image:url('" + e.cover.replace(/'/g, "%27") + "')" }));
+          else cd.appendChild(el("div", { class: "wb-card2-img", style: "background:linear-gradient(135deg," + typeColor(e.type) + "44," + typeColor(e.type) + "18)" }));
+          cd.appendChild(el("div", { class: "wb-card2-body" }, [
+            el("div", { class: "wb-card2-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
+            el("div", { class: "wb-card2-meta", text: statusInfo(e.status).glyph + " " + typeTag(e.type) })
+          ]));
+          grid.appendChild(cd);
+        });
+        listHost.appendChild(grid);
+        return;
       }
-      roots.forEach(function (e) { renderNode(e, 0); });
-      if (!any) card.appendChild(el("div", { class: "empty", text: "Nada encontrado." }));
-    } else {
-      var byType = {};
-      entries.filter(match).forEach(function (e) { (byType[e.type] = byType[e.type] || []).push(e); });
-      var order = Object.keys(byType).sort();
-      if (!order.length) card.appendChild(el("div", { class: "empty", text: "Nada encontrado." }));
-      order.forEach(function (tp) {
-        card.appendChild(el("div", { class: "cathead" }, [
-          el("span", { style: "display:inline-block;width:9px;height:9px;border-radius:50%;background:" + typeColor(tp) + ";margin-right:7px" }),
-          typeTag(tp) + " · " + byType[tp].length
-        ]));
-        byType[tp].forEach(function (e) {
-          card.appendChild(el("div", { class: "row" }, [
-            el("button", { class: "wb-star" + (e.favorite ? " on" : ""), type: "button", "aria-label": "Favoritar", text: "★", onclick: function () { e.favorite = !e.favorite; save(); render(); } }),
+      var card = el("div", { class: "card" });
+      if (mode === "arvore") {
+        var roots = entries.filter(function (e) { return !e.parentId || !wbEntry(e.parentId) || wbEntry(e.parentId).universeId !== uniId; });
+        var any = false;
+        function renderNode(e, depth) {
+          if (depth > 8) return;
+          var kids = entries.filter(function (c) { return c.parentId === e.id; });
+          if (!match(e) && !kids.some(function (k) { return match(k); })) return;
+          any = true;
+          card.appendChild(el("div", { class: "row", style: "padding-left:" + (depth * 16) + "px" }, [
             el("div", { class: "row-body" }, [
-              el("div", { class: "row-title", text: (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
-              el("div", { class: "row-meta", text: statusInfo(e.status).glyph + " " + (e.summary || (e.body || "").slice(0, 70)).replace(/\n/g, " ") })
+              el("div", { class: "row-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
+              el("div", { class: "row-meta", text: statusInfo(e.status).glyph + " " + typeTag(e.type) + (kids.length ? " · " + kids.length + " dentro" : "") })
             ]),
             el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
           ]));
+          kids.forEach(function (k) { renderNode(k, depth + 1); });
+        }
+        roots.forEach(function (e) { renderNode(e, 0); });
+        if (!any) card.appendChild(el("div", { class: "empty", text: "Nada encontrado." }));
+      } else {
+        var byType = {};
+        entries.filter(match).forEach(function (e) { (byType[e.type] = byType[e.type] || []).push(e); });
+        var order = Object.keys(byType).sort();
+        if (!order.length) card.appendChild(el("div", { class: "empty", text: "Nada encontrado." }));
+        order.forEach(function (tp) {
+          card.appendChild(el("div", { class: "cathead" }, [
+            el("span", { style: "display:inline-block;width:9px;height:9px;border-radius:50%;background:" + typeColor(tp) + ";margin-right:7px" }),
+            typeTag(tp) + " · " + byType[tp].length
+          ]));
+          byType[tp].forEach(function (e) {
+            card.appendChild(el("div", { class: "row" }, [
+              el("button", { class: "wb-star" + (e.favorite ? " on" : ""), type: "button", "aria-label": "Favoritar", text: "★", onclick: function () { e.favorite = !e.favorite; save(); renderList(); } }),
+              el("div", { class: "row-body" }, [
+                el("div", { class: "row-title", text: (e.secret ? "🔒 " : "") + (e.title || "(sem título)") }),
+                el("div", { class: "row-meta", text: statusInfo(e.status).glyph + " " + (e.summary || (e.body || "").slice(0, 70)).replace(/\n/g, " ") })
+              ]),
+              el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
+            ]));
+          });
         });
-      });
+      }
+      listHost.appendChild(card);
     }
-    v.appendChild(card);
+    renderList();
   }
 
   /* ---- Datas de eventos (precisão variável: ano · mês/ano · dia/mês/ano) ---- */
@@ -3167,15 +3211,40 @@
     return chain;
   }
   function wbFamily(e) {
-    var parents = [], children = [], siblings = [], spouses = [];
+    var parents = [], children = [], siblings = [], halfSiblings = [], spouses = [], grandparents = [], grandchildren = [];
     (e.links || []).forEach(function (lk) {
       var t = wbEntry(lk.to); if (!t) return;
       if (lk.label === "é filho(a) de") parents.push(t);
       else if (lk.label === "é pai/mãe de") children.push(t);
       else if (lk.label === "irmão/irmã de") siblings.push(t);
+      else if (lk.label === "meio-irmão/meia-irmã de") halfSiblings.push(t);
       else if (lk.label === "casado(a) com") spouses.push(t);
+      else if (lk.label === "avô/avó de") grandchildren.push(t);
+      else if (lk.label === "neto(a) de") grandparents.push(t);
     });
-    return { parents: parents, children: children, siblings: siblings, spouses: spouses };
+    return { parents: parents, children: children, siblings: siblings, halfSiblings: halfSiblings, spouses: spouses, grandparents: grandparents, grandchildren: grandchildren };
+  }
+  // Two entries who share at least one "é filho(a) de" parent are siblings (full, if every parent
+  // matches) or half-siblings (if only some do). Runs reactively whenever a parent link changes —
+  // NOT on every load — so a manually-removed inferred link doesn't silently come back.
+  function wbInferSiblings(childId) {
+    var child = wbEntry(childId);
+    if (!child) return;
+    var parents = (child.links || []).filter(function (l) { return l.label === "é filho(a) de"; }).map(function (l) { return l.to; });
+    if (!parents.length) return;
+    C().entries.forEach(function (other) {
+      if (other.id === child.id || other.universeId !== child.universeId) return;
+      var otherParents = (other.links || []).filter(function (l) { return l.label === "é filho(a) de"; }).map(function (l) { return l.to; });
+      if (!otherParents.length) return;
+      var shared = parents.filter(function (p) { return otherParents.indexOf(p) !== -1; });
+      if (!shared.length) return;
+      var already = (child.links || []).some(function (l) { return l.to === other.id && (l.label === "irmão/irmã de" || l.label === "meio-irmão/meia-irmã de"); });
+      if (already) return;
+      var full = shared.length === parents.length && shared.length === otherParents.length;
+      var label = full ? "irmão/irmã de" : "meio-irmão/meia-irmã de";
+      child.links = child.links || []; child.links.push({ to: other.id, label: label, auto: true });
+      other.links = other.links || []; other.links.push({ to: child.id, label: label, auto: true });
+    });
   }
   function wbAppearsIn(e) {
     var out = [];
@@ -3640,7 +3709,7 @@
 
     // família
     var fam = wbFamily(e);
-    if (fam.parents.length || fam.children.length || fam.siblings.length || fam.spouses.length) {
+    if (fam.parents.length || fam.children.length || fam.siblings.length || fam.halfSiblings.length || fam.spouses.length || fam.grandparents.length || fam.grandchildren.length) {
       card.appendChild(cat("Família"));
       function famLine(lbl, arr) {
         if (!arr.length) return null;
@@ -3648,7 +3717,10 @@
           return el("span", { class: "wl", text: (i ? ", " : "") + x.title, onclick: (function (xx) { return function () { wbOpen(xx); }; })(x) });
         })));
       }
-      [famLine("pais", fam.parents), famLine("filhos", fam.children), famLine("irmãos", fam.siblings), famLine("cônjuge", fam.spouses)].forEach(function (n) { if (n) card.appendChild(n); });
+      [
+        famLine("avós", fam.grandparents), famLine("pais", fam.parents), famLine("filhos", fam.children), famLine("netos", fam.grandchildren),
+        famLine("irmãos", fam.siblings), famLine("meios-irmãos", fam.halfSiblings), famLine("cônjuge", fam.spouses)
+      ].forEach(function (n) { if (n) card.appendChild(n); });
       card.appendChild(wbFamilyTree(e, fam));
     }
 
@@ -3681,6 +3753,8 @@
         e.links.push({ to: to, label: label });
         var inv = linkInverseOf(label), tgt = wbEntry(to);
         if (inv && tgt && !(tgt.links || []).some(function (l) { return l.to === e.id && l.label === inv; })) { tgt.links = tgt.links || []; tgt.links.push({ to: e.id, label: inv }); }
+        if (label === "é filho(a) de") wbInferSiblings(e.id);
+        else if (label === "é pai/mãe de") wbInferSiblings(to);
         touch(true);
       } });
       var toSel = el("select", { class: "field grow", name: "to" });
@@ -4038,7 +4112,7 @@
         var head = el("div", { class: "wb-sec-head" });
         head.appendChild(el("span", { class: "wb-lfield-lab", text: "sessão " + n }));
         var di = el("input", { class: "field", type: "date", value: sx.date || "", style: "width:auto;padding:4px 8px" });
-        di.addEventListener("change", function () { sx.date = di.value; touch(true); });
+        di.addEventListener("change", function () { sx.date = di.value; touch(false); });
         head.appendChild(di);
         head.appendChild(delBtn(function () { if (window.confirm("Excluir a sessão " + n + "?")) { se.sessions = se.sessions.filter(function (x) { return x.id !== sx.id; }); touch(true); } }));
         box.appendChild(head);
@@ -4327,8 +4401,8 @@
     var idset = {}; nodes.forEach(function (n) { idset[n.id] = 1; });
     all.forEach(function (e) {
       if (idset["hub:" + e.universeId]) edges.push({ from: e.id, to: "hub:" + e.universeId, weak: true });
-      (e.links || []).forEach(function (lk) { if (idset[lk.to]) edges.push({ from: e.id, to: lk.to, label: lk.label || "", style: linkStyleOf(lk.label) }); });
     });
+    edges = edges.concat(wbGraphEdges(all, function (id) { return !!idset[id]; }));
     setTimeout(function () {
       createGraph(host, {
         nodes: nodes, edges: edges, hubGravity: 0.025, legend: legend,
