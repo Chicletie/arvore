@@ -474,7 +474,8 @@
   .ntag { font-size: 11px; color: var(--accent-ink); background: var(--accent-wash); padding: 3px 9px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-family: var(--font-body); }
   .ntag-chip { display: inline-flex; align-items: stretch; font-size: 11px; color: var(--accent-ink); background: var(--accent-wash); border-radius: var(--radius-sm); border: 1px solid var(--border); font-family: var(--font-body); overflow: hidden; }
   .ntag-chip.ntag-spoiler { background: color-mix(in srgb, var(--gold) 16%, var(--accent-wash)); }
-  .ntag-chip.ntag-oculto { background: color-mix(in srgb, var(--warn) 16%, var(--accent-wash)); }
+  .ntag-chip.ntag-restrito { background: color-mix(in srgb, var(--accent) 16%, var(--accent-wash)); }
+  .ntag-chip.ntag-mestre { background: color-mix(in srgb, var(--warn) 16%, var(--accent-wash)); }
   .ntag-vis { background: none; border: 0; color: inherit; padding: 3px 7px; cursor: pointer; font-family: inherit; font-size: inherit; }
   .ntag-del { background: none; border: 0; border-left: 1px solid var(--border); color: var(--faint); padding: 3px 6px; cursor: pointer; font-size: inherit; }
   .ntag-del:hover { color: var(--neg); }
@@ -845,8 +846,12 @@
   .wb-secret-mark { color: var(--warn); font-size: 0.82em; letter-spacing: 0.04em; }
   .wb-secret-hidden { color: var(--faint); font-style: italic; }
   .wb-spoiler-mark { color: var(--gold-ink); font-size: 0.82em; letter-spacing: 0.04em; }
+  .wb-restrito-mark { color: var(--accent); font-size: 0.82em; letter-spacing: 0.04em; }
   .dd-secret, .wb-sec-secret > .wb-sec-head { background: repeating-linear-gradient(45deg, transparent, transparent 8px, color-mix(in srgb, var(--warn) 8%, transparent) 8px, color-mix(in srgb, var(--warn) 8%, transparent) 16px); }
   .dd-spoiler, .wb-sec-spoiler > .wb-sec-head { background: repeating-linear-gradient(45deg, transparent, transparent 8px, color-mix(in srgb, var(--gold) 10%, transparent) 8px, color-mix(in srgb, var(--gold) 10%, transparent) 16px); }
+  .dd-restrito, .wb-sec-restrito > .wb-sec-head { background: repeating-linear-gradient(90deg, transparent, transparent 8px, color-mix(in srgb, var(--accent) 12%, transparent) 8px, color-mix(in srgb, var(--accent) 12%, transparent) 16px); }
+  .wb-allow-editor { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0 8px; }
+  .wb-allow-editor select { padding: 2px 6px; font-size: 11px; }
   /* ---- markdown spoiler tags (||texto||) — click to reveal, both in-app and on published wikis ---- */
   .md-spoiler { background: var(--ink); color: transparent; border-radius: 3px; cursor: pointer; padding: 0 2px; transition: color .12s, background .12s; user-select: none; }
   .md-spoiler.on { background: var(--accent-wash); color: inherit; cursor: text; user-select: text; }
@@ -1204,17 +1209,24 @@
     { id: "progresso", label: "progresso" },
     { id: "ligacao", label: "ligação a entrada" }
   ];
-  // Publish visibility for fields/seções/tags/aliases: público sai na wiki normalmente,
-  // spoiler sai mas colapsado atrás de "revelar" (não é sigilo real, é só pra não estragar
-  // surpresa), oculto nem entra no export. Cycled by the same button in the editor.
-  var WB_VIS = ["publico", "spoiler", "oculto"];
+  // Publish visibility for fields/seções/tags/aliases/galeria/capa: público sai na wiki
+  // normalmente; spoiler sai mas colapsado atrás de "revelar" (não é sigilo real, é só pra
+  // não estragar surpresa); restrito sai mas só quem estiver na lista de permitidos daquele
+  // item consegue ler (segurança de verdade, imposta pela própria regra do Firestore, não só
+  // escondida na tela); mestre nunca sai da sua conta. Cycled by the same button in the editor.
+  // ("oculto" is the old stored id for what's now "mestre" — normWorld renames it below so old
+  // data keeps meaning exactly what it always meant, just under the clearer new name.)
+  var WB_VIS = ["publico", "spoiler", "restrito", "mestre"];
   var WB_VIS_INFO = {
     publico: { glyph: "🔓", label: "público" },
     spoiler: { glyph: "🙈", label: "spoiler" },
-    oculto: { glyph: "🔒", label: "oculto" }
+    restrito: { glyph: "🔐", label: "restrito" },
+    mestre: { glyph: "🔒", label: "mestre" }
   };
   function nextVis(v) { var i = WB_VIS.indexOf(v); return WB_VIS[(i + 1) % WB_VIS.length]; }
   function visInfo(v) { return WB_VIS_INFO[v] || WB_VIS_INFO.publico; }
+  function wbVisMarkClass(v) { return v === "mestre" ? "wb-secret-mark" : v === "restrito" ? "wb-restrito-mark" : "wb-spoiler-mark"; }
+  function wbVisBgClass(v, prefix) { return v === "mestre" ? prefix + "-secret" : v === "restrito" ? prefix + "-restrito" : v === "spoiler" ? prefix + "-spoiler" : ""; }
   var LINK_TYPES = [
     { label: "aliado de", inverse: "aliado de", style: "ally" },
     { label: "rival de", inverse: "rival de", style: "rival" },
@@ -1335,7 +1347,8 @@
     return {
       criacao: JSON.parse(JSON.stringify(world)),
       mesa: JSON.parse(JSON.stringify(world)),
-      settings: { accent: "ouro" }
+      settings: { accent: "ouro" },
+      wikiPlayers: []
     };
   }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -1366,9 +1379,26 @@
       if (ENTRY_STATUS.map(function (x) { return x.id; }).indexOf(e.status) === -1) e.status = "rascunho";
       e.secret = !!e.secret;
       if (typeof e.cover !== "string") e.cover = "";
-      if (WB_VIS.indexOf(e.coverVis) === -1) e.coverVis = "publico";
+      // old boolean-secret data becomes "mestre" (same meaning: never leaves your account);
+      // the literal old string "oculto" is likewise just renamed to "mestre" going forward.
+      function wbMigrateVis(v, secretFlag) {
+        if (v === "oculto") return "mestre";
+        if (WB_VIS.indexOf(v) !== -1) return v;
+        return secretFlag ? "mestre" : "publico";
+      }
+      e.coverVis = wbMigrateVis(e.coverVis, false);
+      if (!Array.isArray(e.coverAllow)) e.coverAllow = [];
       if (!e.tagVis || typeof e.tagVis !== "object") e.tagVis = {};
       if (!e.aliasVis || typeof e.aliasVis !== "object") e.aliasVis = {};
+      // tagVis/aliasVis entries used to be a bare vis string; normalized here to always be
+      // {vis, allow} so a restrito tag/alias has somewhere to keep its own allow-list.
+      [e.tagVis, e.aliasVis].forEach(function (map) {
+        Object.keys(map).forEach(function (k) {
+          var cur = map[k];
+          if (cur && typeof cur === "object") { map[k] = { vis: wbMigrateVis(cur.vis, false), allow: Array.isArray(cur.allow) ? cur.allow : [] }; }
+          else { map[k] = { vis: wbMigrateVis(cur, false), allow: [] }; }
+        });
+      });
       if (typeof e.dispAlias !== "string") e.dispAlias = "";
       if (!Array.isArray(e.gallery)) e.gallery = [];
       e.gallery = e.gallery.filter(function (g) { return g && typeof g === "object"; });
@@ -1377,7 +1407,8 @@
         if (typeof g.group !== "string") g.group = "";
         if (typeof g.url !== "string") g.url = "";
         if (typeof g.caption !== "string") g.caption = "";
-        if (WB_VIS.indexOf(g.vis) === -1) g.vis = "publico";
+        g.vis = wbMigrateVis(g.vis, false);
+        if (!Array.isArray(g.allow)) g.allow = [];
       });
       if (e.wikiId !== undefined && typeof e.wikiId !== "string") e.wikiId = null;
       if (e.wikiId === undefined) e.wikiId = null;
@@ -1387,7 +1418,8 @@
         var fm = e.fieldMeta[k]; if (!fm || typeof fm !== "object") { delete e.fieldMeta[k]; return; }
         if (FIELD_TYPES.map(function (x) { return x.id; }).indexOf(fm.type) === -1) fm.type = "texto";
         if (!Array.isArray(fm.opts)) fm.opts = [];
-        if (WB_VIS.indexOf(fm.vis) === -1) fm.vis = fm.secret ? "oculto" : "publico";
+        fm.vis = wbMigrateVis(fm.vis, fm.secret);
+        if (!Array.isArray(fm.allow)) fm.allow = [];
         delete fm.secret;
       });
       e.links.forEach(function (l) { if (typeof l.note !== "string") l.note = ""; if (typeof l.dispAs !== "string") l.dispAs = ""; });
@@ -1397,7 +1429,8 @@
         if (sec.id == null) sec.id = uid();
         if (typeof sec.title !== "string") sec.title = "";
         if (typeof sec.body !== "string") sec.body = "";
-        if (WB_VIS.indexOf(sec.vis) === -1) sec.vis = sec.secret ? "oculto" : "publico";
+        sec.vis = wbMigrateVis(sec.vis, sec.secret);
+        if (!Array.isArray(sec.allow)) sec.allow = [];
         delete sec.secret;
         sec.collapsed = !!sec.collapsed;
       });
@@ -1481,6 +1514,14 @@
     if (s.settings.accent === "ameixa") s.settings.accent = "ametista";
     if (s.settings.accent === "ferrugem") s.settings.accent = "carmim";
     if (s.settings.accent === "oceano") s.settings.accent = "jade";
+    // Roster of players who may be granted "restrito" access to wiki content — cross-cutting
+    // (not per-world), so it lives at the top level alongside settings.
+    if (!Array.isArray(s.wikiPlayers)) s.wikiPlayers = [];
+    s.wikiPlayers = s.wikiPlayers.filter(function (p) { return p && typeof p === "object" && p.email; });
+    s.wikiPlayers.forEach(function (p) {
+      if (typeof p.label !== "string") p.label = "";
+      if (typeof p.addedAt !== "string") p.addedAt = todayKey();
+    });
     return s;
   }
   var state, hadLocal = false;
@@ -1706,6 +1747,37 @@
     opts.forEach(function (o) { sel.appendChild(el("option", { value: o, text: o, selected: o === cur ? "selected" : null })); });
     sel.addEventListener("change", function () { onChange(sel.value === titleOpt ? "" : sel.value); });
     return sel;
+  }
+  // "Quem pode ver" editor for one restrito item: chips of already-picked players (by email,
+  // labeled from state.wikiPlayers when known) + a select to add another from the roster.
+  // `allow` is the live array on the item (fieldMeta[k].allow, section.allow, etc) — mutated
+  // in place, matching how the rest of this codebase's inline editors work.
+  function wbAllowEditor(allow, touch) {
+    var wrap = el("div", { class: "wb-allow-editor" });
+    function paint() {
+      wrap.textContent = "";
+      (allow || []).forEach(function (email) {
+        var p = (state.wikiPlayers || []).filter(function (x) { return x.email === email; })[0];
+        wrap.appendChild(el("span", { class: "ntag-chip" }, [
+          el("span", { class: "ntag-vis", text: (p && p.label ? p.label + " · " : "") + email }),
+          el("button", { type: "button", class: "ntag-del", "aria-label": "remover", text: "✕", onclick: function () {
+            var i = allow.indexOf(email); if (i !== -1) allow.splice(i, 1); touch(true); paint();
+          } })
+        ]));
+      });
+      var available = (state.wikiPlayers || []).filter(function (p) { return allow.indexOf(p.email) === -1; });
+      if (available.length) {
+        var sel = el("select", { class: "field" });
+        sel.appendChild(el("option", { value: "", text: "+ jogador…" }));
+        available.forEach(function (p) { sel.appendChild(el("option", { value: p.email, text: (p.label ? p.label + " — " : "") + p.email })); });
+        sel.addEventListener("change", function () { if (sel.value) { allow.push(sel.value); touch(true); paint(); } });
+        wrap.appendChild(sel);
+      } else if (!(state.wikiPlayers || []).length) {
+        wrap.appendChild(el("span", { class: "hint", text: "nenhum jogador cadastrado ainda (⋯ menu › jogadores da wiki)" }));
+      }
+    }
+    paint();
+    return wrap;
   }
   var SVGNS = "http://www.w3.org/2000/svg";
   function svgEl(name, attrs) {
@@ -2161,7 +2233,7 @@
 
   /* ---- [[ ]] autocomplete for a textarea ---- */
   function wbStubEntry(uniId, title) {
-    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], status: "semente", secret: false, cover: "", coverVis: "publico", gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
+    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
     C().entries.push(e); save();
     return e;
   }
@@ -3554,8 +3626,9 @@
   }
   function wbFieldMeta(e, k) {
     var m = e.fieldMeta[k];
-    if (!m || typeof m !== "object") return { type: guessFieldType(k), opts: [], vis: "publico", _guessed: true };
+    if (!m || typeof m !== "object") return { type: guessFieldType(k), opts: [], vis: "publico", allow: [], _guessed: true };
     if (!Array.isArray(m.opts)) m.opts = [];
+    if (!Array.isArray(m.allow)) m.allow = [];
     if (!m.type) m.type = "texto";
     return m;
   }
@@ -3579,12 +3652,12 @@
     name = (name || "").trim();
     if (!name || (name in e.fields)) return;
     e.fields[name] = "";
-    e.fieldMeta[name] = { type: guessFieldType(name), opts: [], vis: "publico" };
+    e.fieldMeta[name] = { type: guessFieldType(name), opts: [], vis: "publico", allow: [] };
     touch(true);
   }
   function wbRenderLongField(e, k, opts) {
     var fm = wbFieldMeta(e, k), touch = opts.touch;
-    var wrap = el("div", { class: "wb-lfield" + (fm.vis === "oculto" ? " wb-sec-secret" : fm.vis === "spoiler" ? " wb-sec-spoiler" : ""), "data-toc": k });
+    var wrap = el("div", { class: "wb-lfield" + (wbVisBgClass(fm.vis, "wb-sec") ? " " + wbVisBgClass(fm.vis, "wb-sec") : ""), "data-toc": k });
     var head = el("div", { class: "wb-lfield-head" });
     if (opts.ro) head.appendChild(el("span", { class: "wb-lfield-lab", text: k }));
     else head.appendChild(editable({ tag: "span", className: "wb-lfield-lab", value: k, placeholder: "campo", commit: function (nv) {
@@ -3592,7 +3665,7 @@
       if (nv && nv !== k && !(nv in e.fields)) { e.fields[nv] = e.fields[k]; delete e.fields[k]; e.fieldMeta[nv] = fm; delete e.fieldMeta[k]; touch(true); }
       else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
     } }));
-    if (fm.vis !== "publico") head.appendChild(el("span", { class: fm.vis === "oculto" ? "wb-secret-mark" : "wb-spoiler-mark", text: visInfo(fm.vis).glyph }));
+    if (fm.vis !== "publico") head.appendChild(el("span", { class: wbVisMarkClass(fm.vis), text: visInfo(fm.vis).glyph }));
     if (!opts.ro) head.appendChild(el("span", { class: "wb-fieldctl" }, [
       el("button", { type: "button", title: "Tipo: " + fm.type, text: "⚙", onclick: function () {
         var m = wbFieldMetaWrite(e, k), ids = FIELD_TYPES.map(function (x) { return x.id; });
@@ -3604,9 +3677,12 @@
       el("button", { type: "button", title: "Remover campo", text: "✕", onclick: function () { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); } })
     ]));
     wrap.appendChild(head);
+    if (!opts.ro && fm.vis === "restrito") wrap.appendChild(wbAllowEditor(fm.allow, touch));
     if (opts.ro) {
       if (opts.hideSecret && fm.vis === "spoiler") {
         wrap.appendChild(wbSpoilerCover(function () { var d = el("div", { class: "wb-prose wb-lfield-read" }); d.appendChild(renderMarkdown(e.fields[k] || "")); return d; }));
+      } else if (opts.hideSecret && fm.vis === "restrito") {
+        wrap.appendChild(wbRestritoPlaceholder(fm.allow));
       } else {
         var rd = el("div", { class: "wb-prose wb-lfield-read" });
         rd.appendChild(renderMarkdown(e.fields[k] || ""));
@@ -3631,7 +3707,7 @@
       if (nv && nv !== k && !(nv in e.fields)) { e.fields[nv] = e.fields[k]; delete e.fields[k]; if (e.fieldMeta[k]) { e.fieldMeta[nv] = e.fieldMeta[k]; delete e.fieldMeta[k]; } touch(true); }
       else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
     } }));
-    if (fm.vis !== "publico") dt.appendChild(el("span", { class: fm.vis === "oculto" ? "wb-secret-mark" : "wb-spoiler-mark", text: " " + visInfo(fm.vis).glyph }));
+    if (fm.vis !== "publico") dt.appendChild(el("span", { class: wbVisMarkClass(fm.vis), text: " " + visInfo(fm.vis).glyph }));
     if (!opts.ro) {
       dt.appendChild(el("span", { class: "wb-fieldctl" }, [
         el("button", { type: "button", title: "Tipo: " + fm.type + " (toque p/ mudar)", text: "⚙", onclick: function () {
@@ -3646,7 +3722,9 @@
       ]));
     }
     dl.appendChild(dt);
-    var dd = el("dd", fm.vis === "oculto" ? { class: "dd-secret" } : fm.vis === "spoiler" ? { class: "dd-spoiler" } : {});
+    var ddCls = wbVisBgClass(fm.vis, "dd");
+    var dd = el("dd", ddCls ? { class: ddCls } : {});
+    if (!opts.ro && fm.vis === "restrito") dd.appendChild(wbAllowEditor(fm.allow, touch));
     if (fm.type === "bool") {
       dd.appendChild(el("button", { class: "wb-lockbtn" + (val === "sim" ? " on" : ""), type: "button", text: val === "sim" ? "✓ sim" : "não", onclick: function () { e.fields[k] = val === "sim" ? "" : "sim"; touch(true); } }));
     } else if (fm.type === "escolha") {
@@ -3681,6 +3759,8 @@
       var inner = dd;
       dd = el("dd", { class: "dd-spoiler" });
       dd.appendChild(wbSpoilerCover(function () { return inner; }));
+    } else if (opts.hideSecret && fm.vis === "restrito") {
+      dd = el("dd", { class: "dd-restrito" }, [wbRestritoPlaceholder(fm.allow)]);
     }
     dl.appendChild(dd);
   }
@@ -3697,15 +3777,25 @@
     wrap.appendChild(btn);
     return wrap;
   }
-  // Shared chip list for tags/aliases: each chip has its own publico/spoiler/oculto state
-  // (tap the text to cycle it) and its own remove button. arrKey = "tags"|"aliases" (plain
-  // string array, untouched everywhere else in the app), visKey = the parallel text->vis map.
+  // Unlike spoiler, there's nothing to "reveal" in the in-app preview — restrito access is
+  // decided by the actual logged-in viewer on the published wiki, not by clicking a button
+  // here. "Modo leitor" just shows who it's for.
+  function wbRestritoPlaceholder(allow) {
+    var n = (allow || []).length;
+    return el("div", { class: "wb-spoiler-block", style: "font-style:italic;color:var(--faint);padding:10px 12px" },
+      [el("span", { text: "🔐 restrito — visível só " + (n ? "pra " + n + " pessoa" + (n > 1 ? "s" : "") + " específica" + (n > 1 ? "s" : "") : "pra quem for definido") })]);
+  }
+  // Shared chip list for tags/aliases: each chip has its own publico/spoiler/restrito/mestre
+  // state (tap the text to cycle it, "quem pode ver" picker appears under it when restrito)
+  // and its own remove button. arrKey = "tags"|"aliases" (plain string array, untouched
+  // everywhere else in the app), visKey = the parallel text->{vis,allow} map.
   function wbVisChipList(e, arrKey, visKey, prefix, touch, opts) {
     opts = opts || {};
     var wrap = el("div", { class: "note-tags" });
     (e[arrKey] || []).forEach(function (t) {
-      var v = e[visKey][t] || "publico";
-      if (opts.hideSecret && v === "oculto") return;
+      var entry = e[visKey][t] || { vis: "publico", allow: [] };
+      var v = entry.vis || "publico";
+      if (opts.hideSecret && v === "mestre") return;
       if (opts.ro) {
         var span = el("span", { class: "ntag" });
         if (opts.hideSecret && v === "spoiler") {
@@ -3717,21 +3807,22 @@
         return;
       }
       var chip = el("span", { class: "ntag-chip" + (v !== "publico" ? " ntag-" + v : "") });
-      chip.appendChild(el("button", { type: "button", class: "ntag-vis", title: "Wiki: " + visInfo(v).label + " (toque p/ mudar)", text: (v !== "publico" ? visInfo(v).glyph + " " : "") + prefix + t, onclick: function () { e[visKey][t] = nextVis(v); touch(true); } }));
+      chip.appendChild(el("button", { type: "button", class: "ntag-vis", title: "Wiki: " + visInfo(v).label + " (toque p/ mudar)", text: (v !== "publico" ? visInfo(v).glyph + " " : "") + prefix + t, onclick: function () { entry.vis = nextVis(v); e[visKey][t] = entry; touch(true); } }));
       chip.appendChild(el("button", { type: "button", class: "ntag-del", "aria-label": "remover", text: "✕", onclick: function () { e[arrKey] = e[arrKey].filter(function (x) { return x !== t; }); delete e[visKey][t]; touch(true); } }));
       wrap.appendChild(chip);
+      if (v === "restrito") { if (!Array.isArray(entry.allow)) entry.allow = []; wrap.appendChild(wbAllowEditor(entry.allow, touch)); }
     });
     return wrap;
   }
   function wbRenderSections(card, e, opts) {
     var touch = opts.touch;
     (e.sections || []).forEach(function (sec, idx) {
-      if (opts.hideSecret && sec.vis === "oculto") return;
-      var host = el("div", { class: "wb-sec" + (sec.vis === "oculto" ? " wb-sec-secret" : sec.vis === "spoiler" ? " wb-sec-spoiler" : ""), "data-toc": (sec.title || "Seção") });
+      if (opts.hideSecret && sec.vis === "mestre") return;
+      var host = el("div", { class: "wb-sec" + (wbVisBgClass(sec.vis, "wb-sec") ? " " + wbVisBgClass(sec.vis, "wb-sec") : ""), "data-toc": (sec.title || "Seção") });
       var head = el("div", { class: "wb-sec-head" });
       if (opts.ro) head.appendChild(el("h3", { text: sec.title || "Seção" }));
       else head.appendChild(editable({ tag: "h3", value: sec.title, placeholder: "Título da seção", commit: function (nv) { sec.title = nv.trim(); touch(false); } }));
-      if (sec.vis !== "publico") head.appendChild(el("span", { class: sec.vis === "oculto" ? "wb-secret-mark" : "wb-spoiler-mark", text: visInfo(sec.vis).glyph }));
+      if (sec.vis !== "publico") head.appendChild(el("span", { class: wbVisMarkClass(sec.vis), text: visInfo(sec.vis).glyph }));
       if (!opts.ro) {
         head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Recolher", text: sec.collapsed ? "▸" : "▾", onclick: function () { sec.collapsed = !sec.collapsed; touch(true); } }));
         head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Wiki: " + visInfo(sec.vis).label + " (toque p/ mudar)", text: visInfo(sec.vis).glyph, onclick: function () { sec.vis = nextVis(sec.vis); touch(true); } }));
@@ -3740,9 +3831,12 @@
         head.appendChild(delBtn(function () { if (window.confirm("Remover esta seção?")) { e.sections.splice(idx, 1); touch(true); } }));
       }
       host.appendChild(head);
+      if (!opts.ro && sec.vis === "restrito") host.appendChild(wbAllowEditor(sec.allow, touch));
       if (!sec.collapsed) {
         if (opts.hideSecret && sec.vis === "spoiler") {
           host.appendChild(wbSpoilerCover(function () { var d = el("div", { class: "wb-prose" }); d.appendChild(renderMarkdown(sec.body)); return d; }));
+        } else if (opts.hideSecret && sec.vis === "restrito") {
+          host.appendChild(wbRestritoPlaceholder(sec.allow));
         } else {
           var bw = el("div");
           function showBody() {
@@ -3763,7 +3857,7 @@
     });
     if (!opts.ro) {
       card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ seção", style: "margin-top:12px", onclick: function () {
-        e.sections.push({ id: uid(), title: "", body: "", vis: "publico", collapsed: false });
+        e.sections.push({ id: uid(), title: "", body: "", vis: "publico", allow: [], collapsed: false });
         touch(true);
       } }));
     }
@@ -3786,38 +3880,85 @@
   }
 
   /* ---- publish as standalone wiki page ---- */
-  // Snapshot sent to the public Firestore doc: no ids/links/coords, nothing an outsider
-  // shouldn't see. "oculto" content is dropped entirely; "spoiler" content is kept but
-  // flagged so wiki.html can render it behind a reveal — same rules as "modo leitor".
+  // Snapshot sent to the public Firestore doc: only publico/spoiler items — nothing "restrito"
+  // or "mestre" ever goes here (restrito gets its own per-item subcollection below, mestre
+  // never leaves your account at all). "spoiler" is kept but flagged so wiki.html renders it
+  // behind a reveal — same rules as "modo leitor".
+  function wbWikiVisible(v) { return v === "publico" || v === "spoiler"; }
   function wbBuildWikiSnapshot(e) {
     var f = flowerById(e.universeId);
     var fields = [];
     Object.keys(e.fields || {}).forEach(function (k) {
       var fm = wbFieldMeta(e, k);
-      if (fm.vis === "oculto") return;
+      if (!wbWikiVisible(fm.vis)) return;
       fields.push({ key: k, type: fm.type, value: e.fields[k] || "", vis: fm.vis, opts: fm.opts || [] });
     });
-    var sections = (e.sections || []).filter(function (s) { return s.vis !== "oculto"; }).map(function (s) {
+    var sections = (e.sections || []).filter(function (s) { return wbWikiVisible(s.vis); }).map(function (s) {
       return { title: s.title || "", body: s.body || "", vis: s.vis };
     });
-    var gallery = (e.gallery || []).filter(function (g) { return g.vis !== "oculto" && g.url; }).map(function (g) {
+    var gallery = (e.gallery || []).filter(function (g) { return wbWikiVisible(g.vis) && g.url; }).map(function (g) {
       return { group: g.group || "", url: g.url, caption: g.caption || "", vis: g.vis };
     });
     return {
       title: e.title || "(sem título)",
       type: e.type || "",
       universe: f ? f.name : "",
-      aliases: (e.aliases || []).filter(function (a) { return (e.aliasVis[a] || "publico") !== "oculto"; }).map(function (a) { return { text: a, vis: e.aliasVis[a] || "publico" }; }),
-      tags: (e.tags || []).filter(function (t) { return (e.tagVis[t] || "publico") !== "oculto"; }).map(function (t) { return { text: t, vis: e.tagVis[t] || "publico" }; }),
+      aliases: (e.aliases || []).filter(function (a) { return wbWikiVisible((e.aliasVis[a] || {}).vis || "publico"); }).map(function (a) { return { text: a, vis: (e.aliasVis[a] || {}).vis || "publico" }; }),
+      tags: (e.tags || []).filter(function (t) { return wbWikiVisible((e.tagVis[t] || {}).vis || "publico"); }).map(function (t) { return { text: t, vis: (e.tagVis[t] || {}).vis || "publico" }; }),
       summary: e.summary || "",
       body: e.body || "",
-      cover: e.coverVis !== "oculto" ? (e.cover || "") : "",
+      cover: wbWikiVisible(e.coverVis) ? (e.cover || "") : "",
       coverVis: e.coverVis,
       fields: fields,
       sections: sections,
       gallery: gallery,
       publishedAt: todayKey()
     };
+  }
+  // Everything marked "restrito" goes here instead — each becomes its OWN Firestore document
+  // (wikiRestrito/<wikiId>/itens/<itemId>) with its own "permitidos" (allowed emails), because
+  // Firestore security rules can only grant or deny a whole document, never one field inside a
+  // shared one. Two fields with different allowed viewers on the same entry MUST be two docs.
+  function wbRestritoItems(e) {
+    var items = [];
+    Object.keys(e.fields || {}).forEach(function (k) {
+      var fm = wbFieldMeta(e, k);
+      if (fm.vis === "restrito") items.push({ id: "campo-" + wbSlugify(k), kind: "campo", key: k, type: fm.type, value: e.fields[k] || "", opts: fm.opts || [], permitidos: fm.allow || [] });
+    });
+    (e.sections || []).forEach(function (s) {
+      if (s.vis === "restrito") items.push({ id: "secao-" + s.id, kind: "secao", title: s.title || "", body: s.body || "", permitidos: s.allow || [] });
+    });
+    (e.tags || []).forEach(function (t) {
+      var v = e.tagVis[t] || {};
+      if (v.vis === "restrito") items.push({ id: "tag-" + wbSlugify(t), kind: "tag", text: t, permitidos: v.allow || [] });
+    });
+    (e.aliases || []).forEach(function (a) {
+      var v = e.aliasVis[a] || {};
+      if (v.vis === "restrito") items.push({ id: "alias-" + wbSlugify(a), kind: "alias", text: a, permitidos: v.allow || [] });
+    });
+    (e.gallery || []).forEach(function (g) {
+      if (g.vis === "restrito" && g.url) items.push({ id: "galeria-" + g.id, kind: "galeria", group: g.group || "", url: g.url, caption: g.caption || "", permitidos: g.allow || [] });
+    });
+    if (e.coverVis === "restrito" && e.cover) items.push({ id: "capa", kind: "capa", url: e.cover, permitidos: e.coverAllow || [] });
+    return items;
+  }
+  // Syncs the subcollection to exactly match `items` — anything currently in Firestore that's
+  // no longer in `items` (vis changed away from restrito, or was deleted) gets removed. Needs
+  // full read+write access regardless of who's on which item's own allow-list, which is why the
+  // Firestore rule grants the owner's UID unconditional read here (see memory / setup notes).
+  function wbSyncRestrito(id, items) {
+    if (!fbFs) return Promise.resolve();
+    var col = fbFs.collection("wikiRestrito").doc(id).collection("itens");
+    return col.get().then(function (snap) {
+      var keepIds = items.map(function (it) { return it.id; });
+      var batch = fbFs.batch();
+      items.forEach(function (it) {
+        var data = {}; Object.keys(it).forEach(function (k) { if (k !== "id") data[k] = it[k]; });
+        batch.set(col.doc(it.id), data);
+      });
+      snap.docs.forEach(function (d) { if (keepIds.indexOf(d.id) === -1) batch.delete(d.ref); });
+      return batch.commit();
+    });
   }
   // Wiki id = a slug of the title (not a random uid) so the link reads as "wiki/leonel-bianchi"
   // instead of a random string — generated once at first publish and kept stable afterwards
@@ -3843,7 +3984,7 @@
       universe: f ? f.name : "",
       universeId: e.universeId,
       franchiseIds: e.franchiseIds || [],
-      tags: (e.tags || []).filter(function (t) { return (e.tagVis[t] || "publico") === "publico"; }),
+      tags: (e.tags || []).filter(function (t) { return ((e.tagVis[t] || {}).vis || "publico") === "publico"; }),
       updatedAt: todayKey()
     };
   }
@@ -3859,6 +4000,8 @@
         return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate);
       });
     }).then(function () {
+      return wbSyncRestrito(id, wbRestritoItems(e));
+    }).then(function () {
       e.wikiId = id; e.wikiPublishedAt = todayKey(); touch(true);
     }).catch(function (err) {
       window.alert("Não consegui publicar: " + (err && err.message ? err.message : err) + "\n\nSe for erro de permissão, a coleção \"wikiPublic\" ainda não tem a regra de leitura pública no Firestore.");
@@ -3870,6 +4013,8 @@
     var id = e.wikiId;
     var idxUpdate = {}; idxUpdate["entries." + id] = firebase.firestore.FieldValue.delete();
     fbFs.collection("wikiPublic").doc(id).delete().then(function () {
+      return wbSyncRestrito(id, []);
+    }).then(function () {
       return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate).catch(function () {});
     }).then(function () {
       e.wikiId = null; e.wikiPublishedAt = ""; touch(true);
@@ -3921,10 +4066,14 @@
       coverWrap.textContent = "";
       if (e.cover) {
         coverWrap.appendChild(el("img", { class: "wb-cover", src: e.cover, alt: "" }));
-        coverWrap.appendChild(el("div", { class: "wb-cover-actions" }, [
-          el("button", { class: "btn ghost sm", type: "button", text: "trocar capa", onclick: function () { pickImage(function (url) { e.cover = url; touch(true); }); } }),
-          el("button", { class: "btn ghost sm", type: "button", text: "remover", onclick: function () { e.cover = ""; touch(true); } })
-        ]));
+        if (!ro) {
+          coverWrap.appendChild(el("div", { class: "wb-cover-actions" }, [
+            el("button", { class: "btn ghost sm", type: "button", text: "trocar capa", onclick: function () { pickImage(function (url) { e.cover = url; touch(true); }); } }),
+            el("button", { class: "btn ghost sm", type: "button", text: "remover", onclick: function () { e.cover = ""; touch(true); } }),
+            el("button", { class: "btn ghost sm", type: "button", text: "Wiki: " + visInfo(e.coverVis).label + " (toque p/ mudar)", title: "Wiki: " + visInfo(e.coverVis).label + " (toque p/ mudar)", onclick: function () { e.coverVis = nextVis(e.coverVis); touch(true); } })
+          ]));
+          if (e.coverVis === "restrito") coverWrap.appendChild(wbAllowEditor(e.coverAllow, touch));
+        }
       } else if (!ro) {
         coverWrap.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ imagem de capa", onclick: function () { pickImage(function (url) { e.cover = url; touch(true); }); } }));
       }
@@ -3993,7 +4142,7 @@
     w.focusTitle = false;
 
     // aliases
-    var aliasVisible = (e.aliases || []).filter(function (a) { return !(hideSecret && e.aliasVis[a] === "oculto"); });
+    var aliasVisible = (e.aliases || []).filter(function (a) { return !(hideSecret && (e.aliasVis[a] || {}).vis === "mestre"); });
     if (aliasVisible.length || !ro) {
       var aliasWrap = el("div", { class: "wb-rel", style: "margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap" }, [el("span", { class: "hint", text: "também:" })]);
       aliasWrap.appendChild(wbVisChipList(e, "aliases", "aliasVis", "", touch, { hideSecret: hideSecret, ro: ro }));
@@ -4033,7 +4182,7 @@
     wbRenderSections(card, e, { hideSecret: hideSecret, ro: ro, touch: touch, cat: cat });
 
     // fields — short typed ones as a specimen label, long descriptive ones as roomy blocks
-    var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && wbFieldMeta(e, k).vis === "oculto"); });
+    var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && wbFieldMeta(e, k).vis === "mestre"); });
     var shortKeys = fkeys.filter(function (k) { return wbFieldMeta(e, k).type !== "nota"; });
     var longKeys = fkeys.filter(function (k) { return wbFieldMeta(e, k).type === "nota"; });
     if (shortKeys.length) {
@@ -4068,7 +4217,7 @@
       var galGroups = [];
       (e.gallery || []).forEach(function (g) { if (galGroups.indexOf(g.group) === -1) galGroups.push(g.group); });
       galGroups.forEach(function (grp) {
-        var items = e.gallery.filter(function (g) { return g.group === grp && !(hideSecret && g.vis === "oculto"); });
+        var items = e.gallery.filter(function (g) { return g.group === grp && !(hideSecret && g.vis === "mestre"); });
         if (!items.length) return;
         card.appendChild(el("div", { class: "wb-gal-grouphead", text: grp || "Geral" }));
         var grid = el("div", { class: "wb-gal-grid" });
@@ -4076,6 +4225,8 @@
           var fig = el("figure", { class: "wb-gal-item" + (g.vis !== "publico" ? " wb-gal-" + g.vis : "") });
           if (hideSecret && g.vis === "spoiler") {
             fig.appendChild(wbSpoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "" }); }));
+          } else if (hideSecret && g.vis === "restrito") {
+            fig.appendChild(wbRestritoPlaceholder(g.allow));
           } else {
             fig.appendChild(el("img", { src: g.url, alt: g.caption || "" }));
           }
@@ -4088,6 +4239,7 @@
               el("button", { type: "button", title: "Wiki: " + visInfo(g.vis).label + " (toque p/ mudar)", text: visInfo(g.vis).glyph, onclick: function () { g.vis = nextVis(g.vis); touch(true); } }),
               el("button", { type: "button", title: "Remover", text: "✕", onclick: function () { e.gallery = e.gallery.filter(function (x) { return x.id !== g.id; }); touch(true); } })
             ]));
+            if (g.vis === "restrito") fig.appendChild(wbAllowEditor(g.allow, touch));
           }
           grid.appendChild(fig);
         });
@@ -4097,7 +4249,7 @@
         var lastGroup = e.gallery.length ? e.gallery[e.gallery.length - 1].group : "";
         var grp = window.prompt("Grupo (ex: Primeira Temporada) — deixe em branco pra 'Geral':", lastGroup || "");
         if (grp == null) return;
-        pickImage(function (url) { e.gallery.push({ id: uid(), group: grp.trim(), url: url, caption: "", vis: "publico" }); touch(true); });
+        pickImage(function (url) { e.gallery.push({ id: uid(), group: grp.trim(), url: url, caption: "", vis: "publico", allow: [] }); touch(true); });
       } }));
     }
 
@@ -5617,6 +5769,31 @@
     } else {
       box.appendChild(el("button", { class: "mini-btn", type: "button", text: "Entrar / criar conta", onclick: function () { root.innerHTML = ""; openAuthModal(); } }));
     }
+
+    box.appendChild(el("div", { class: "section-label", style: "margin-top:14px", text: "Jogadores da wiki" }));
+    box.appendChild(el("div", { class: "hint", style: "margin:-4px 0 8px", text: "Quem pode ver conteúdo marcado \"🔐 restrito\" nas suas entradas publicadas." }));
+    (state.wikiPlayers || []).forEach(function (p) {
+      box.appendChild(el("div", { class: "row" }, [
+        el("div", { class: "row-body" }, [el("div", { class: "row-title", text: p.label || p.email }), el("div", { class: "row-meta", text: p.email })]),
+        delBtn(function () {
+          state.wikiPlayers = state.wikiPlayers.filter(function (x) { return x.email !== p.email; });
+          save(); root.innerHTML = ""; document.getElementById("menuBtn").click();
+        })
+      ]));
+    });
+    var addForm = el("form", { class: "inline", style: "margin-top:6px", onsubmit: function (ev) {
+      ev.preventDefault();
+      var email = (addForm.querySelector("[name=email]").value || "").trim().toLowerCase();
+      var label = (addForm.querySelector("[name=label]").value || "").trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { window.alert("Email inválido."); return; }
+      if ((state.wikiPlayers || []).some(function (p) { return p.email === email; })) { window.alert("Esse email já está na lista."); return; }
+      state.wikiPlayers = (state.wikiPlayers || []).concat([{ email: email, label: label, addedAt: todayKey() }]);
+      save(); root.innerHTML = ""; document.getElementById("menuBtn").click();
+    } });
+    addForm.appendChild(el("input", { class: "field", name: "label", placeholder: "nome/apelido (opcional)", style: "width:40%" }));
+    addForm.appendChild(el("input", { class: "field grow", name: "email", type: "email", placeholder: "email do jogador" }));
+    addForm.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "+ adicionar" }));
+    box.appendChild(addForm);
 
     box.appendChild(el("div", { class: "section-label", style: "margin-top:14px", text: "Aparência" }));
     var sw = el("div", { class: "accent-swatches" });
