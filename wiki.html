@@ -14,30 +14,44 @@
 <style>
   /* Página isolada: sem menu, sem navegação, sem dependência do resto do app.
      Mesma paleta "Herbário do Multiverso" do app principal, duplicada aqui de propósito
-     (esta página não carrega index.html nem nada dele — é uma folha avulsa). */
+     (esta página não carrega index.html nem nada dele — é uma folha avulsa).
+     Diagramação inspirada em wiki (infobox flutuante + índice + seções longas), mas
+     na nossa estética em vez da do fandom. */
   :root { color-scheme: light dark; }
   :root {
-    --bg: #e8dcbf; --paper: #f5ecd6; --surface: #f6eeda; --border: #d2bf98; --border-strong: #a98f61;
+    --bg: #e8dcbf; --paper: #f5ecd6; --surface: #f6eeda; --surface-2: #ece0c3; --border: #d2bf98; --border-strong: #a98f61;
     --ink: #2e2416; --muted: #6a5940; --faint: #9a8763; --gold: #9c7b3c; --gold-ink: #785a28;
     --accent-wash: #ecdfbe; --warn: #b07d24; --shadow: 0 1px 2px rgba(74,52,20,0.06), 0 14px 34px -18px rgba(74,52,20,0.26);
-    --radius: 6px; --font-body: "Spectral", Georgia, serif; --font-display: "Cormorant", Georgia, serif; --font-wb: "Cormorant Garamond", Georgia, serif;
+    --radius: 6px; --font-body: "Spectral", Georgia, "Times New Roman", serif; --font-display: "Cormorant", Georgia, serif; --font-wb: "Cormorant Garamond", Georgia, serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #14100a; --paper: #211a10; --surface: #221b11; --border: #3a2f1d; --border-strong: #55442b;
+      --bg: #14100a; --paper: #211a10; --surface: #221b11; --surface-2: #2b2216; --border: #3a2f1d; --border-strong: #55442b;
       --ink: #e9dcbd; --muted: #ac9e80; --faint: #7c6e55; --gold: #d8b878; --gold-ink: #ecd3a2;
       --accent-wash: #2a2114; --warn: #d6a24a; --shadow: 0 2px 10px rgba(0,0,0,0.45), 0 26px 60px -24px rgba(0,0,0,0.7);
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); line-height: 1.6; padding: 32px 16px 60px; }
-  .page { max-width: 640px; margin: 0 auto; }
-  .card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 26px; box-shadow: var(--shadow); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); line-height: 1.6; padding: 28px 16px 60px; }
+  .page { max-width: 800px; margin: 0 auto; }
+  .card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 28px; box-shadow: var(--shadow); }
   .eyebrow { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display: flex; gap: 6px; flex-wrap: wrap; }
   h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin: 6px 0 4px; }
-  .aliases { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 10px; }
-  .summary { font-family: var(--font-wb); font-size: 18px; font-style: italic; color: var(--muted); margin: 8px 0 16px; }
-  .cover { width: 100%; max-height: 360px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border-strong); margin-bottom: 16px; display: block; }
+  .aliases { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 14px; }
+
+  /* infobox — floats right of the article on wide screens, stacks full-width on narrow ones */
+  .infobox { float: none; width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin: 0 0 18px; overflow: hidden; }
+  @media (min-width: 620px) { .infobox { float: right; width: 250px; margin: 0 0 16px 22px; } }
+  .infobox .cover { width: 100%; display: block; max-height: 280px; object-fit: cover; }
+  .infobox-facts { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .infobox-facts tr { border-top: 1px solid var(--border); }
+  .infobox-facts tr:first-child { border-top: 0; }
+  .infobox-facts th, .infobox-facts td { padding: 7px 10px; text-align: left; vertical-align: top; }
+  .infobox-facts th { width: 40%; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  .infobox-facts td { font-family: var(--font-wb); font-size: 14.5px; }
+
+  .article { min-width: 0; }
+  .summary { font-family: var(--font-wb); font-size: 18px; font-style: italic; color: var(--muted); margin: 0 0 14px; }
   .prose { font-family: var(--font-wb); font-size: 18px; }
   .prose p { margin: 0 0 14px; }
   .prose img.wb-img { max-width: 100%; border-radius: var(--radius); margin: 10px 0; display: block; }
@@ -45,20 +59,43 @@
   .prose blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--gold); color: var(--muted); }
   .prose a { color: var(--gold-ink); }
   .wl-plain { font-weight: 600; }
-  .cathead { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); border-bottom: 1px solid var(--border); padding-bottom: 5px; margin: 26px 0 10px; }
-  dl.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 0; }
+
+  /* índice — jumps to each section anchor, sits right after the intro */
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin: 4px 0 22px; max-width: 320px; clear: both; }
+  .toc-head { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); margin-bottom: 6px; }
+  .toc ol { margin: 0; padding-left: 20px; font-size: 14px; }
+  .toc li { margin: 3px 0; }
+  .toc a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--border-strong); }
+  .toc a:hover { color: var(--gold-ink); }
+
+  .cathead { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); border-bottom: 1px solid var(--border); padding-bottom: 5px; margin: 26px 0 10px; scroll-margin-top: 14px; }
+  .cathead:first-of-type { margin-top: 22px; }
+
+  /* galeria — full width, abaixo do corpo, agrupada por rótulo (ex: temporadas) */
+  .gallery-wrap { clear: both; margin-top: 8px; }
+  .gal-grouphead { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold-ink); font-weight: 600; margin: 16px 0 8px; }
+  .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .gal-item { margin: 0; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+  .gal-item img { width: 100%; height: 130px; object-fit: cover; display: block; }
+  .gal-item figcaption { font-size: 11.5px; color: var(--muted); padding: 5px 8px; }
+
+  dl.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 0; clear: both; }
   dl.fields dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
   dl.fields dd { margin: 2px 0 0; font-family: var(--font-wb); font-size: 16px; }
   @media (max-width: 480px) { dl.fields { grid-template-columns: 1fr; } }
-  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 18px; }
+
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 22px; clear: both; }
   .tag { font-size: 11px; color: var(--gold-ink); background: var(--accent-wash); padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border); }
+
   .md-spoiler { background: var(--ink); color: transparent; border-radius: 3px; cursor: pointer; padding: 0 2px; }
   .md-spoiler.on { background: var(--accent-wash); color: inherit; cursor: text; }
   .spoiler-block { border: 1px dashed var(--gold); border-radius: var(--radius); margin: 10px 0; }
   .spoiler-block.revealed { border-style: solid; padding: 12px 14px; }
   .spoiler-reveal { width: 100%; text-align: left; background: color-mix(in srgb, var(--gold) 10%, transparent); border: 0; border-radius: var(--radius); color: var(--gold-ink); font-style: italic; font-family: var(--font-body); font-size: 14px; padding: 10px 12px; cursor: pointer; }
-  .foot { text-align: center; font-size: 11.5px; color: var(--faint); margin-top: 22px; }
+
+  .foot { text-align: center; font-size: 11.5px; color: var(--faint); margin-top: 26px; clear: both; }
   .empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+  html { scroll-behavior: smooth; }
 </style>
 </head>
 <body>
@@ -87,6 +124,7 @@
     (kids || []).forEach(function (c) { if (c == null || c === false) return; e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
     return e;
   }
+  function slugify(s, i) { return "sec-" + i + "-" + String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 30); }
 
   /* ---- minimal isolated markdown (duplicated from index.html on purpose — this page
      never loads the app, [[links]] render as plain emphasized text, nothing is clickable
@@ -167,12 +205,11 @@
     wrap.appendChild(btn);
     return wrap;
   }
+  function spoilerSpan(text) {
+    return el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: text, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } });
+  }
   function chip(prefix, item) {
-    if (item.vis === "spoiler") {
-      var c = el("span", { class: "tag" });
-      c.appendChild(el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: prefix + item.text, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } }));
-      return c;
-    }
+    if (item.vis === "spoiler") { var c = el("span", { class: "tag" }); c.appendChild(spoilerSpan(prefix + item.text)); return c; }
     return el("span", { class: "tag", text: prefix + item.text });
   }
 
@@ -189,43 +226,83 @@
       var aliasLine = el("div", { class: "aliases" }, [el("span", { text: "também: " })]);
       data.aliases.forEach(function (a, i) {
         if (i) aliasLine.appendChild(document.createTextNode(", "));
-        if (a.vis === "spoiler") aliasLine.appendChild(el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: a.text, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } }));
+        if (a.vis === "spoiler") aliasLine.appendChild(spoilerSpan(a.text));
         else aliasLine.appendChild(document.createTextNode(a.text));
       });
       card.appendChild(aliasLine);
     }
-    if (data.cover) card.appendChild(el("img", { class: "cover", src: data.cover, alt: "" }));
-    if (data.summary) { var sp = el("p", { class: "summary" }); mdInline(sp, data.summary); card.appendChild(sp); }
-    if (data.body) card.appendChild(renderMarkdown(data.body));
 
     var shortFields = (data.fields || []).filter(function (f) { return f.type !== "nota"; });
     var longFields = (data.fields || []).filter(function (f) { return f.type === "nota"; });
-    if (shortFields.length) {
-      card.appendChild(el("div", { class: "cathead", text: "Campos" }));
-      var dl = el("dl", { class: "fields" });
-      shortFields.forEach(function (f) {
-        dl.appendChild(el("dt", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
-        var dd = el("dd");
-        if (f.vis === "spoiler") {
-          dd.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
-        } else {
-          mdInline(dd, f.value);
-        }
-        dl.appendChild(dd);
-      });
-      card.appendChild(dl);
-    }
-    longFields.forEach(function (f) {
-      card.appendChild(el("div", { class: "cathead", text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
-      if (f.vis === "spoiler") card.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
-      else card.appendChild(renderMarkdown(f.value));
-    });
 
-    (data.sections || []).forEach(function (s) {
-      card.appendChild(el("div", { class: "cathead", text: (s.title || "Seção") + (s.vis === "spoiler" ? " 🙈" : "") }));
-      if (s.vis === "spoiler") card.appendChild(spoilerCover(function () { return renderMarkdown(s.body); }));
-      else card.appendChild(renderMarkdown(s.body));
+    // infobox — cover + short facts, floats beside the article on wide screens
+    if (data.cover || shortFields.length) {
+      var info = el("div", { class: "infobox" });
+      if (data.cover) info.appendChild(el("img", { class: "cover", src: data.cover, alt: "" }));
+      if (shortFields.length) {
+        var itable = el("table", { class: "infobox-facts" });
+        shortFields.forEach(function (f) {
+          var td = el("td");
+          if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
+          else mdInline(td, f.value);
+          itable.appendChild(el("tr", {}, [el("th", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }), td]));
+        });
+        info.appendChild(itable);
+      }
+      card.appendChild(info);
+    }
+
+    var article = el("div", { class: "article" });
+    if (data.summary) { var sp = el("p", { class: "summary" }); mdInline(sp, data.summary); article.appendChild(sp); }
+    if (data.body) article.appendChild(renderMarkdown(data.body));
+
+    // índice — pula pra cada seção/campo longo/galeria, só aparece se houver o que listar
+    var tocEntries = [];
+    longFields.forEach(function (f, i) { var id = slugify(f.key, "lf" + i); f._anchor = id; tocEntries.push({ id: id, label: f.key }); });
+    (data.sections || []).forEach(function (s, i) { var id = slugify(s.title || "Seção", "sc" + i); s._anchor = id; tocEntries.push({ id: id, label: s.title || "Seção" }); });
+    if (data.gallery && data.gallery.length) tocEntries.push({ id: "galeria", label: "Galeria" });
+    if (tocEntries.length > 1) {
+      var toc = el("div", { class: "toc" });
+      toc.appendChild(el("div", { class: "toc-head", text: "Índice" }));
+      var ol = el("ol");
+      tocEntries.forEach(function (t) { ol.appendChild(el("li", {}, [el("a", { href: "#" + t.id, text: t.label })])); });
+      toc.appendChild(ol);
+      article.appendChild(toc);
+    }
+
+    longFields.forEach(function (f) {
+      article.appendChild(el("div", { class: "cathead", id: f._anchor, text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
+      if (f.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
+      else article.appendChild(renderMarkdown(f.value));
     });
+    (data.sections || []).forEach(function (s) {
+      article.appendChild(el("div", { class: "cathead", id: s._anchor, text: (s.title || "Seção") + (s.vis === "spoiler" ? " 🙈" : "") }));
+      if (s.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(s.body); }));
+      else article.appendChild(renderMarkdown(s.body));
+    });
+    card.appendChild(article);
+
+    // galeria — agrupada por rótulo livre (ex: "Primeira Temporada", "Segunda Temporada")
+    if (data.gallery && data.gallery.length) {
+      var gwrap = el("div", { class: "gallery-wrap" });
+      gwrap.appendChild(el("div", { class: "cathead", id: "galeria", text: "Galeria" }));
+      var groups = [];
+      data.gallery.forEach(function (g) { if (groups.indexOf(g.group) === -1) groups.push(g.group); });
+      groups.forEach(function (grp) {
+        var items = data.gallery.filter(function (g) { return g.group === grp; });
+        gwrap.appendChild(el("div", { class: "gal-grouphead", text: grp || "Geral" }));
+        var grid = el("div", { class: "gal-grid" });
+        items.forEach(function (g) {
+          var fig = el("figure", { class: "gal-item" });
+          if (g.vis === "spoiler") fig.appendChild(spoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "" }); }));
+          else fig.appendChild(el("img", { src: g.url, alt: g.caption || "" }));
+          if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
+          grid.appendChild(fig);
+        });
+        gwrap.appendChild(grid);
+      });
+      card.appendChild(gwrap);
+    }
 
     if (data.tags && data.tags.length) {
       var tagWrap = el("div", { class: "tags" });

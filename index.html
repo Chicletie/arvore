@@ -853,6 +853,16 @@
   .wb-spoiler-block { border: 1px dashed var(--gold); border-radius: var(--radius-sm); }
   .wb-spoiler-block.revealed { border-style: solid; padding: 10px 12px; }
   .wb-spoiler-reveal { width: 100%; text-align: left; background: color-mix(in srgb, var(--gold) 8%, transparent); border: 0; border-radius: var(--radius-sm); color: var(--gold-ink); font-style: italic; font-family: var(--font-body); font-size: 14px; padding: 10px 12px; cursor: pointer; }
+  /* ---- gallery (grouped by "temporada"/season, mirrors the wiki-page gallery) ---- */
+  .wb-gal-grouphead { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold-ink); margin: 14px 0 6px; font-weight: 600; }
+  .wb-gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 6px; }
+  .wb-gal-item { margin: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
+  .wb-gal-item img { width: 100%; height: 110px; object-fit: cover; display: block; }
+  .wb-gal-item figcaption { font-size: 11px; color: var(--muted); padding: 4px 6px; }
+  .wb-gal-ctl { display: flex; gap: 2px; padding: 2px 4px 4px; }
+  .wb-gal-ctl button { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 12px; padding: 2px 4px; }
+  .wb-gal-ctl button:hover { color: var(--ink); }
+  .wb-gal-item.wb-gal-oculto { opacity: 0.55; }
   .wb-lockbtn { background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--faint); font-size: 12px; padding: 3px 7px; cursor: pointer; }
   .wb-lockbtn.on { color: var(--warn); border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
 
@@ -1359,6 +1369,16 @@
       if (WB_VIS.indexOf(e.coverVis) === -1) e.coverVis = "publico";
       if (!e.tagVis || typeof e.tagVis !== "object") e.tagVis = {};
       if (!e.aliasVis || typeof e.aliasVis !== "object") e.aliasVis = {};
+      if (typeof e.dispAlias !== "string") e.dispAlias = "";
+      if (!Array.isArray(e.gallery)) e.gallery = [];
+      e.gallery = e.gallery.filter(function (g) { return g && typeof g === "object"; });
+      e.gallery.forEach(function (g) {
+        if (g.id == null) g.id = uid();
+        if (typeof g.group !== "string") g.group = "";
+        if (typeof g.url !== "string") g.url = "";
+        if (typeof g.caption !== "string") g.caption = "";
+        if (WB_VIS.indexOf(g.vis) === -1) g.vis = "publico";
+      });
       if (e.wikiId !== undefined && typeof e.wikiId !== "string") e.wikiId = null;
       if (e.wikiId === undefined) e.wikiId = null;
       if (typeof e.wikiPublishedAt !== "string") e.wikiPublishedAt = "";
@@ -1370,7 +1390,7 @@
         if (WB_VIS.indexOf(fm.vis) === -1) fm.vis = fm.secret ? "oculto" : "publico";
         delete fm.secret;
       });
-      e.links.forEach(function (l) { if (typeof l.note !== "string") l.note = ""; });
+      e.links.forEach(function (l) { if (typeof l.note !== "string") l.note = ""; if (typeof l.dispAs !== "string") l.dispAs = ""; });
       if (!Array.isArray(e.sections)) e.sections = [];
       e.sections = e.sections.filter(function (sec) { return sec && typeof sec === "object"; });
       e.sections.forEach(function (sec) {
@@ -1674,6 +1694,19 @@
     wrap.refreshItems = function (list) { opts.items = list; if (cur && !labelFor(cur)) { cur = ""; input.value = ""; } };
     return wrap;
   }
+  // Small "mostrar como" picker for one specific link: lets that one connection display the
+  // target's title OR any of its aliases, independent of what the target's own page shows or
+  // what any other link to it shows (e.g. "O Hóspede" on his own page, "filho de Leonel
+  // Bianchi" from his son's Ligações). Empty selection = fall back to wbDisplayName's default.
+  function wbDispAsPicker(target, current, onChange) {
+    var titleOpt = target.title || "(sem título)";
+    var opts = [titleOpt].concat((target.aliases || []).filter(function (a) { return a !== titleOpt; }));
+    var sel = el("select", { class: "field", style: "padding:3px 6px;font-size:12px;max-width:170px", title: "Mostrar como…" });
+    var cur = (current && current.trim()) || titleOpt;
+    opts.forEach(function (o) { sel.appendChild(el("option", { value: o, text: o, selected: o === cur ? "selected" : null })); });
+    sel.addEventListener("change", function () { onChange(sel.value === titleOpt ? "" : sel.value); });
+    return sel;
+  }
   var SVGNS = "http://www.w3.org/2000/svg";
   function svgEl(name, attrs) {
     var e = document.createElementNS(SVGNS, name);
@@ -1939,6 +1972,14 @@
       return (e.aliases || []).some(function (a) { return a.toLowerCase() === n; });
     })[0];
   }
+  // Which name to show for a link to `entry`: the link's own override (chosen per-connection,
+  // e.g. "filho de Leonel Bianchi" even though the entry's own page reads "O Hóspede"), else
+  // the entry's preferred display alias (used everywhere a name isn't tied to one specific
+  // link, like map node labels), else the plain title.
+  function wbDisplayName(entry, dispAs) {
+    if (!entry) return "(removida)";
+    return (dispAs && dispAs.trim()) || (entry.dispAlias && entry.dispAlias.trim()) || entry.title || "(sem título)";
+  }
   function wbTouch(id) {
     var r = C().recent.filter(function (x) { return x !== id; });
     r.unshift(id); C().recent = r.slice(0, 12);
@@ -2111,7 +2152,7 @@
 
   /* ---- [[ ]] autocomplete for a textarea ---- */
   function wbStubEntry(uniId, title) {
-    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], status: "semente", secret: false, cover: "", coverVis: "publico", tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
+    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], status: "semente", secret: false, cover: "", coverVis: "publico", gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
     C().entries.push(e); save();
     return e;
   }
@@ -2907,7 +2948,7 @@
       var vis = {}; visible.forEach(function (e) { vis[e.id] = 1; });
       var nodes = visible.map(function (e) {
         var col = colorBy === "franquia" ? (((e.franchiseIds || [])[0] && !w.mapHide.fr[e.franchiseIds[0]]) ? franchiseColor(e.franchiseIds[0]) : "var(--faint)") : typeColor(e.type);
-        return { id: e.id, label: e.title || "(sem título)", color: col, r: 19, x: e.x, y: e.y, kind: "entry", ref: e, group: colorBy === "franquia" ? ((e.franchiseIds || [])[0] || "—") : e.type };
+        return { id: e.id, label: wbDisplayName(e), color: col, r: 19, x: e.x, y: e.y, kind: "entry", ref: e, group: colorBy === "franquia" ? ((e.franchiseIds || [])[0] || "—") : e.type };
       });
       var edges = [], localCands = {}, portalSeen = {};
       visible.forEach(function (e) {
@@ -2924,7 +2965,7 @@
           } else {
             var pid = "portal:" + lk.to;
             if (!portalSeen[pid]) {
-              nodes.push({ id: pid, label: target.title + " ↗", color: flowerById(target.universeId).color, r: 14, kind: "portal", ref: target });
+              nodes.push({ id: pid, label: wbDisplayName(target) + " ↗", color: flowerById(target.universeId).color, r: 14, kind: "portal", ref: target });
               portalSeen[pid] = 1;
             }
             edges.push({ from: e.id, to: pid, label: lk.label || "", style: linkStyleOf(lk.label) });
@@ -3356,17 +3397,21 @@
     while (cur && guard++ < 12) { chain.unshift(cur); cur = cur.parentId ? wbEntry(cur.parentId) : null; }
     return chain;
   }
+  // Each bucket holds {entry, link} pairs (not bare entries) so callers can honor the link's
+  // own dispAs override — the same person can read "O Hóspede" on his own page but "Leonel
+  // Bianchi" here, from his son's point of view.
   function wbFamily(e) {
     var parents = [], children = [], siblings = [], halfSiblings = [], spouses = [], grandparents = [], grandchildren = [];
     (e.links || []).forEach(function (lk) {
       var t = wbEntry(lk.to); if (!t) return;
-      if (lk.label === "é filho(a) de") parents.push(t);
-      else if (lk.label === "é pai/mãe de") children.push(t);
-      else if (lk.label === "irmão/irmã de") siblings.push(t);
-      else if (lk.label === "meio-irmão/meia-irmã de") halfSiblings.push(t);
-      else if (lk.label === "casado(a) com") spouses.push(t);
-      else if (lk.label === "avô/avó de") grandchildren.push(t);
-      else if (lk.label === "neto(a) de") grandparents.push(t);
+      var pair = { entry: t, link: lk };
+      if (lk.label === "é filho(a) de") parents.push(pair);
+      else if (lk.label === "é pai/mãe de") children.push(pair);
+      else if (lk.label === "irmão/irmã de") siblings.push(pair);
+      else if (lk.label === "meio-irmão/meia-irmã de") halfSiblings.push(pair);
+      else if (lk.label === "casado(a) com") spouses.push(pair);
+      else if (lk.label === "avô/avó de") grandchildren.push(pair);
+      else if (lk.label === "neto(a) de") grandparents.push(pair);
     });
     return { parents: parents, children: children, siblings: siblings, halfSiblings: halfSiblings, spouses: spouses, grandparents: grandparents, grandchildren: grandchildren };
   }
@@ -3388,8 +3433,8 @@
       if (already) return;
       var full = shared.length === parents.length && shared.length === otherParents.length;
       var label = full ? "irmão/irmã de" : "meio-irmão/meia-irmã de";
-      child.links = child.links || []; child.links.push({ to: other.id, label: label, auto: true });
-      other.links = other.links || []; other.links.push({ to: child.id, label: label, auto: true });
+      child.links = child.links || []; child.links.push({ to: other.id, label: label, auto: true, dispAs: other.dispAlias || "" });
+      other.links = other.links || []; other.links.push({ to: child.id, label: label, auto: true, dispAs: child.dispAlias || "" });
     });
   }
   // Same idea for grandparents: whoever is a parent of your parent is your avô/avó, and it works
@@ -3397,8 +3442,8 @@
   // child, and can also turn that parent into a grandparent of the child's existing kids.
   function wbLinkPair(a, b, label, inv) {
     if (!(a.links || []).some(function (l) { return l.to === b.id && (l.label === label || l.label === inv); })) {
-      a.links = a.links || []; a.links.push({ to: b.id, label: label, auto: true });
-      b.links = b.links || []; b.links.push({ to: a.id, label: inv, auto: true });
+      a.links = a.links || []; a.links.push({ to: b.id, label: label, auto: true, dispAs: b.dispAlias || "" });
+      b.links = b.links || []; b.links.push({ to: a.id, label: inv, auto: true, dispAs: a.dispAlias || "" });
     }
   }
   function wbInferGrandparents(childId) {
@@ -3746,6 +3791,9 @@
     var sections = (e.sections || []).filter(function (s) { return s.vis !== "oculto"; }).map(function (s) {
       return { title: s.title || "", body: s.body || "", vis: s.vis };
     });
+    var gallery = (e.gallery || []).filter(function (g) { return g.vis !== "oculto" && g.url; }).map(function (g) {
+      return { group: g.group || "", url: g.url, caption: g.caption || "", vis: g.vis };
+    });
     return {
       title: e.title || "(sem título)",
       type: e.type || "",
@@ -3758,6 +3806,7 @@
       coverVis: e.coverVis,
       fields: fields,
       sections: sections,
+      gallery: gallery,
       publishedAt: todayKey()
     };
   }
@@ -3909,6 +3958,15 @@
       card.appendChild(aliasWrap);
     }
 
+    // display name used in the map / as the default for new links to this entry
+    if (!ro && (e.aliases || []).length) {
+      var dispRow = el("div", { class: "wb-rel", style: "margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap" }, [
+        el("span", { class: "hint", text: "nome no mapa e em novas ligações:" }),
+        wbDispAsPicker(e, e.dispAlias, function (v) { e.dispAlias = v; touch(true); })
+      ]);
+      card.appendChild(dispRow);
+    }
+
     // summary
     card.appendChild(editable({
       tag: "p", className: "wb-summary", value: e.summary, placeholder: "Uma linha que resume esta entrada…", multiline: true,
@@ -3956,6 +4014,43 @@
         if (k) wbAddField(e, k, touch);
       } }));
       card.appendChild(tray);
+    }
+
+    // galeria — imagens agrupadas por "temporada"/rótulo livre, exportadas do mesmo jeito na wiki
+    if ((e.gallery || []).length || !ro) {
+      card.appendChild(cat("Galeria"));
+      var galGroups = [];
+      (e.gallery || []).forEach(function (g) { if (galGroups.indexOf(g.group) === -1) galGroups.push(g.group); });
+      galGroups.forEach(function (grp) {
+        var items = e.gallery.filter(function (g) { return g.group === grp && !(hideSecret && g.vis === "oculto"); });
+        if (!items.length) return;
+        card.appendChild(el("div", { class: "wb-gal-grouphead", text: grp || "Geral" }));
+        var grid = el("div", { class: "wb-gal-grid" });
+        items.forEach(function (g) {
+          var fig = el("figure", { class: "wb-gal-item" + (g.vis !== "publico" ? " wb-gal-" + g.vis : "") });
+          if (hideSecret && g.vis === "spoiler") {
+            fig.appendChild(wbSpoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "" }); }));
+          } else {
+            fig.appendChild(el("img", { src: g.url, alt: g.caption || "" }));
+          }
+          if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
+          if (!ro) {
+            fig.appendChild(el("div", { class: "wb-gal-ctl" }, [
+              el("button", { type: "button", title: "Legenda", text: "✎", onclick: function () { var c = window.prompt("Legenda:", g.caption || ""); if (c != null) { g.caption = c.trim(); touch(true); } } }),
+              el("button", { type: "button", title: "Wiki: " + visInfo(g.vis).label + " (toque p/ mudar)", text: visInfo(g.vis).glyph, onclick: function () { g.vis = nextVis(g.vis); touch(true); } }),
+              el("button", { type: "button", title: "Remover", text: "✕", onclick: function () { e.gallery = e.gallery.filter(function (x) { return x.id !== g.id; }); touch(true); } })
+            ]));
+          }
+          grid.appendChild(fig);
+        });
+        card.appendChild(grid);
+      });
+      if (!ro) card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ imagem na galeria", onclick: function () {
+        var lastGroup = e.gallery.length ? e.gallery[e.gallery.length - 1].group : "";
+        var grp = window.prompt("Grupo (ex: Primeira Temporada) — deixe em branco pra 'Geral':", lastGroup || "");
+        if (grp == null) return;
+        pickImage(function (url) { e.gallery.push({ id: uid(), group: grp.trim(), url: url, caption: "", vis: "publico" }); touch(true); });
+      } }));
     }
 
     // tags
@@ -4055,8 +4150,8 @@
       card.appendChild(cat("Família"));
       function famLine(lbl, arr) {
         if (!arr.length) return null;
-        return el("div", { class: "wb-rel", style: "margin:2px 0" }, [el("span", { style: "color:var(--faint)", text: lbl + ": " })].concat(arr.map(function (x, i) {
-          return el("span", { class: "wl", text: (i ? ", " : "") + x.title, onclick: (function (xx) { return function () { wbOpen(xx); }; })(x) });
+        return el("div", { class: "wb-rel", style: "margin:2px 0" }, [el("span", { style: "color:var(--faint)", text: lbl + ": " })].concat(arr.map(function (pair, i) {
+          return el("span", { class: "wl", text: (i ? ", " : "") + wbDisplayName(pair.entry, pair.link.dispAs), onclick: (function (xx) { return function () { wbOpen(xx); }; })(pair.entry) });
         })));
       }
       [
@@ -4075,9 +4170,10 @@
       card.appendChild(el("div", { class: "row wb-rel" }, [
         el("span", { style: "width:8px;height:8px;border-radius:2px;background:" + st.color + ";flex-shrink:0" }),
         el("div", { class: "row-body" }, [
-          el("div", { class: "row-title", style: "font-size:14px", text: (lk.label ? lk.label + " → " : "→ ") + (t ? t.title : "(removida)") }),
+          el("div", { class: "row-title", style: "font-size:14px", text: (lk.label ? lk.label + " → " : "→ ") + wbDisplayName(t, lk.dispAs) }),
           el("div", { class: "row-meta", text: t ? flowerById(t.universeId).name + " · " + t.type : "" })
         ]),
+        (t && !ro && t.aliases && t.aliases.length) ? wbDispAsPicker(t, lk.dispAs, function (v) { lk.dispAs = v; touch(true); }) : null,
         t ? el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(t); } }) : null,
         ro ? null : delBtn(function () {
           if (t && linkInverseOf(lk.label)) { t.links = (t.links || []).filter(function (l) { return !(l.to === e.id && l.label === linkInverseOf(lk.label)); }); }
@@ -4092,9 +4188,10 @@
         var to = toCombo.value;
         var label = lf.querySelector("[name=label]").value.trim();
         if (!to) return;
-        e.links.push({ to: to, label: label });
-        var inv = linkInverseOf(label), tgt = wbEntry(to);
-        if (inv && tgt && !(tgt.links || []).some(function (l) { return l.to === e.id && l.label === inv; })) { tgt.links = tgt.links || []; tgt.links.push({ to: e.id, label: inv }); }
+        var tgt = wbEntry(to);
+        e.links.push({ to: to, label: label, dispAs: (tgt && tgt.dispAlias) || "" });
+        var inv = linkInverseOf(label);
+        if (inv && tgt && !(tgt.links || []).some(function (l) { return l.to === e.id && l.label === inv; })) { tgt.links = tgt.links || []; tgt.links.push({ to: e.id, label: inv, dispAs: e.dispAlias || "" }); }
         if (label === "é filho(a) de") { wbInferSiblings(e.id); wbInferGrandparents(e.id); }
         else if (label === "é pai/mãe de") { wbInferSiblings(to); wbInferGrandparents(to); }
         if (linkStyleOf(label) === "family") { wbInferFamilyExtras(e.id); wbInferFamilyExtras(to); }
@@ -4241,17 +4338,17 @@
       return g;
     }
     var pn = fam.parents.length;
-    fam.parents.forEach(function (p, i) {
+    fam.parents.forEach(function (pair, i) {
       var px = pn === 1 ? cx : (W * 0.28 + i * (W * 0.44 / Math.max(1, pn - 1)));
       svg.appendChild(svgEl("line", { x1: px, y1: 30, x2: cx, y2: 62, stroke: "var(--border-strong)" }));
-      svg.appendChild(nodeAt(px, 20, p.title, p));
+      svg.appendChild(nodeAt(px, 20, wbDisplayName(pair.entry, pair.link.dispAs), pair.entry));
     });
     svg.appendChild(nodeAt(cx, 75, e.title, e, true));
     var cn = fam.children.length;
-    fam.children.forEach(function (c, i) {
+    fam.children.forEach(function (pair, i) {
       var cxx = cn === 1 ? cx : (W * 0.14 + i * (W * 0.72 / Math.max(1, cn - 1)));
       svg.appendChild(svgEl("line", { x1: cx, y1: 88, x2: cxx, y2: 118, stroke: "var(--border-strong)" }));
-      svg.appendChild(nodeAt(cxx, 130, c.title, c));
+      svg.appendChild(nodeAt(cxx, 130, wbDisplayName(pair.entry, pair.link.dispAs), pair.entry));
     });
     return el("div", { style: "overflow-x:auto;margin-top:6px" }, [svg]);
   }
@@ -4735,7 +4832,7 @@
     hubList.forEach(function (f, i) { var a = -Math.PI / 2 + i * (Math.PI * 2 / Math.max(1, hubList.length)); hubPos[f.id] = { x: Math.cos(a) * hubR, y: Math.sin(a) * hubR }; });
     var nodes = [], edges = [], legend = {};
     ulist.forEach(function (f) { if (w.mmHide[f.id] || !hubPos[f.id]) return; nodes.push({ id: "hub:" + f.id, label: f.name, color: f.color, r: 24, kind: "hub", fixed: true, x: hubPos[f.id].x, y: hubPos[f.id].y }); legend[f.name] = f.color; });
-    all.forEach(function (e) { nodes.push({ id: e.id, label: e.title || "(sem título)", color: flowerById(e.universeId).color, r: 14, kind: "entry", x: null, y: null, hub: hubPos[e.universeId] }); });
+    all.forEach(function (e) { nodes.push({ id: e.id, label: wbDisplayName(e), color: flowerById(e.universeId).color, r: 14, kind: "entry", x: null, y: null, hub: hubPos[e.universeId] }); });
     var idset = {}; nodes.forEach(function (n) { idset[n.id] = 1; });
     all.forEach(function (e) {
       if (idset["hub:" + e.universeId]) edges.push({ from: e.id, to: "hub:" + e.universeId, weak: true });
