@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>wiki</title>
+<link rel="icon" href="./icon.svg?v=3" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&display=swap" />
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<style>
+  /* Página isolada: sem menu, sem navegação, sem dependência do resto do app.
+     Mesma paleta "Herbário do Multiverso" do app principal, duplicada aqui de propósito
+     (esta página não carrega index.html nem nada dele — é uma folha avulsa). */
+  :root { color-scheme: light dark; }
+  :root {
+    --bg: #e8dcbf; --paper: #f5ecd6; --surface: #f6eeda; --border: #d2bf98; --border-strong: #a98f61;
+    --ink: #2e2416; --muted: #6a5940; --faint: #9a8763; --gold: #9c7b3c; --gold-ink: #785a28;
+    --accent-wash: #ecdfbe; --warn: #b07d24; --shadow: 0 1px 2px rgba(74,52,20,0.06), 0 14px 34px -18px rgba(74,52,20,0.26);
+    --radius: 6px; --font-body: "Spectral", Georgia, serif; --font-display: "Cormorant", Georgia, serif; --font-wb: "Cormorant Garamond", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14100a; --paper: #211a10; --surface: #221b11; --border: #3a2f1d; --border-strong: #55442b;
+      --ink: #e9dcbd; --muted: #ac9e80; --faint: #7c6e55; --gold: #d8b878; --gold-ink: #ecd3a2;
+      --accent-wash: #2a2114; --warn: #d6a24a; --shadow: 0 2px 10px rgba(0,0,0,0.45), 0 26px 60px -24px rgba(0,0,0,0.7);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); line-height: 1.6; padding: 32px 16px 60px; }
+  .page { max-width: 640px; margin: 0 auto; }
+  .card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 26px; box-shadow: var(--shadow); }
+  .eyebrow { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display: flex; gap: 6px; flex-wrap: wrap; }
+  h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin: 6px 0 4px; }
+  .aliases { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 10px; }
+  .summary { font-family: var(--font-wb); font-size: 18px; font-style: italic; color: var(--muted); margin: 8px 0 16px; }
+  .cover { width: 100%; max-height: 360px; object-fit: cover; border-radius: var(--radius); border: 1px solid var(--border-strong); margin-bottom: 16px; display: block; }
+  .prose { font-family: var(--font-wb); font-size: 18px; }
+  .prose p { margin: 0 0 14px; }
+  .prose img.wb-img { max-width: 100%; border-radius: var(--radius); margin: 10px 0; display: block; }
+  .prose code.wb-code { font-family: ui-monospace, monospace; background: var(--accent-wash); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
+  .prose blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--gold); color: var(--muted); }
+  .prose a { color: var(--gold-ink); }
+  .wl-plain { font-weight: 600; }
+  .cathead { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); border-bottom: 1px solid var(--border); padding-bottom: 5px; margin: 26px 0 10px; }
+  dl.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 0; }
+  dl.fields dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  dl.fields dd { margin: 2px 0 0; font-family: var(--font-wb); font-size: 16px; }
+  @media (max-width: 480px) { dl.fields { grid-template-columns: 1fr; } }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 18px; }
+  .tag { font-size: 11px; color: var(--gold-ink); background: var(--accent-wash); padding: 3px 9px; border-radius: 4px; border: 1px solid var(--border); }
+  .md-spoiler { background: var(--ink); color: transparent; border-radius: 3px; cursor: pointer; padding: 0 2px; }
+  .md-spoiler.on { background: var(--accent-wash); color: inherit; cursor: text; }
+  .spoiler-block { border: 1px dashed var(--gold); border-radius: var(--radius); margin: 10px 0; }
+  .spoiler-block.revealed { border-style: solid; padding: 12px 14px; }
+  .spoiler-reveal { width: 100%; text-align: left; background: color-mix(in srgb, var(--gold) 10%, transparent); border: 0; border-radius: var(--radius); color: var(--gold-ink); font-style: italic; font-family: var(--font-body); font-size: 14px; padding: 10px 12px; cursor: pointer; }
+  .foot { text-align: center; font-size: 11.5px; color: var(--faint); margin-top: 22px; }
+  .empty { text-align: center; color: var(--muted); padding: 60px 20px; }
+</style>
+</head>
+<body>
+<div class="page" id="page"><div class="empty">Carregando…</div></div>
+<script>
+(function () {
+  "use strict";
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyC2nVLv97V6D1S6rZ7nwhhyQXgWeFxQLd0",
+    authDomain: "rotina-555dd.firebaseapp.com",
+    projectId: "rotina-555dd",
+    storageBucket: "rotina-555dd.firebasestorage.app",
+    messagingSenderId: "979165283716",
+    appId: "1:979165283716:web:258160eb92ead2353e89d1"
+  };
+
+  function el(tag, attrs, kids) {
+    var e = document.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      var val = attrs[k];
+      if (k === "class") e.className = val;
+      else if (k === "text") e.textContent = val == null ? "" : val;
+      else if (k.slice(0, 2) === "on" && typeof val === "function") e.addEventListener(k.slice(2), val);
+      else if (val != null && val !== false) e.setAttribute(k, val);
+    }
+    (kids || []).forEach(function (c) { if (c == null || c === false) return; e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return e;
+  }
+
+  /* ---- minimal isolated markdown (duplicated from index.html on purpose — this page
+     never loads the app, [[links]] render as plain emphasized text, nothing is clickable
+     to "the rest of the wiki" since there is no rest of the wiki here) ---- */
+  function mdInline(container, s) {
+    var re = /(!\[[^\]]*\]\([^)\s]+\)|`[^`]+`|\[\[[^\]\[]+\]\]|\[[^\]]+\]\((?:https?:|mailto:)[^)\s]+\)|\|\|[^|]+\|\||\*\*[^*]+\*\*|__[^_]+__|~~[^~]+~~|\*[^*\n]+\*|(?:^|\s)_[^_\n]+_(?=\s|$))/g;
+    var last = 0, m;
+    function txt(str) { if (str) container.appendChild(document.createTextNode(str)); }
+    while ((m = re.exec(s))) {
+      var tok = m[0], at = m.index, lead = "";
+      if (/^\s_/.test(tok)) { lead = tok.charAt(0); tok = tok.slice(1); at += 1; }
+      txt(s.slice(last, at)); if (lead) txt(lead);
+      if (tok.charAt(0) === "!") {
+        var im = tok.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+        container.appendChild(el("img", { class: "wb-img", src: im[2], alt: im[1] || "", loading: "lazy" }));
+      } else if (tok.charAt(0) === "`") {
+        container.appendChild(el("code", { class: "wb-code", text: tok.slice(1, -1) }));
+      } else if (tok.slice(0, 2) === "[[") {
+        var raw = tok.slice(2, -2), disp = raw.trim();
+        if (raw.indexOf("|") !== -1) disp = raw.split("|")[1].trim();
+        container.appendChild(el("span", { class: "wl-plain", text: disp }));
+      } else if (tok.charAt(0) === "[") {
+        var lm = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+        container.appendChild(el("a", { href: lm[2], target: "_blank", rel: "noopener noreferrer", text: lm[1] }));
+      } else if (tok.slice(0, 2) === "**" || tok.slice(0, 2) === "__") {
+        container.appendChild(el("strong", { text: tok.slice(2, -2) }));
+      } else if (tok.slice(0, 2) === "~~") {
+        container.appendChild(el("del", { text: tok.slice(2, -2) }));
+      } else if (tok.slice(0, 2) === "||") {
+        container.appendChild(el("span", { class: "md-spoiler", tabindex: "0", role: "button", "aria-label": "spoiler, toque para revelar", text: tok.slice(2, -2), onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } }));
+      } else {
+        container.appendChild(el("em", { text: tok.slice(1, -1) }));
+      }
+      last = re.lastIndex;
+    }
+    txt(s.slice(last));
+  }
+  function renderMarkdown(text) {
+    var wrap = el("div", { class: "prose" });
+    var lines = String(text || "").split("\n");
+    var listBuf = null, listOrdered = false, i = 0;
+    function flush() { if (listBuf) { wrap.appendChild(listBuf); listBuf = null; } }
+    for (; i < lines.length; i++) {
+      var ln = lines[i];
+      if (/^\s*```/.test(ln)) {
+        flush(); var buf = []; i++;
+        while (i < lines.length && !/^\s*```/.test(lines[i])) { buf.push(lines[i]); i++; }
+        wrap.appendChild(el("pre", {}, [el("code", { text: buf.join("\n") })]));
+        continue;
+      }
+      if (/^\s*$/.test(ln)) { flush(); continue; }
+      if (/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(ln)) { flush(); wrap.appendChild(el("hr")); continue; }
+      var h = ln.match(/^(#{1,6})\s+(.*)/);
+      if (h) { flush(); var hEl = el("h" + Math.min(6, h[1].length + 2)); mdInline(hEl, h[2]); wrap.appendChild(hEl); continue; }
+      if (/^\s*>\s?/.test(ln)) { flush(); var q = el("blockquote"); mdInline(q, ln.replace(/^\s*>\s?/, "")); wrap.appendChild(q); continue; }
+      var task = ln.match(/^\s*[-*+]\s+\[([ xX])\]\s+(.*)/);
+      var item = ln.match(/^\s*[-*+]\s+(.*)/);
+      var oitem = ln.match(/^\s*\d+[.)]\s+(.*)/);
+      if (task || item || oitem) {
+        var ordered = !!oitem && !item;
+        if (!listBuf || listOrdered !== ordered) { flush(); listBuf = el(ordered ? "ol" : "ul"); listOrdered = ordered; }
+        var li = el("li");
+        mdInline(li, task ? task[2] : (item ? item[1] : oitem[1]));
+        listBuf.appendChild(li);
+        continue;
+      }
+      flush();
+      var p = el("p"); mdInline(p, ln); wrap.appendChild(p);
+    }
+    flush();
+    return wrap;
+  }
+
+  function spoilerCover(buildInner) {
+    var wrap = el("div", { class: "spoiler-block" });
+    var btn = el("button", { class: "spoiler-reveal", type: "button", text: "🙈 spoiler — toque para revelar" });
+    btn.addEventListener("click", function () { wrap.className = "spoiler-block revealed"; wrap.textContent = ""; wrap.appendChild(buildInner()); });
+    wrap.appendChild(btn);
+    return wrap;
+  }
+  function chip(prefix, item) {
+    if (item.vis === "spoiler") {
+      var c = el("span", { class: "tag" });
+      c.appendChild(el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: prefix + item.text, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } }));
+      return c;
+    }
+    return el("span", { class: "tag", text: prefix + item.text });
+  }
+
+  function render(data) {
+    var page = document.getElementById("page");
+    page.textContent = "";
+    document.title = data.title || "wiki";
+    var card = el("div", { class: "card" });
+
+    var eyebrowBits = [data.type, data.universe].filter(Boolean);
+    if (eyebrowBits.length) card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: eyebrowBits.join(" · ") })]));
+    card.appendChild(el("h1", { text: data.title || "(sem título)" }));
+    if (data.aliases && data.aliases.length) {
+      var aliasLine = el("div", { class: "aliases" }, [el("span", { text: "também: " })]);
+      data.aliases.forEach(function (a, i) {
+        if (i) aliasLine.appendChild(document.createTextNode(", "));
+        if (a.vis === "spoiler") aliasLine.appendChild(el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: a.text, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } }));
+        else aliasLine.appendChild(document.createTextNode(a.text));
+      });
+      card.appendChild(aliasLine);
+    }
+    if (data.cover) card.appendChild(el("img", { class: "cover", src: data.cover, alt: "" }));
+    if (data.summary) { var sp = el("p", { class: "summary" }); mdInline(sp, data.summary); card.appendChild(sp); }
+    if (data.body) card.appendChild(renderMarkdown(data.body));
+
+    var shortFields = (data.fields || []).filter(function (f) { return f.type !== "nota"; });
+    var longFields = (data.fields || []).filter(function (f) { return f.type === "nota"; });
+    if (shortFields.length) {
+      card.appendChild(el("div", { class: "cathead", text: "Campos" }));
+      var dl = el("dl", { class: "fields" });
+      shortFields.forEach(function (f) {
+        dl.appendChild(el("dt", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
+        var dd = el("dd");
+        if (f.vis === "spoiler") {
+          dd.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
+        } else {
+          mdInline(dd, f.value);
+        }
+        dl.appendChild(dd);
+      });
+      card.appendChild(dl);
+    }
+    longFields.forEach(function (f) {
+      card.appendChild(el("div", { class: "cathead", text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
+      if (f.vis === "spoiler") card.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
+      else card.appendChild(renderMarkdown(f.value));
+    });
+
+    (data.sections || []).forEach(function (s) {
+      card.appendChild(el("div", { class: "cathead", text: (s.title || "Seção") + (s.vis === "spoiler" ? " 🙈" : "") }));
+      if (s.vis === "spoiler") card.appendChild(spoilerCover(function () { return renderMarkdown(s.body); }));
+      else card.appendChild(renderMarkdown(s.body));
+    });
+
+    if (data.tags && data.tags.length) {
+      var tagWrap = el("div", { class: "tags" });
+      data.tags.forEach(function (t) { tagWrap.appendChild(chip("#", t)); });
+      card.appendChild(tagWrap);
+    }
+
+    page.appendChild(card);
+    page.appendChild(el("div", { class: "foot", text: "página isolada, gerada a partir de uma entrada do tree" + (data.publishedAt ? " · " + data.publishedAt : "") }));
+  }
+
+  function showMessage(msg) {
+    document.getElementById("page").innerHTML = "";
+    document.getElementById("page").appendChild(el("div", { class: "empty", text: msg }));
+  }
+
+  var id = new URLSearchParams(location.search).get("id");
+  if (!id) { showMessage("Link inválido — falta o identificador da wiki."); return; }
+  if (typeof firebase === "undefined") { showMessage("Não consegui carregar a conexão com a nuvem."); return; }
+  try { firebase.initializeApp(FIREBASE_CONFIG); } catch (e) {}
+  var fs = firebase.firestore();
+  fs.collection("wikiPublic").doc(id).get().then(function (snap) {
+    if (!snap.exists) { showMessage("Essa wiki não existe mais (o link pode ter sido despublicado)."); return; }
+    render(snap.data());
+  }).catch(function () {
+    showMessage("Não consegui carregar essa wiki agora. Tente de novo mais tarde.");
+  });
+})();
+</script>
+</body>
+</html>

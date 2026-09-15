@@ -472,6 +472,12 @@
 
   .note-tags { display: flex; gap: 6px; flex-wrap: wrap; }
   .ntag { font-size: 11px; color: var(--accent-ink); background: var(--accent-wash); padding: 3px 9px; border-radius: var(--radius-sm); border: 1px solid var(--border); font-family: var(--font-body); }
+  .ntag-chip { display: inline-flex; align-items: stretch; font-size: 11px; color: var(--accent-ink); background: var(--accent-wash); border-radius: var(--radius-sm); border: 1px solid var(--border); font-family: var(--font-body); overflow: hidden; }
+  .ntag-chip.ntag-spoiler { background: color-mix(in srgb, var(--gold) 16%, var(--accent-wash)); }
+  .ntag-chip.ntag-oculto { background: color-mix(in srgb, var(--warn) 16%, var(--accent-wash)); }
+  .ntag-vis { background: none; border: 0; color: inherit; padding: 3px 7px; cursor: pointer; font-family: inherit; font-size: inherit; }
+  .ntag-del { background: none; border: 0; border-left: 1px solid var(--border); color: var(--faint); padding: 3px 6px; cursor: pointer; font-size: inherit; }
+  .ntag-del:hover { color: var(--neg); }
 
   .entry { padding: 14px 0; border-bottom: 1px solid var(--border); }
   .entry:last-child { border-bottom: none; }
@@ -838,7 +844,15 @@
   .wb-fld-progress .bar-track { flex: 1; margin-top: 0; }
   .wb-secret-mark { color: var(--warn); font-size: 0.82em; letter-spacing: 0.04em; }
   .wb-secret-hidden { color: var(--faint); font-style: italic; }
+  .wb-spoiler-mark { color: var(--gold-ink); font-size: 0.82em; letter-spacing: 0.04em; }
   .dd-secret, .wb-sec-secret > .wb-sec-head { background: repeating-linear-gradient(45deg, transparent, transparent 8px, color-mix(in srgb, var(--warn) 8%, transparent) 8px, color-mix(in srgb, var(--warn) 8%, transparent) 16px); }
+  .dd-spoiler, .wb-sec-spoiler > .wb-sec-head { background: repeating-linear-gradient(45deg, transparent, transparent 8px, color-mix(in srgb, var(--gold) 10%, transparent) 8px, color-mix(in srgb, var(--gold) 10%, transparent) 16px); }
+  /* ---- markdown spoiler tags (||texto||) — click to reveal, both in-app and on published wikis ---- */
+  .md-spoiler { background: var(--ink); color: transparent; border-radius: 3px; cursor: pointer; padding: 0 2px; transition: color .12s, background .12s; user-select: none; }
+  .md-spoiler.on { background: var(--accent-wash); color: inherit; cursor: text; user-select: text; }
+  .wb-spoiler-block { border: 1px dashed var(--gold); border-radius: var(--radius-sm); }
+  .wb-spoiler-block.revealed { border-style: solid; padding: 10px 12px; }
+  .wb-spoiler-reveal { width: 100%; text-align: left; background: color-mix(in srgb, var(--gold) 8%, transparent); border: 0; border-radius: var(--radius-sm); color: var(--gold-ink); font-style: italic; font-family: var(--font-body); font-size: 14px; padding: 10px 12px; cursor: pointer; }
   .wb-lockbtn { background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--faint); font-size: 12px; padding: 3px 7px; cursor: pointer; }
   .wb-lockbtn.on { color: var(--warn); border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
 
@@ -1180,6 +1194,17 @@
     { id: "progresso", label: "progresso" },
     { id: "ligacao", label: "ligação a entrada" }
   ];
+  // Publish visibility for fields/seções/tags/aliases: público sai na wiki normalmente,
+  // spoiler sai mas colapsado atrás de "revelar" (não é sigilo real, é só pra não estragar
+  // surpresa), oculto nem entra no export. Cycled by the same button in the editor.
+  var WB_VIS = ["publico", "spoiler", "oculto"];
+  var WB_VIS_INFO = {
+    publico: { glyph: "🔓", label: "público" },
+    spoiler: { glyph: "🙈", label: "spoiler" },
+    oculto: { glyph: "🔒", label: "oculto" }
+  };
+  function nextVis(v) { var i = WB_VIS.indexOf(v); return WB_VIS[(i + 1) % WB_VIS.length]; }
+  function visInfo(v) { return WB_VIS_INFO[v] || WB_VIS_INFO.publico; }
   var LINK_TYPES = [
     { label: "aliado de", inverse: "aliado de", style: "ally" },
     { label: "rival de", inverse: "rival de", style: "rival" },
@@ -1331,12 +1356,19 @@
       if (ENTRY_STATUS.map(function (x) { return x.id; }).indexOf(e.status) === -1) e.status = "rascunho";
       e.secret = !!e.secret;
       if (typeof e.cover !== "string") e.cover = "";
+      if (WB_VIS.indexOf(e.coverVis) === -1) e.coverVis = "publico";
+      if (!e.tagVis || typeof e.tagVis !== "object") e.tagVis = {};
+      if (!e.aliasVis || typeof e.aliasVis !== "object") e.aliasVis = {};
+      if (e.wikiId !== undefined && typeof e.wikiId !== "string") e.wikiId = null;
+      if (e.wikiId === undefined) e.wikiId = null;
+      if (typeof e.wikiPublishedAt !== "string") e.wikiPublishedAt = "";
       if (!e.fieldMeta || typeof e.fieldMeta !== "object") e.fieldMeta = {};
       Object.keys(e.fieldMeta).forEach(function (k) {
         var fm = e.fieldMeta[k]; if (!fm || typeof fm !== "object") { delete e.fieldMeta[k]; return; }
         if (FIELD_TYPES.map(function (x) { return x.id; }).indexOf(fm.type) === -1) fm.type = "texto";
         if (!Array.isArray(fm.opts)) fm.opts = [];
-        fm.secret = !!fm.secret;
+        if (WB_VIS.indexOf(fm.vis) === -1) fm.vis = fm.secret ? "oculto" : "publico";
+        delete fm.secret;
       });
       e.links.forEach(function (l) { if (typeof l.note !== "string") l.note = ""; });
       if (!Array.isArray(e.sections)) e.sections = [];
@@ -1345,7 +1377,8 @@
         if (sec.id == null) sec.id = uid();
         if (typeof sec.title !== "string") sec.title = "";
         if (typeof sec.body !== "string") sec.body = "";
-        sec.secret = !!sec.secret;
+        if (WB_VIS.indexOf(sec.vis) === -1) sec.vis = sec.secret ? "oculto" : "publico";
+        delete sec.secret;
         sec.collapsed = !!sec.collapsed;
       });
       if (!Array.isArray(e.events)) e.events = [];
@@ -1920,7 +1953,7 @@
   /* ---- markdown ---- */
   function mdInline(container, s) {
     // token order matters: images, code, wiki-links, external links, then emphasis
-    var re = /(!\[[^\]]*\]\([^)\s]+\)|`[^`]+`|\[\[[^\]\[]+\]\]|\[[^\]]+\]\((?:https?:|mailto:)[^)\s]+\)|\*\*[^*]+\*\*|__[^_]+__|~~[^~]+~~|\*[^*\n]+\*|(?:^|\s)_[^_\n]+_(?=\s|$))/g;
+    var re = /(!\[[^\]]*\]\([^)\s]+\)|`[^`]+`|\[\[[^\]\[]+\]\]|\[[^\]]+\]\((?:https?:|mailto:)[^)\s]+\)|\|\|[^|]+\|\||\*\*[^*]+\*\*|__[^_]+__|~~[^~]+~~|\*[^*\n]+\*|(?:^|\s)_[^_\n]+_(?=\s|$))/g;
     var last = 0, m;
     function txt(str) { if (str) container.appendChild(document.createTextNode(str)); }
     while ((m = re.exec(s))) {
@@ -1946,6 +1979,8 @@
         container.appendChild(el("strong", { text: tok.slice(2, -2) }));
       } else if (tok.slice(0, 2) === "~~") {
         container.appendChild(el("del", { text: tok.slice(2, -2) }));
+      } else if (tok.slice(0, 2) === "||") {
+        container.appendChild(el("span", { class: "md-spoiler", tabindex: "0", role: "button", "aria-label": "conteúdo com spoiler, toque para revelar", text: tok.slice(2, -2), onclick: function (ev) { ev.currentTarget.classList.toggle("on"); }, onkeydown: function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.currentTarget.classList.toggle("on"); } } }));
       } else {
         container.appendChild(el("em", { text: tok.slice(1, -1) }));
       }
@@ -2076,7 +2111,7 @@
 
   /* ---- [[ ]] autocomplete for a textarea ---- */
   function wbStubEntry(uniId, title) {
-    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], status: "semente", secret: false, cover: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
+    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], status: "semente", secret: false, cover: "", coverVis: "publico", tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
     C().entries.push(e); save();
     return e;
   }
@@ -2174,6 +2209,7 @@
       B("N", "Negrito", function () { mdWrapSel(ta, "**", "**"); }),
       B("I", "Itálico", function () { mdWrapSel(ta, "*", "*"); }),
       B("S̶", "Riscado", function () { mdWrapSel(ta, "~~", "~~"); }),
+      B("🙈", "Spoiler (||texto||) — visível na wiki só ao tocar", function () { mdWrapSel(ta, "||", "||"); }),
       B("‹›", "Código", function () { mdWrapSel(ta, "`", "`"); }),
       sep(),
       B("H2", "Título", function () { mdLinePrefix(ta, "## "); }),
@@ -2190,7 +2226,7 @@
       B("🖼", "Imagem", function () { pickImage(function (url) { mdInsertAt(ta, "\n![](" + url + ")\n"); renderPreview(); }); }),
       previewBtn
     ]);
-    var done = el("button", { class: "btn sm", type: "button", text: "Concluir", style: "margin-top:8px", onclick: function () { finish(true); } });
+    var done = el("button", { class: "btn sm", type: "button", text: "Concluir", style: "margin-top:8px", onclick: function (ev) { ev.stopPropagation(); finish(true); } });
     host.appendChild(bar); host.appendChild(split); host.appendChild(done);
     if (opts.uniId) attachWikiAutocomplete(ta, opts.uniId);
     var finished = false;
@@ -2768,7 +2804,7 @@
       e.parentId = parCombo.value || null;
       if (x != null) e.x = x;
       if (y != null) e.y = y;
-      if (g("tmpl") && g("tmpl").checked) (C().templates[e.type] || []).forEach(function (k) { if (!(k in e.fields)) { e.fields[k] = ""; e.fieldMeta[k] = { type: guessFieldType(k), opts: [], secret: false }; } });
+      if (g("tmpl") && g("tmpl").checked) (C().templates[e.type] || []).forEach(function (k) { if (!(k in e.fields)) { e.fields[k] = ""; e.fieldMeta[k] = { type: guessFieldType(k), opts: [], vis: "publico" }; } });
       var cp = campId && wbCampaign(campId);
       var cse = cp && (cp.seasons || []).filter(function (x) { return x.id === seasonId; })[0];
       if (cp && cse && cp.universeId === e.universeId && cse.roster.indexOf(e.id) === -1) cse.roster.push(e.id);
@@ -3464,7 +3500,7 @@
   }
   function wbFieldMeta(e, k) {
     var m = e.fieldMeta[k];
-    if (!m || typeof m !== "object") return { type: guessFieldType(k), opts: [], secret: false, _guessed: true };
+    if (!m || typeof m !== "object") return { type: guessFieldType(k), opts: [], vis: "publico", _guessed: true };
     if (!Array.isArray(m.opts)) m.opts = [];
     if (!m.type) m.type = "texto";
     return m;
@@ -3489,12 +3525,12 @@
     name = (name || "").trim();
     if (!name || (name in e.fields)) return;
     e.fields[name] = "";
-    e.fieldMeta[name] = { type: guessFieldType(name), opts: [], secret: false };
+    e.fieldMeta[name] = { type: guessFieldType(name), opts: [], vis: "publico" };
     touch(true);
   }
   function wbRenderLongField(e, k, opts) {
     var fm = wbFieldMeta(e, k), touch = opts.touch;
-    var wrap = el("div", { class: "wb-lfield" + (fm.secret ? " wb-sec-secret" : ""), "data-toc": k });
+    var wrap = el("div", { class: "wb-lfield" + (fm.vis === "oculto" ? " wb-sec-secret" : fm.vis === "spoiler" ? " wb-sec-spoiler" : ""), "data-toc": k });
     var head = el("div", { class: "wb-lfield-head" });
     if (opts.ro) head.appendChild(el("span", { class: "wb-lfield-lab", text: k }));
     else head.appendChild(editable({ tag: "span", className: "wb-lfield-lab", value: k, placeholder: "campo", commit: function (nv) {
@@ -3502,7 +3538,7 @@
       if (nv && nv !== k && !(nv in e.fields)) { e.fields[nv] = e.fields[k]; delete e.fields[k]; e.fieldMeta[nv] = fm; delete e.fieldMeta[k]; touch(true); }
       else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
     } }));
-    if (fm.secret) head.appendChild(el("span", { class: "wb-secret-mark", text: "🔒" }));
+    if (fm.vis !== "publico") head.appendChild(el("span", { class: fm.vis === "oculto" ? "wb-secret-mark" : "wb-spoiler-mark", text: visInfo(fm.vis).glyph }));
     if (!opts.ro) head.appendChild(el("span", { class: "wb-fieldctl" }, [
       el("button", { type: "button", title: "Tipo: " + fm.type, text: "⚙", onclick: function () {
         var m = wbFieldMetaWrite(e, k), ids = FIELD_TYPES.map(function (x) { return x.id; });
@@ -3510,12 +3546,18 @@
         if (m.type === "escolha") { var o = window.prompt("Opções separadas por vírgula:", m.opts.join(", ")); m.opts = (o || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean); }
         touch(true);
       } }),
-      el("button", { type: "button", title: fm.secret ? "Tornar público" : "Marcar secreto", text: fm.secret ? "🔒" : "🔓", onclick: function () { var m = wbFieldMetaWrite(e, k); m.secret = !m.secret; touch(true); } }),
+      el("button", { type: "button", title: "Wiki: " + visInfo(fm.vis).label + " (toque p/ mudar)", text: visInfo(fm.vis).glyph, onclick: function () { var m = wbFieldMetaWrite(e, k); m.vis = nextVis(m.vis); touch(true); } }),
       el("button", { type: "button", title: "Remover campo", text: "✕", onclick: function () { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); } })
     ]));
     wrap.appendChild(head);
     if (opts.ro) {
-      wrap.appendChild(el("div", { class: "wb-prose wb-lfield-read", text: e.fields[k] || "" }));
+      if (opts.hideSecret && fm.vis === "spoiler") {
+        wrap.appendChild(wbSpoilerCover(function () { var d = el("div", { class: "wb-prose wb-lfield-read" }); d.appendChild(renderMarkdown(e.fields[k] || "")); return d; }));
+      } else {
+        var rd = el("div", { class: "wb-prose wb-lfield-read" });
+        rd.appendChild(renderMarkdown(e.fields[k] || ""));
+        wrap.appendChild(rd);
+      }
     } else {
       var ta = el("textarea", { class: "wb-lfield-input", placeholder: "Escrever…" });
       ta.value = e.fields[k] || "";
@@ -3535,7 +3577,7 @@
       if (nv && nv !== k && !(nv in e.fields)) { e.fields[nv] = e.fields[k]; delete e.fields[k]; if (e.fieldMeta[k]) { e.fieldMeta[nv] = e.fieldMeta[k]; delete e.fieldMeta[k]; } touch(true); }
       else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
     } }));
-    if (fm.secret) dt.appendChild(el("span", { class: "wb-secret-mark", text: " 🔒" }));
+    if (fm.vis !== "publico") dt.appendChild(el("span", { class: fm.vis === "oculto" ? "wb-secret-mark" : "wb-spoiler-mark", text: " " + visInfo(fm.vis).glyph }));
     if (!opts.ro) {
       dt.appendChild(el("span", { class: "wb-fieldctl" }, [
         el("button", { type: "button", title: "Tipo: " + fm.type + " (toque p/ mudar)", text: "⚙", onclick: function () {
@@ -3545,12 +3587,12 @@
           if (m.type === "escolha") { var o = window.prompt("Opções separadas por vírgula:", m.opts.join(", ")); m.opts = (o || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean); }
           touch(true);
         } }),
-        el("button", { type: "button", title: fm.secret ? "Tornar público" : "Marcar secreto", text: fm.secret ? "🔒" : "🔓", onclick: function () { var m = wbFieldMetaWrite(e, k); m.secret = !m.secret; touch(true); } }),
+        el("button", { type: "button", title: "Wiki: " + visInfo(fm.vis).label + " (toque p/ mudar)", text: visInfo(fm.vis).glyph, onclick: function () { var m = wbFieldMetaWrite(e, k); m.vis = nextVis(m.vis); touch(true); } }),
         el("button", { type: "button", title: "Remover campo", text: "✕", onclick: function () { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); } })
       ]));
     }
     dl.appendChild(dt);
-    var dd = el("dd", fm.secret ? { class: "dd-secret" } : {});
+    var dd = el("dd", fm.vis === "oculto" ? { class: "dd-secret" } : fm.vis === "spoiler" ? { class: "dd-spoiler" } : {});
     if (fm.type === "bool") {
       dd.appendChild(el("button", { class: "wb-lockbtn" + (val === "sim" ? " on" : ""), type: "button", text: val === "sim" ? "✓ sim" : "não", onclick: function () { e.fields[k] = val === "sim" ? "" : "sim"; touch(true); } }));
     } else if (fm.type === "escolha") {
@@ -3581,45 +3623,93 @@
     } else {
       dd.appendChild(editable({ tag: "span", value: val, placeholder: "…", multiline: fm.type === "nota", commit: function (nv) { e.fields[k] = fm.type === "nota" ? nv : nv.trim(); touch(false); } }));
     }
+    if (opts.hideSecret && fm.vis === "spoiler") {
+      var inner = dd;
+      dd = el("dd", { class: "dd-spoiler" });
+      dd.appendChild(wbSpoilerCover(function () { return inner; }));
+    }
     dl.appendChild(dd);
+  }
+  // Whole-block spoiler cover (for a section/field marked "spoiler"): collapsed behind a
+  // "revelar" button. Only used in "modo leitor" preview and on the published wiki page —
+  // during normal editing the author sees everything plainly, same as "oculto" today.
+  function wbSpoilerCover(buildInner) {
+    var wrap = el("div", { class: "wb-spoiler-block" });
+    var btn = el("button", { class: "wb-spoiler-reveal", type: "button", text: "🙈 spoiler — toque para revelar" });
+    btn.addEventListener("click", function () {
+      wrap.className = "wb-spoiler-block revealed"; wrap.textContent = "";
+      wrap.appendChild(buildInner());
+    });
+    wrap.appendChild(btn);
+    return wrap;
+  }
+  // Shared chip list for tags/aliases: each chip has its own publico/spoiler/oculto state
+  // (tap the text to cycle it) and its own remove button. arrKey = "tags"|"aliases" (plain
+  // string array, untouched everywhere else in the app), visKey = the parallel text->vis map.
+  function wbVisChipList(e, arrKey, visKey, prefix, touch, opts) {
+    opts = opts || {};
+    var wrap = el("div", { class: "note-tags" });
+    (e[arrKey] || []).forEach(function (t) {
+      var v = e[visKey][t] || "publico";
+      if (opts.hideSecret && v === "oculto") return;
+      if (opts.ro) {
+        var span = el("span", { class: "ntag" });
+        if (opts.hideSecret && v === "spoiler") {
+          span.appendChild(el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: prefix + t, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } }));
+        } else {
+          span.textContent = prefix + t;
+        }
+        wrap.appendChild(span);
+        return;
+      }
+      var chip = el("span", { class: "ntag-chip" + (v !== "publico" ? " ntag-" + v : "") });
+      chip.appendChild(el("button", { type: "button", class: "ntag-vis", title: "Wiki: " + visInfo(v).label + " (toque p/ mudar)", text: (v !== "publico" ? visInfo(v).glyph + " " : "") + prefix + t, onclick: function () { e[visKey][t] = nextVis(v); touch(true); } }));
+      chip.appendChild(el("button", { type: "button", class: "ntag-del", "aria-label": "remover", text: "✕", onclick: function () { e[arrKey] = e[arrKey].filter(function (x) { return x !== t; }); delete e[visKey][t]; touch(true); } }));
+      wrap.appendChild(chip);
+    });
+    return wrap;
   }
   function wbRenderSections(card, e, opts) {
     var touch = opts.touch;
     (e.sections || []).forEach(function (sec, idx) {
-      if (opts.hideSecret && sec.secret) return;
-      var host = el("div", { class: "wb-sec" + (sec.secret ? " wb-sec-secret" : ""), "data-toc": (sec.title || "Seção") });
+      if (opts.hideSecret && sec.vis === "oculto") return;
+      var host = el("div", { class: "wb-sec" + (sec.vis === "oculto" ? " wb-sec-secret" : sec.vis === "spoiler" ? " wb-sec-spoiler" : ""), "data-toc": (sec.title || "Seção") });
       var head = el("div", { class: "wb-sec-head" });
       if (opts.ro) head.appendChild(el("h3", { text: sec.title || "Seção" }));
       else head.appendChild(editable({ tag: "h3", value: sec.title, placeholder: "Título da seção", commit: function (nv) { sec.title = nv.trim(); touch(false); } }));
-      if (sec.secret) head.appendChild(el("span", { class: "wb-secret-mark", text: "🔒" }));
+      if (sec.vis !== "publico") head.appendChild(el("span", { class: sec.vis === "oculto" ? "wb-secret-mark" : "wb-spoiler-mark", text: visInfo(sec.vis).glyph }));
       if (!opts.ro) {
         head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Recolher", text: sec.collapsed ? "▸" : "▾", onclick: function () { sec.collapsed = !sec.collapsed; touch(true); } }));
-        head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: sec.secret ? "Tornar pública" : "Marcar secreta", text: sec.secret ? "🔒" : "🔓", onclick: function () { sec.secret = !sec.secret; touch(true); } }));
+        head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Wiki: " + visInfo(sec.vis).label + " (toque p/ mudar)", text: visInfo(sec.vis).glyph, onclick: function () { sec.vis = nextVis(sec.vis); touch(true); } }));
         head.appendChild(el("button", { class: "wb-ord", type: "button", text: "▲", disabled: idx === 0 ? "disabled" : null, onclick: function () { var t = e.sections[idx - 1]; e.sections[idx - 1] = sec; e.sections[idx] = t; touch(true); } }));
         head.appendChild(el("button", { class: "wb-ord", type: "button", text: "▼", disabled: idx === e.sections.length - 1 ? "disabled" : null, onclick: function () { var t = e.sections[idx + 1]; e.sections[idx + 1] = sec; e.sections[idx] = t; touch(true); } }));
         head.appendChild(delBtn(function () { if (window.confirm("Remover esta seção?")) { e.sections.splice(idx, 1); touch(true); } }));
       }
       host.appendChild(head);
       if (!sec.collapsed) {
-        var bw = el("div");
-        function showBody() {
-          bw.className = "wb-prose"; bw.textContent = ""; bw.onclick = null;
-          if (sec.body) bw.appendChild(renderMarkdown(sec.body));
-          else if (!opts.ro) bw.appendChild(el("span", { class: "ie placeholder", tabindex: "0", role: "button", text: "Escrever…" }));
-          if (!opts.ro) bw.onclick = function (ev) {
-            if (ev.target.closest && (ev.target.closest(".wl") || ev.target.closest("a[href]") || ev.target.closest(".wb-img") || ev.target.closest(".wb-task-box"))) return;
-            bw.className = ""; bw.textContent = ""; bw.onclick = null;
-            bw.appendChild(mdEditorUI(sec.body || "", function (val) { sec.body = val; touch(false); }, { uniId: e.universeId, minHeight: "30vh", onExit: showBody }));
-          };
+        if (opts.hideSecret && sec.vis === "spoiler") {
+          host.appendChild(wbSpoilerCover(function () { var d = el("div", { class: "wb-prose" }); d.appendChild(renderMarkdown(sec.body)); return d; }));
+        } else {
+          var bw = el("div");
+          function showBody() {
+            bw.className = "wb-prose"; bw.textContent = ""; bw.onclick = null;
+            if (sec.body) bw.appendChild(renderMarkdown(sec.body));
+            else if (!opts.ro) bw.appendChild(el("span", { class: "ie placeholder", tabindex: "0", role: "button", text: "Escrever…" }));
+            if (!opts.ro) bw.onclick = function (ev) {
+              if (ev.target.closest && (ev.target.closest(".wl") || ev.target.closest("a[href]") || ev.target.closest(".wb-img") || ev.target.closest(".wb-task-box"))) return;
+              bw.className = ""; bw.textContent = ""; bw.onclick = null;
+              bw.appendChild(mdEditorUI(sec.body || "", function (val) { sec.body = val; touch(false); }, { uniId: e.universeId, minHeight: "30vh", onExit: showBody }));
+            };
+          }
+          showBody();
+          host.appendChild(bw);
         }
-        showBody();
-        host.appendChild(bw);
       }
       card.appendChild(host);
     });
     if (!opts.ro) {
       card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ seção", style: "margin-top:12px", onclick: function () {
-        e.sections.push({ id: uid(), title: "", body: "", secret: false, collapsed: false });
+        e.sections.push({ id: uid(), title: "", body: "", vis: "publico", collapsed: false });
         touch(true);
       } }));
     }
@@ -3641,6 +3731,72 @@
     return out.slice(0, 8);
   }
 
+  /* ---- publish as standalone wiki page ---- */
+  // Snapshot sent to the public Firestore doc: no ids/links/coords, nothing an outsider
+  // shouldn't see. "oculto" content is dropped entirely; "spoiler" content is kept but
+  // flagged so wiki.html can render it behind a reveal — same rules as "modo leitor".
+  function wbBuildWikiSnapshot(e) {
+    var f = flowerById(e.universeId);
+    var fields = [];
+    Object.keys(e.fields || {}).forEach(function (k) {
+      var fm = wbFieldMeta(e, k);
+      if (fm.vis === "oculto") return;
+      fields.push({ key: k, type: fm.type, value: e.fields[k] || "", vis: fm.vis, opts: fm.opts || [] });
+    });
+    var sections = (e.sections || []).filter(function (s) { return s.vis !== "oculto"; }).map(function (s) {
+      return { title: s.title || "", body: s.body || "", vis: s.vis };
+    });
+    return {
+      title: e.title || "(sem título)",
+      type: e.type || "",
+      universe: f ? f.name : "",
+      aliases: (e.aliases || []).filter(function (a) { return (e.aliasVis[a] || "publico") !== "oculto"; }).map(function (a) { return { text: a, vis: e.aliasVis[a] || "publico" }; }),
+      tags: (e.tags || []).filter(function (t) { return (e.tagVis[t] || "publico") !== "oculto"; }).map(function (t) { return { text: t, vis: e.tagVis[t] || "publico" }; }),
+      summary: e.summary || "",
+      body: e.body || "",
+      cover: e.coverVis !== "oculto" ? (e.cover || "") : "",
+      coverVis: e.coverVis,
+      fields: fields,
+      sections: sections,
+      publishedAt: todayKey()
+    };
+  }
+  function wbWikiUrl(id) { return location.origin + location.pathname.replace(/index\.html$/, "") + "wiki.html?id=" + id; }
+  function wbPublishWiki(e, touch) {
+    if (e.secret) { window.alert("Esta entrada está marcada como secreta — torne-a pública primeiro (botão 🔒 no topo)."); return; }
+    if (!fbFs) { window.alert("Sem conexão com a nuvem agora — tente de novo em instantes."); return; }
+    if (!fbUser) { window.alert("Entre na sua conta pra publicar (menu ⋯ › sincronização)."); return; }
+    var id = e.wikiId || uid();
+    fbFs.collection("wikiPublic").doc(id).set(wbBuildWikiSnapshot(e)).then(function () {
+      e.wikiId = id; e.wikiPublishedAt = todayKey(); touch(true);
+    }).catch(function (err) {
+      window.alert("Não consegui publicar: " + (err && err.message ? err.message : err) + "\n\nSe for erro de permissão, a coleção \"wikiPublic\" ainda não tem a regra de leitura pública no Firestore.");
+    });
+  }
+  function wbUnpublishWiki(e, touch) {
+    if (!e.wikiId || !fbFs) return;
+    if (!window.confirm("Despublicar essa wiki? O link para de funcionar.")) return;
+    fbFs.collection("wikiPublic").doc(e.wikiId).delete().then(function () {
+      e.wikiId = null; e.wikiPublishedAt = ""; touch(true);
+    }).catch(function (err) { window.alert("Não consegui despublicar: " + (err && err.message ? err.message : err)); });
+  }
+  function wbWikiPublishRow(e, touch) {
+    var row = el("div", { class: "hint", style: "margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" });
+    if (e.secret) {
+      row.appendChild(el("span", { text: "Secreta — não publicável como wiki." }));
+      if (e.wikiId) row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "despublicar link antigo", onclick: function () { wbUnpublishWiki(e, touch); } }));
+    } else if (!e.wikiId) {
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "🔗 publicar como wiki", onclick: function () { wbPublishWiki(e, touch); } }));
+    } else {
+      var url = wbWikiUrl(e.wikiId);
+      row.appendChild(el("span", { text: "wiki publicada" + (e.wikiPublishedAt ? " em " + e.wikiPublishedAt : "") + ":" }));
+      row.appendChild(el("code", { style: "font-size:11px;word-break:break-all", text: url }));
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "copiar link", onclick: function () { if (navigator.clipboard) navigator.clipboard.writeText(url); } }));
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "atualizar", onclick: function () { wbPublishWiki(e, touch); } }));
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "despublicar", onclick: function () { wbUnpublishWiki(e, touch); } }));
+    }
+    return row;
+  }
   function wbEntryRead(v, e) {
     var w = wbState();
     var f = flowerById(e.universeId);
@@ -3731,6 +3887,8 @@
       ])
     ]));
 
+    if (!ro) card.appendChild(wbWikiPublishRow(e, touch));
+
     // title
     card.appendChild(editable({
       tag: "h1", value: e.title && e.title !== "(sem título)" ? e.title : "", placeholder: "Nome da entrada",
@@ -3740,15 +3898,21 @@
     w.focusTitle = false;
 
     // aliases
-    card.appendChild(editable({
-      tag: "div", className: "wb-rel", value: (e.aliases || []).join(", "), placeholder: "＋ também conhecido como…",
-      display: function (val) { return val ? "também: " + val : null; },
-      commit: function (nv) { e.aliases = nv.split(",").map(function (s) { return s.trim(); }).filter(Boolean); touch(false); }
-    }));
+    var aliasVisible = (e.aliases || []).filter(function (a) { return !(hideSecret && e.aliasVis[a] === "oculto"); });
+    if (aliasVisible.length || !ro) {
+      var aliasWrap = el("div", { class: "wb-rel", style: "margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap" }, [el("span", { class: "hint", text: "também:" })]);
+      aliasWrap.appendChild(wbVisChipList(e, "aliases", "aliasVis", "", touch, { hideSecret: hideSecret, ro: ro }));
+      if (!ro) aliasWrap.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ apelido", onclick: function () {
+        var a = window.prompt("Também conhecido como:");
+        if (a && a.trim() && (e.aliases || []).indexOf(a.trim()) === -1) { e.aliases = (e.aliases || []).concat([a.trim()]); touch(true); }
+      } }));
+      card.appendChild(aliasWrap);
+    }
 
     // summary
     card.appendChild(editable({
       tag: "p", className: "wb-summary", value: e.summary, placeholder: "Uma linha que resume esta entrada…", multiline: true,
+      display: function (val) { if (!val) return null; var s = el("span"); mdInline(s, val); return s; },
       commit: function (nv) { e.summary = nv.trim(); touch(false); }
     }));
 
@@ -3765,7 +3929,7 @@
     wbRenderSections(card, e, { hideSecret: hideSecret, ro: ro, touch: touch, cat: cat });
 
     // fields — short typed ones as a specimen label, long descriptive ones as roomy blocks
-    var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && (e.fieldMeta[k] || {}).secret); });
+    var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && wbFieldMeta(e, k).vis === "oculto"); });
     var shortKeys = fkeys.filter(function (k) { return wbFieldMeta(e, k).type !== "nota"; });
     var longKeys = fkeys.filter(function (k) { return wbFieldMeta(e, k).type === "nota"; });
     if (shortKeys.length) {
@@ -3775,7 +3939,7 @@
     }
     longKeys.forEach(function (k) {
       if (ro && !(e.fields[k] || "").trim()) return;
-      card.appendChild(wbRenderLongField(e, k, { ro: ro, touch: touch }));
+      card.appendChild(wbRenderLongField(e, k, { hideSecret: hideSecret, ro: ro, touch: touch }));
     });
 
     // ghost suggestions
@@ -3795,13 +3959,11 @@
     }
 
     // tags
-    var tagWrap = el("div", { class: "note-tags", style: "margin-top:16px" });
-    (e.tags || []).forEach(function (t) {
-      tagWrap.appendChild(el("button", { class: "ntag", type: "button", title: "remover", text: "#" + t + "  ✕", onclick: function () { e.tags = e.tags.filter(function (x) { return x !== t; }); touch(true); } }));
-    });
+    var tagWrap = wbVisChipList(e, "tags", "tagVis", "#", touch, { hideSecret: hideSecret, ro: ro });
+    tagWrap.style.marginTop = "16px";
     if (!ro) tagWrap.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ marcador", onclick: function () {
       var t = window.prompt("Marcador:");
-      if (t && t.trim()) { e.tags = (e.tags || []).concat([t.trim()]); touch(true); }
+      if (t && t.trim() && (e.tags || []).indexOf(t.trim()) === -1) { e.tags = (e.tags || []).concat([t.trim()]); touch(true); }
     } }));
     if (tagWrap.childNodes.length) card.appendChild(tagWrap);
 
