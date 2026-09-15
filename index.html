@@ -3378,6 +3378,57 @@
       parents.forEach(function (p) { if (p.id !== kid.id) wbLinkPair(kid, p, "neto(a) de", "avô/avó de"); });
     });
   }
+  // Composes the rest of the family vocabulary from the same atomic facts (parent/child, irmão,
+  // casado(a) com): tio/tia + sobrinho(a), primo(a), padrasto/madrasta + enteado(a), sogro/sogra +
+  // genro/nora, cunhado(a). Only kinship/marriage relations are composed this way — they're
+  // logically entailed by the atomic facts. Non-kinship links (aliado, amigo, chefe, faz parte
+  // de…) are NOT auto-composed: those are facts about the world someone has to state, not
+  // deductions. Reactive-only + additive-only, same rule as wbInferSiblings/wbInferGrandparents:
+  // never runs on load, and removing an inferred link never cascades into removing another.
+  function wbInferFamilyExtras(id) {
+    var en = wbEntry(id);
+    if (!en) return;
+    function linksOf(x, labels) { return (x.links || []).filter(function (l) { return labels.indexOf(l.label) !== -1; }).map(function (l) { return wbEntry(l.to); }).filter(Boolean); }
+    function parentsOf(x) { return linksOf(x, ["é filho(a) de"]); }
+    function childrenOf(x) { return C().entries.filter(function (o) { return o.universeId === x.universeId && (o.links || []).some(function (l) { return l.label === "é filho(a) de" && l.to === x.id; }); }); }
+    function siblingsOf(x) { return linksOf(x, ["irmão/irmã de", "meio-irmão/meia-irmã de"]); }
+    function spousesOf(x) { return linksOf(x, ["casado(a) com"]); }
+    function unclesOf(x) { return linksOf(x, ["tio/tia de"]); }
+    function nephewsOf(x) { return linksOf(x, ["sobrinho(a) de"]); }
+
+    var parents = parentsOf(en), sibs = siblingsOf(en), spouses = spousesOf(en);
+
+    // tio/tia <-> sobrinho(a): my parents' siblings are my tios; my siblings' children are my sobrinhos.
+    parents.forEach(function (p) {
+      siblingsOf(p).forEach(function (tio) { if (tio.id !== en.id) wbLinkPair(en, tio, "sobrinho(a) de", "tio/tia de"); });
+    });
+    sibs.forEach(function (s) {
+      childrenOf(en).forEach(function (sobrinho) { wbLinkPair(sobrinho, s, "sobrinho(a) de", "tio/tia de"); });
+    });
+
+    // primo(a): children of siblings, on both sides — and directly from a tio/sobrinho link even
+    // if it was typed in by hand instead of derived from parent+irmão facts.
+    sibs.forEach(function (s) {
+      childrenOf(s).forEach(function (primo) { childrenOf(en).forEach(function (meu) { if (meu.id !== primo.id) wbLinkPair(meu, primo, "primo(a) de", "primo(a) de"); }); });
+    });
+    unclesOf(en).forEach(function (tio) {
+      childrenOf(tio).forEach(function (primo) { if (primo.id !== en.id) wbLinkPair(en, primo, "primo(a) de", "primo(a) de"); });
+    });
+    nephewsOf(en).forEach(function (sobrinho) {
+      childrenOf(en).forEach(function (primo) { if (primo.id !== sobrinho.id) wbLinkPair(sobrinho, primo, "primo(a) de", "primo(a) de"); });
+    });
+
+    // casado(a) com composes into padrasto/madrasta, sogro/sogra e cunhado(a).
+    spouses.forEach(function (sp) {
+      childrenOf(sp).forEach(function (kid) { if (kid.id !== en.id && !parentsOf(kid).some(function (p) { return p.id === en.id; })) wbLinkPair(kid, en, "enteado(a) de", "padrasto/madrasta de"); });
+      childrenOf(en).forEach(function (kid) { if (!parentsOf(kid).some(function (p) { return p.id === sp.id; })) wbLinkPair(kid, sp, "enteado(a) de", "padrasto/madrasta de"); });
+      parentsOf(sp).forEach(function (sogro) { wbLinkPair(en, sogro, "genro/nora de", "sogro/sogra de"); });
+      siblingsOf(sp).forEach(function (cunhado) { if (cunhado.id !== en.id) wbLinkPair(en, cunhado, "cunhado(a) de", "cunhado(a) de"); });
+    });
+    sibs.forEach(function (s) {
+      spousesOf(s).forEach(function (cunhado) { wbLinkPair(en, cunhado, "cunhado(a) de", "cunhado(a) de"); });
+    });
+  }
   function wbAppearsIn(e) {
     var out = [];
     wbFranchisesOf(e.universeId).forEach(function (fr) {
@@ -3884,6 +3935,7 @@
         if (inv && tgt && !(tgt.links || []).some(function (l) { return l.to === e.id && l.label === inv; })) { tgt.links = tgt.links || []; tgt.links.push({ to: e.id, label: inv }); }
         if (label === "é filho(a) de") { wbInferSiblings(e.id); wbInferGrandparents(e.id); }
         else if (label === "é pai/mãe de") { wbInferSiblings(to); wbInferGrandparents(to); }
+        if (linkStyleOf(label) === "family") { wbInferFamilyExtras(e.id); wbInferFamilyExtras(to); }
         touch(true);
       } });
       var toItems = [];
