@@ -67,28 +67,39 @@ async function sendInviteEmail(email, link, isNew, apiKey) {
   }
 }
 
-// Temático da Academia Whitmore (universo Lótus) — envelope azul-royal/prata por fora, carta de
-// pergaminho por dentro (mesma paleta cream/tinta do próprio site), com um selo de cera no topo.
-// Documento HTML completo (não só um <div>) porque a fonte do Google só carrega em clientes que
-// respeitam <link> no <head> — nos que não respeitam, cai pra serifa segura do fallback, sem
-// quebrar nada. Cinzel (gravada em pedra) só no título e no selo — texto curto, uma linha só,
-// baixo risco mesmo se o fallback entrar. Nada de `float` (quebra em vários clientes de email,
-// foi tentado antes e não funcionou) nem fonte cursiva grande (cortava/estourava a área de
-// conteúdo em teste real) — o lema em latim vai em itálico de serifa normal, tamanho comedido.
+// Temático da Academia Whitmore (universo Lótus) — envelope azul-royal por fora, carta de
+// pergaminho por dentro (paleta cream/tinta do próprio site), selo de cera PRATEADO no topo e
+// uma capitular de verdade na abertura. Documento HTML completo (não só um <div>) porque a fonte
+// do Google só carrega em clientes que respeitam <link> no <head> — nos que não respeitam, cai
+// pra serifa segura do fallback. Duas lições da rodada anterior, ambas resolvidas SEM abrir mão
+// do efeito: (1) `float` pra capitular quebra em cliente de email de verdade — a capitular agora
+// é uma célula de tabela (técnica padrão de HTML email pra layout de duas colunas, muito mais
+// robusta que float) em vez de span flutuante. (2) `border-radius` numa <table> não vira círculo
+// de verdade — o selo agora é um <div>, que renderiza como círculo. O "W" do selo usa Pinyon
+// Script (caligráfico) — arriscado se o fallback entrar (cai pra itálico serifado, ainda legível,
+// só menos bonito), mas é uma letra só, então risco baixo.
 function buildInviteHtml(link) {
   return (
     '<!doctype html><html><head><meta charset="utf-8" />' +
     '<link rel="preconnect" href="https://fonts.googleapis.com" />' +
-    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap" />' +
+    '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Pinyon+Script&display=swap" />' +
     '</head><body style="margin:0;">' +
     '<div style="background:#0a1730;padding:44px 16px;font-family:Georgia,\'Times New Roman\',serif;">' +
       '<div style="max-width:460px;margin:0 auto;">' +
-        '<table role="presentation" width="60" height="60" align="center" style="margin:0 auto -30px;border-collapse:collapse;background:#0d1b3f;border:2px solid #c7d0de;border-radius:50%;"><tr><td align="center" valign="middle" style="font-family:\'Cinzel\',Georgia,serif;font-size:22px;font-weight:700;color:#c7d0de;">W</td></tr></table>' +
-        '<div style="background:#f5ecd6;border:1px solid #d2bf98;border-radius:4px;padding:46px 32px 34px;color:#2e2416;">' +
+        '<div style="width:72px;height:72px;border-radius:50%;margin:0 auto -36px;position:relative;z-index:2;' +
+          'background:radial-gradient(circle at 33% 28%,#f5f7f9 0%,#d7dde4 32%,#a7b1bf 68%,#7f8a9a 100%);' +
+          'border:3px solid #eef1f4;box-shadow:0 5px 12px rgba(0,0,0,0.5),inset 0 1px 3px rgba(255,255,255,0.7);' +
+          'text-align:center;line-height:66px;font-family:\'Pinyon Script\',Georgia,cursive,serif;font-size:38px;color:#1a2440;">W</div>' +
+        '<div style="background:#f5ecd6;border:1px solid #d2bf98;border-radius:4px;padding:48px 32px 34px;color:#2e2416;">' +
           '<div style="font-family:\'Cinzel\',Georgia,serif;font-size:22px;font-weight:700;text-align:center;letter-spacing:0.07em;color:#0d1b3f;margin-bottom:20px;">CHAMADO DOS C&Eacute;US</div>' +
           '<div style="height:1px;background:#c9b98a;margin:0 0 22px;"></div>' +
-          '<p style="font-size:16px;line-height:1.75;margin:0 0 16px;">A Academia Whitmore o convoca para prestigiar o acervo mais cobiçado do mundo mágico.</p>' +
-          '<p style="font-size:16px;line-height:1.75;margin:0 0 0;">Conclua seu registro abaixo para acessar todo o conhecimento que Ela pode nos fornecer.</p>' +
+          '<table role="presentation" width="100%" style="border-collapse:collapse;margin:0 0 16px;">' +
+            '<tr>' +
+              '<td width="42" valign="top" style="font-family:\'Cinzel\',Georgia,serif;font-size:52px;line-height:0.82;font-weight:700;color:#0d1b3f;padding:2px 8px 0 0;">A</td>' +
+              '<td valign="top" style="font-size:16px;line-height:1.75;color:#2e2416;padding-top:5px;">Academia Whitmore o convoca para prestigiar o acervo mais cobiçado do mundo mágico.</td>' +
+            '</tr>' +
+          '</table>' +
+          '<p style="font-size:16px;line-height:1.75;margin:0;">Conclua seu registro abaixo para acessar todo o conhecimento que Ela pode nos fornecer.</p>' +
           '<div style="text-align:center;margin:30px 0 26px;">' +
             '<a href="' + link + '" style="display:inline-block;background:#0d1b3f;color:#dfe4ea;text-decoration:none;padding:13px 30px;border-radius:2px;font-size:14px;font-weight:700;letter-spacing:0.05em;">ESCOLHER SENHA E ENTRAR</a>' +
           '</div>' +
