@@ -53,7 +53,7 @@
   function isParadiseGateMode() { return /\/wiki(\.html)?(\/|$)/.test(location.pathname); }
   function wikiHref(id) { return ROOT + (isParadiseGateMode() ? "wiki/" : "ursprung/") + encodeURIComponent(id); }
   function homeLabel() { return isParadiseGateMode() ? "🌸 Paradise Gate" : "🌿 Herbário do Multiverso"; }
-  function homeHref() { return ROOT + (isParadiseGateMode() ? "wiki.html" : "ursprung.html"); }
+  function homeHref() { return ROOT + (isParadiseGateMode() ? "wiki" : "ursprung"); }
 
   function resolveSlug() {
     var m = location.pathname.match(/\/(?:wiki|ursprung)\/([^/?#]+)\/?$/);
