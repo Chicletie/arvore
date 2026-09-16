@@ -48,6 +48,9 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f
 .page { max-width: 800px; margin: 0 auto; }
 .card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 28px; box-shadow: var(--shadow); }
 .eyebrow { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display: flex; gap: 6px; flex-wrap: wrap; }
+.crumb { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+.crumb a { color: var(--gold-ink); text-decoration: none; }
+.crumb a:hover { text-decoration: underline; }
 h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin: 6px 0 4px; }
 .aliases { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 14px; }
 

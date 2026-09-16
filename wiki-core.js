@@ -593,6 +593,18 @@
     var card = el("div", { class: "card" });
     var currentTabLabel = "Geral";
 
+    // "Dentro de" (ex: uma cidade dentro de uma província dentro de um país) — cadeia de
+    // ancestrais publicados, já resolvida no snapshot (wbWikiAncestors), do mais distante ao
+    // mais próximo. Um ancestral sem página publicada não aparece, mas não quebra a cadeia.
+    if (data.ancestors && data.ancestors.length) {
+      var crumb = el("div", { class: "crumb" });
+      data.ancestors.forEach(function (c, i) {
+        if (i) crumb.appendChild(document.createTextNode(" › "));
+        crumb.appendChild(el("a", { href: wikiHref(c.targetId), text: c.targetTitle }));
+      });
+      card.appendChild(crumb);
+    }
+
     var eyebrowBits = [data.type, isParadiseGateMode() ? null : data.universe].filter(Boolean);
     if (eyebrowBits.length) card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: eyebrowBits.join(" · ") })]));
     card.appendChild(el("h1", { text: data.title || "(sem título)" }));
@@ -712,6 +724,8 @@
     // ter nenhuma relação registrada), senão fica "Relações" com as outras abas dentro.
     var relSectionLabel = relGraph ? "Relações" : (eventsSorted.length ? "Linha do tempo" : null);
     if (relSectionLabel) sharedToc.push({ id: "relacoes", label: relSectionLabel });
+    var hasChildren = data.children && data.children.length;
+    if (hasChildren) sharedToc.push({ id: "contem", label: "Contém" });
     if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
     // Galeria e Citações entram como abas (mesmo seletor .work-tabs de Geral/variante de
@@ -827,6 +841,18 @@
       var kids = [el("span", { class: "link-card-label", text: lk.label || "ligação" }), el("span", { class: "link-card-title", text: lk.targetTitle })];
       return lk.targetId ? el("a", { class: "link-card", href: wikiHref(lk.targetId) }, kids) : el("div", { class: "link-card", style: "cursor:default", "aria-disabled": "true" }, kids);
     }
+    // Contém — o reverso do breadcrumb do topo: o que está "dentro de" esta entrada (ex: uma
+    // província contém suas cidades), mesma fonte (parentId) e mesma regra de só mostrar quem
+    // também está publicado.
+    if (hasChildren) {
+      var chwrap = el("div", { class: "links-wrap" });
+      chwrap.appendChild(el("div", { class: "cathead", id: "contem", text: "Contém" }));
+      var chrow = el("div", { class: "links-grid" });
+      data.children.forEach(function (c) { chrow.appendChild(linkCard({ label: c.type, targetId: c.targetId, targetTitle: c.targetTitle })); });
+      chwrap.appendChild(chrow);
+      card.appendChild(chwrap);
+    }
+
     if (hasLinks) {
       var lwrap = el("div", { class: "links-wrap" });
       lwrap.appendChild(el("div", { class: "cathead", id: "ligacoes", text: "Ligações" }));

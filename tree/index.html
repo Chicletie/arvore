@@ -1093,12 +1093,13 @@
   // um personagem de lá. Existe pra dar um lugar de verdade (com página própria, template
   // próprio) pra citações de quem nunca virou uma entrada de Personagem — a obra em si vira a
   // "casa" da citação nesse caso.
-  var WB_TYPES = ["Local", "Personagem", "Facção", "Sistema de Magia", "Divindade", "Evento histórico", "Item", "Publicação", "Criatura", "Língua / Povo", "Conceito"];
+  var WB_TYPES = ["Local", "Personagem", "Facção", "Título / Cargo", "Sistema de Magia", "Divindade", "Evento histórico", "Item", "Publicação", "Criatura", "Língua / Povo", "Conceito"];
   var FRANCHISE_KINDS = ["Romance", "Trilogia", "Série", "Conto", "Novela", "Roteiro", "Quadrinho", "Campanha de RPG", "Outro"];
   var WB_TEMPLATES = {
     "Personagem": ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"],
     "Local": ["População", "Governo", "Clima", "Geografia", "Economia", "História", "Pontos de interesse", "Atmosfera"],
     "Facção": ["Liderança", "Território", "Propósito", "Membros", "Recursos", "Aliados", "Rivais", "Segredos"],
+    "Título / Cargo": ["Detentor atual", "Instituído por", "Símbolos", "Deveres e poderes", "Linha de sucessão", "História"],
     "Sistema de Magia": ["Fonte", "Quem pode usar", "Como funciona", "Custo / preço", "Limites", "Aparência / sensação", "Tabus"],
     "Divindade": ["Domínio", "Símbolos", "Culto e clero", "Manifestações", "Mitos", "Relação com mortais"],
     "Evento histórico": ["Quando", "Onde", "Envolvidos", "Causas", "O que aconteceu", "Consequências"],
@@ -1185,6 +1186,7 @@
     { label: "sócio(a) de", inverse: "sócio(a) de", style: "bond" },
     { label: "é dono(a) de", inverse: "é propriedade de", style: "bond" },
     { label: "tutor(a) de", inverse: "animal de estimação de", style: "bond" },
+    { label: "detém o título de", inverse: "é detido(a) por", style: "bond" },
     { label: "faz parte de", inverse: "tem como membro", style: "faction" },
     { label: "lidera", inverse: "é liderado(a) por", style: "faction" },
     { label: "pertence a", inverse: "contém", style: "neutral" },
@@ -1198,6 +1200,8 @@
     { label: "guarda", inverse: "é guardado(a) por", style: "narrative" },
     { label: "amaldiçoa", inverse: "é amaldiçoado(a) por", style: "narrative" },
     { label: "profetiza", inverse: "é profetizado(a) por", style: "narrative" },
+    { label: "pratica", inverse: "é praticado(a) por", style: "practice" },
+    { label: "acredita em", inverse: "é uma crença de", style: "practice" },
     { label: "manifesta-se como", inverse: "manifestação de", style: "multiversal" }
   ];
   var EDGE_STYLE = {
@@ -1210,6 +1214,7 @@
     faction: { color: "#3f7d94", dash: "" },
     location: { color: "#4a8f7d", dash: "" },
     narrative: { color: "#7d6a9d", dash: "4 3" },
+    practice: { color: "#2f8f9d", dash: "2 2" },
     multiversal: { color: "#8f5cc9", dash: "6 4" },
     neutral: { color: "var(--border-strong)", dash: "" }
   };
@@ -1276,6 +1281,11 @@
     });
     cr.types = cr.types.filter(function (t) { return t && t !== "Linha do tempo"; });
     if (!cr.types.length) cr.types = WB_TYPES.slice();
+    // Um tipo NOVO adicionado ao catálogo embutido (WB_TYPES) depois que o mundo já existia
+    // nunca chegava aos mundos antigos — cr.types fica congelado desde a criação do mundo,
+    // igual cr.templates (ver mescla logo abaixo). Sem isso, "Título / Cargo" (e antes,
+    // "Publicação") nunca apareceria no seletor de tipo de mundos já existentes.
+    WB_TYPES.forEach(function (t) { if (cr.types.indexOf(t) === -1) cr.types.push(t); });
     if (!cr.templates || typeof cr.templates !== "object") cr.templates = clone(WB_TEMPLATES);
     // Novos campos padrão adicionados a um tipo (ex: a leva de campos curtos pra infobox da
     // wiki, 2026-09-16) precisam chegar em mundos já salvos, não só em mundos novos — mundos
@@ -3796,7 +3806,7 @@
     var n = " " + (name || "").toLowerCase() + " ";
     if (/( idade | anos |n[úu]mero|quantidade|popula[çc][ãa]o|altura|peso|n[íi]vel|contagem|total)/.test(n)) return "numero";
     if (/(data|nascimento|morte|falecimento|funda[çc][ãa]o|publica[çc][ãa]o|in[íi]cio| fim )/.test(n)) return "data";
-    if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando|localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua| autor |natureza)/.test(n)) return "texto";
+    if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando|localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua| autor |natureza|detentor|institu[íi]do)/.test(n)) return "texto";
     return "nota";
   }
   // Um campo chamado "segredo"/"nota do mestre"/etc quase sempre É pra ficar de fora da wiki —
@@ -4158,6 +4168,8 @@
       var cxLinked = cx && cx.wikiId && !cx.secret;
       return { id: q.id, text: q.text, group: q.group || "", note: q.note || "", vis: outVis(q.vis), contextTitle: cx ? wbDisplayName(cx) : "", contextId: cxLinked ? cx.wikiId : null };
     });
+    var ancestors = wbWikiAncestors(e);
+    var children = wbWikiChildren(e);
     var variants = (e.variants || []).map(function (variant) {
       var vfields = [];
       Object.keys(variant.fields || {}).forEach(function (k) {
@@ -4188,6 +4200,8 @@
       gallery: gallery,
       events: events,
       citacoes: citacoes,
+      ancestors: ancestors,
+      children: children,
       variants: variants,
       links: wbWikiLinks(e),
       backlinks: wbWikiBacklinks(e),
@@ -4227,6 +4241,29 @@
     });
     return out;
   }
+  // "Dentro de" (parentId) já vira breadcrumb + "Contém" no app (wbBreadcrumb/linha 5318) mas
+  // nunca chegava na wiki publicada — mesma regra de visibilidade dos links: só entra quem
+  // também está publicado e não é secreto. Um ancestral não publicado é PULADO, não interrompe
+  // a cadeia — uma cidade continua "dentro" do país mesmo que a página da província não exista.
+  function wbWikiAncestors(e) {
+    var chain = [], cur = e.parentId ? wbEntry(e.parentId) : null, guard = 0;
+    while (cur && guard++ < 12) {
+      if (cur.wikiId && !cur.secret && !(e.universeId === "lotus" && cur.universeId !== "lotus")) {
+        chain.unshift({ targetId: cur.wikiId, targetTitle: wbDisplayName(cur), type: cur.type || "" });
+      }
+      cur = cur.parentId ? wbEntry(cur.parentId) : null;
+    }
+    return chain;
+  }
+  function wbWikiChildren(e) {
+    var out = [];
+    C().entries.forEach(function (x) {
+      if (x.parentId !== e.id || !x.wikiId || x.secret) return;
+      if (e.universeId === "lotus" && x.universeId !== "lotus") return;
+      out.push({ targetId: x.wikiId, targetTitle: wbDisplayName(x), type: x.type || "" });
+    });
+    return out;
+  }
   // "Ver como wiki" — the owner's own reading view, same visual style as the published pages
   // but reusing wiki-core.js/wiki-style.css directly against LIVE local data instead of a
   // Firestore round-trip. No filtering by vis at all: mestre-tier content included, spoilers
@@ -4248,6 +4285,11 @@
       var cx = q.contextId && wbEntry(q.contextId);
       return { id: q.id, text: q.text, group: q.group || "", note: q.note || "", vis: "publico", contextTitle: cx ? wbDisplayName(cx) : "", contextId: cx && cx.wikiId ? cx.wikiId : null };
     });
+    // Prévia do dono: mostra a cadeia INTEIRA de ancestrais e TODOS os filhos, publicados ou
+    // não (mesma filosofia do resto desta função — nada é filtrado aqui, é só pra quem já está
+    // vendo tudo por dentro). targetId fica null quando o ancestral/filho ainda não tem wikiId.
+    var ancestors = wbBreadcrumb(e).slice(0, -1).map(function (c) { return { targetId: c.wikiId || null, targetTitle: wbDisplayName(c), type: c.type || "" }; });
+    var children = C().entries.filter(function (x) { return x.parentId === e.id; }).map(function (x) { return { targetId: x.wikiId || null, targetTitle: wbDisplayName(x), type: x.type || "" }; });
     var links = (e.links || []).map(function (lk) {
       var t = wbEntry(lk.to);
       return t ? { label: lk.label || "", targetId: t.wikiId || null, targetTitle: wbDisplayName(t, lk.dispAs) } : null;
@@ -4277,6 +4319,8 @@
       gallery: gallery,
       events: events,
       citacoes: citacoes,
+      ancestors: ancestors,
+      children: children,
       variants: variants,
       links: links,
       backlinks: [],
