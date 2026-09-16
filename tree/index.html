@@ -3743,7 +3743,7 @@
   }
   function guessFieldType(name) {
     var n = " " + (name || "").toLowerCase() + " ";
-    if (/(idade|anos|n[úu]mero|quantidade|popula[çc][ãa]o|altura|peso|n[íi]vel|contagem|total)/.test(n)) return "numero";
+    if (/( idade | anos |n[úu]mero|quantidade|popula[çc][ãa]o|altura|peso|n[íi]vel|contagem|total)/.test(n)) return "numero";
     if (/(data|nascimento|morte|falecimento|funda[çc][ãa]o|in[íi]cio| fim )/.test(n)) return "data";
     if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando|localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua)/.test(n)) return "texto";
     return "nota";
