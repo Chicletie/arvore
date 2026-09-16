@@ -51,15 +51,14 @@ exports.createPlayerAccount = onCall({ secrets: [brevoApiKey] }, async (request)
 });
 
 async function sendInviteEmail(email, link, isNew, apiKey) {
-  var subject = isNew ? "Você foi convidado(a) para Paradise Gate" : "Seu acesso à Paradise Gate";
   var res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: { "api-key": apiKey, "Content-Type": "application/json", "Accept": "application/json" },
     body: JSON.stringify({
-      sender: { name: "Paradise Gate", email: "naoresponda@paradisegate.com.br" },
+      sender: { name: "Paradise Gate", email: "convites@paradisegate.com.br" },
       to: [{ email: email }],
-      subject: subject,
-      htmlContent: buildInviteHtml(link, isNew)
+      subject: "Chamado dos Céus",
+      htmlContent: buildInviteHtml(link)
     })
   });
   if (!res.ok) {
@@ -68,24 +67,22 @@ async function sendInviteEmail(email, link, isNew, apiKey) {
   }
 }
 
-// Paleta e tom emprestados do tema "Herbário do Multiverso" do site — a maioria dos clientes de
-// email não carrega fontes do Google, então usa-se serifs seguras (Georgia) em vez de tentar
-// puxar Cormorant/Spectral, mas as cores e a moldura ficam iguais.
-function buildInviteHtml(link, isNew) {
-  var greeting = isNew
-    ? "Você foi convidado(a) a fazer parte de <strong>Paradise Gate</strong>."
-    : "Aqui está seu acesso à <strong>Paradise Gate</strong>.";
+// Temático da Academia Whitmore (universo Lótus) — azul royal + prata, cópia fixa dada pelo
+// autor, igual pra convite novo ou reenvio de acesso. Serif segura (Georgia) em vez das fontes
+// do site, já que a maioria dos clientes de email não carrega Google Fonts.
+function buildInviteHtml(link) {
   return (
-    '<div style="background:#e8dcbf;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;color:#2e2416;">' +
-      '<div style="max-width:480px;margin:0 auto;background:#f5ecd6;border:1px solid #d2bf98;border-radius:6px;padding:32px;">' +
-        '<div style="font-size:26px;font-weight:600;margin-bottom:4px;">&#127800; Paradise Gate</div>' +
-        '<div style="height:1px;background:#d2bf98;margin:12px 0 20px;"></div>' +
-        '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">' + greeting + '</p>' +
-        '<p style="font-size:16px;line-height:1.6;margin:0 0 14px;">Clique no botão abaixo pra escolher sua senha e entrar:</p>' +
+    '<div style="background:#0d1b3f;padding:32px 16px;font-family:Georgia,\'Times New Roman\',serif;color:#dfe4ea;">' +
+      '<div style="max-width:480px;margin:0 auto;background:#13234f;border:1px solid #7c8aa8;border-radius:6px;padding:32px;">' +
+        '<div style="font-size:24px;font-weight:600;margin-bottom:4px;color:#c7d0de;letter-spacing:0.03em;">Chamado dos Céus</div>' +
+        '<div style="height:1px;background:#7c8aa8;margin:12px 0 20px;"></div>' +
+        '<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">A Academia Whitmore o convoca para prestigiar o acervo mais cobiçado do mundo mágico.</p>' +
+        '<p style="font-size:16px;line-height:1.7;margin:0 0 16px;">Conclua seu registro abaixo para acessar todo o conhecimento que Ela pode nos fornecer.</p>' +
         '<div style="text-align:center;margin:28px 0;">' +
-          '<a href="' + link + '" style="display:inline-block;background:#2e2416;color:#f5ecd6;text-decoration:none;padding:12px 28px;border-radius:4px;font-size:15px;">Escolher senha e entrar</a>' +
+          '<a href="' + link + '" style="display:inline-block;background:#c7d0de;color:#0d1b3f;text-decoration:none;padding:12px 28px;border-radius:4px;font-size:15px;font-weight:600;">Escolher senha e entrar</a>' +
         '</div>' +
-        '<p style="font-size:13px;color:#6a5940;line-height:1.5;margin:0;">Se você não esperava este email, pode ignorá-lo com segurança.</p>' +
+        '<p style="font-size:14px;font-style:italic;color:#a8b3c7;text-align:center;margin:0 0 20px;">Sub lege Coeli, scientia crescat</p>' +
+        '<p style="font-size:13px;color:#8b96ac;line-height:1.5;margin:0;">Se você não esperava este email, pode ignorá-lo com segurança.</p>' +
       '</div>' +
     '</div>'
   );
