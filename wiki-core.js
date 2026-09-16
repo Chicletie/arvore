@@ -1197,6 +1197,37 @@
     }
     paintNews();
 
+    // Notas recentes — distinto de Novidades de propósito: Novidades é sobre O QUE MUDOU na
+    // wiki (páginas publicadas/atualizadas), isto aqui é conteúdo narrativo de verdade (o
+    // texto de uma nota específica), reaproveitando o Posts que já existia por entrada. Mesma
+    // paginação de 8 em 8, mesmo sumiço durante busca que Novidades já tinha.
+    var NOTES_PAGE = 8;
+    var notesShown = NOTES_PAGE;
+    var notesSection = el("div");
+    wrap.appendChild(notesSection);
+    var allNotes = [];
+    entries.forEach(function (e) { (e.posts || []).forEach(function (p) { allNotes.push({ id: p.id, title: p.title, date: p.date, entryId: e.id, entryTitle: e.title }); }); });
+    allNotes.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    function paintNotes() {
+      notesSection.textContent = "";
+      if (!allNotes.length) return;
+      notesSection.appendChild(el("div", { class: "home-unihead", text: "📝 Notas recentes" }));
+      var notesGrid = el("div", { class: "links-grid" });
+      allNotes.slice(0, notesShown).forEach(function (n) {
+        notesGrid.appendChild(el("a", { class: "link-card", href: wikiHref(n.entryId) + "#posts" }, [
+          el("span", { class: "link-card-label", text: (n.date || "") + " · " + n.entryTitle }),
+          el("span", { class: "link-card-title", text: n.title || "(sem título)" })
+        ]));
+      });
+      notesSection.appendChild(notesGrid);
+      if (allNotes.length > notesShown) {
+        var moreNotesBtn = el("button", { class: "home-random", type: "button", style: "margin-top:10px", text: "ver mais notas" });
+        moreNotesBtn.addEventListener("click", function () { notesShown += NOTES_PAGE; paintNotes(); });
+        notesSection.appendChild(moreNotesBtn);
+      }
+    }
+    paintNotes();
+
     var randomBtn = el("button", { class: "home-random", type: "button", text: "🎲 página aleatória" });
     randomBtn.addEventListener("click", function () {
       var pick = entries[Math.floor(Math.random() * entries.length)];
@@ -1255,6 +1286,7 @@
       listWrap.textContent = "";
       var q = (filterText || "").toLowerCase().trim();
       newsSection.hidden = !!q;
+      notesSection.hidden = !!q;
       // Busca também bate no TÍTULO das notas (não no corpo — não está no índice, ver
       // wbIndexEntry) — assim uma nota chamada "A Noite do Duelo" aparece buscando "duelo",
       // ainda que a palavra não esteja em mais nenhum outro campo indexado da entrada.
