@@ -1343,7 +1343,7 @@
       types: WB_TYPES.slice(),
       templates: JSON.parse(JSON.stringify(WB_TEMPLATES)),
       linkTypes: [],
-      entries: [], franchises: [], campaigns: [], calendars: {}, mapViews: [], quotes: [], recent: [], multiverseNotes: "", typeMeta: {}, universes: []
+      entries: [], franchises: [], campaigns: [], calendars: {}, mapViews: [], quotes: [], recent: [], multiverseNotes: "", typeMeta: {}, universes: [], tagDefs: []
     };
     return {
       criacao: JSON.parse(JSON.stringify(world)),
@@ -1356,7 +1356,13 @@
   var DEFAULTS = emptyState();
 
   function normWorld(cr, dc) {
-    ["types", "linkTypes", "entries", "franchises", "campaigns", "mapViews", "quotes", "recent", "universes"].forEach(function (k) { if (!Array.isArray(cr[k])) cr[k] = clone(dc[k] || []); });
+    ["types", "linkTypes", "entries", "franchises", "campaigns", "mapViews", "quotes", "recent", "universes", "tagDefs"].forEach(function (k) { if (!Array.isArray(cr[k])) cr[k] = clone(dc[k] || []); });
+    cr.tagDefs.forEach(function (t) {
+      if (t.id == null) t.id = uid();
+      if (typeof t.name !== "string") t.name = "";
+      if (typeof t.color !== "string") t.color = "";
+      if (t.parentId === undefined) t.parentId = null;
+    });
     cr.types = cr.types.filter(function (t) { return t && t !== "Linha do tempo"; });
     if (!cr.types.length) cr.types = WB_TYPES.slice();
     if (!cr.templates || typeof cr.templates !== "object") cr.templates = clone(WB_TEMPLATES);
@@ -1401,6 +1407,7 @@
         });
       });
       if (typeof e.dispAlias !== "string") e.dispAlias = "";
+      if (!Array.isArray(e.history)) e.history = [];
       // Variantes por obra/campanha ("abas" tipo Luzes / PG: Genesis): cada uma é um pacote
       // paralelo de resumo+corpo+campos+seções, só que ligado a UMA obra específica — tudo
       // dentro da mesma entrada/link. Título, apelidos, tags, ligações e publicação continuam
@@ -2125,6 +2132,43 @@
   function wbOpen(e) { wbTouch(e.id); save(); wbGo({ view: "entry", entryId: e.id, uniId: e.universeId, justEntered: true }); }
   function franchiseColor(id) { return "hsl(" + (hashHue(id + "fr") ) + " 55% 55%)"; }
 
+  /* ---- Tags como entidades ---- */
+  // Tags stay plain strings on entry.tags (unchanged — the wiki's whole tag-visibility system,
+  // search, and cross-linking all key off that string today, and re-keying every entry to a
+  // tag id would touch all of it for comparatively little gain). tagDefs is a lightweight,
+  // OPTIONAL side-table matched by exact name: a tag with no def just gets an auto hash color,
+  // same trick as franchiseColor — no data migration, no behavior change for anyone who never
+  // opens the tags manager.
+  function wbTagDef(name) { return C().tagDefs.filter(function (t) { return t.name === name; })[0]; }
+  function wbTagColor(name) { var d = wbTagDef(name); return (d && d.color) || "hsl(" + hashHue(name + "tag") + " 55% 55%)"; }
+  function wbAllTagNames() {
+    var names = {};
+    C().entries.forEach(function (e) { (e.tags || []).forEach(function (t) { names[t] = 1; }); });
+    C().tagDefs.forEach(function (t) { if (t.name) names[t.name] = 1; });
+    return Object.keys(names).sort();
+  }
+  function wbEnsureTagDef(name) {
+    var d = wbTagDef(name);
+    if (!d) { d = { id: uid(), name: name, color: "", parentId: null }; C().tagDefs.push(d); }
+    return d;
+  }
+  function wbEntriesWithTag(name) { return C().entries.filter(function (e) { return (e.tags || []).indexOf(name) !== -1; }); }
+  // Renaming has to touch every entry that carries the tag — tags[] is just a string, and
+  // tagVis is keyed by that same string — plus the tagDef itself. Merging into an EXISTING name
+  // is allowed on purpose (fixing "Vilao" → "Vilão" when "Vilão" already exists elsewhere is a
+  // normal case, not an error) since tagVis lives per-entry, so there's nothing global to merge.
+  function wbRenameTag(oldName, newName) {
+    if (!newName || newName === oldName) return;
+    C().entries.forEach(function (e) {
+      var i = (e.tags || []).indexOf(oldName);
+      if (i === -1) return;
+      if (e.tags.indexOf(newName) === -1) e.tags[i] = newName; else e.tags.splice(i, 1);
+      if (e.tagVis && e.tagVis[oldName]) { if (!e.tagVis[newName]) e.tagVis[newName] = e.tagVis[oldName]; delete e.tagVis[oldName]; }
+    });
+    var d = wbTagDef(oldName);
+    if (d) d.name = newName;
+  }
+
   /* ---- markdown ---- */
   function mdInline(container, s) {
     // token order matters: images, code, wiki-links, external links, then emphasis
@@ -2267,7 +2311,7 @@
     return host;
   }
   function wbStubEntry(uniId, title) {
-    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey() };
+    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [] };
     C().entries.push(e); save();
     return e;
   }
@@ -2530,6 +2574,8 @@
     if (w.view === "compare" && wbEntry(w.entryId)) return wbCompareView(v);
     if (w.view === "settings") return wbSettingsView(v);
     if (w.view === "wikipanel") return wbWikiPanelView(v);
+    if (w.view === "tagsIndex") return wbTagsIndexView(v);
+    if (w.view === "tagDetail" && w.tagName) return wbTagDetailView(v, w.tagName);
     return isMesa() ? wbMesaHome(v) : wbHomeView(v);
   };
   // Dashboard of every published entry across BOTH worlds (tree + mesa share the same
@@ -3279,8 +3325,15 @@
   function wbUniverseEntries(v, uniId, f) {
     var w = wbState();
     var mode = ["lista", "arvore", "cartoes"].indexOf(w.entMode) === -1 ? "lista" : w.entMode;
+    // Seleção múltipla — só faz sentido no modo lista, e fica de fora do estado persistido de
+    // propósito (ninguém espera reabrir o universo amanhã e achar entradas ainda marcadas).
+    var bulkMode = false, sel = {};
+    var bulkBtn = el("button", { class: "btn ghost sm", type: "button", text: "selecionar", onclick: function () {
+      bulkMode = !bulkMode; sel = {}; bulkBtn.textContent = bulkMode ? "cancelar seleção" : "selecionar"; renderList();
+    } });
     v.appendChild(el("div", { style: "display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap" }, [
-      el("button", { class: "btn", type: "button", text: "+ Nova entrada", onclick: function () { wbNewEntry(uniId); } })
+      el("button", { class: "btn", type: "button", text: "+ Nova entrada", onclick: function () { wbNewEntry(uniId); } }),
+      mode === "lista" ? bulkBtn : null
     ]));
     v.appendChild(segControl([["lista", "Lista"], ["arvore", "Árvore"], ["cartoes", "Cartões"]], mode, function (m) { wbGo({ entMode: m }); }));
     var entries = wbEntriesOf(uniId);
@@ -3362,6 +3415,10 @@
           ]));
           byType[tp].forEach(function (e) {
             card.appendChild(el("div", { class: "row" }, [
+              bulkMode ? el("input", { type: "checkbox", style: "margin-right:2px", checked: sel[e.id] ? "checked" : null, onchange: function (ev) {
+                if (ev.target.checked) sel[e.id] = true; else delete sel[e.id];
+                renderList();
+              } }) : null,
               el("button", { class: "wb-star" + (e.favorite ? " on" : ""), type: "button", "aria-label": "Favoritar", text: "★", onclick: function () { e.favorite = !e.favorite; save(); renderList(); } }),
               el("div", { class: "row-body" }, [
                 el("div", { class: "row-title", text: (e.secret ? "🔒 " : "") + wbDisplayName(e) }),
@@ -3371,6 +3428,36 @@
             ]));
           });
         });
+      }
+      var n = Object.keys(sel).length;
+      if (bulkMode && n) {
+        var bar = el("div", { class: "hint", style: "margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm)" });
+        bar.appendChild(el("span", { text: n + " selecionada(s)" }));
+        bar.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "excluir", onclick: function () {
+          if (!window.confirm("Excluir " + n + " entrada(s)? Isso não pode ser desfeito.")) return;
+          var ids = Object.keys(sel);
+          C().entries = C().entries.filter(function (x) { return ids.indexOf(x.id) === -1; });
+          sel = {}; save(); renderList();
+        } }));
+        var statusSel = el("select", { class: "field", style: "padding:3px 6px;font-size:12px" },
+          [el("option", { value: "", text: "mudar estado…" })].concat(ENTRY_STATUS.map(function (s) { return el("option", { value: s.id, text: s.glyph + " " + s.label }); })));
+        statusSel.addEventListener("change", function () {
+          if (!statusSel.value) return;
+          Object.keys(sel).forEach(function (id) { var en = wbEntry(id); if (en) en.status = statusSel.value; });
+          save(); renderList();
+        });
+        bar.appendChild(statusSel);
+        bar.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "★ favoritar", onclick: function () {
+          Object.keys(sel).forEach(function (id) { var en = wbEntry(id); if (en) en.favorite = true; });
+          save(); renderList();
+        } }));
+        bar.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "＋ tag", onclick: function () {
+          var t = window.prompt("Adicionar esta tag a todas as selecionadas:");
+          if (!t) return; t = t.trim(); if (!t) return;
+          Object.keys(sel).forEach(function (id) { var en = wbEntry(id); if (en && en.tags.indexOf(t) === -1) en.tags.push(t); });
+          save(); renderList();
+        } }));
+        listHost.appendChild(bar);
       }
       listHost.appendChild(card);
     }
@@ -3989,18 +4076,21 @@
       var entry = e[visKey][t] || { vis: "publico", allow: [] };
       var v = entry.vis || "publico";
       if (opts.hideSecret && v === "mestre") return;
+      var tagColor = (opts.colored && arrKey === "tags") ? wbTagColor(t) : null;
       if (opts.ro) {
-        var span = el("span", { class: "ntag" });
+        var span = el("span", { class: "ntag", style: tagColor ? "border-color:" + tagColor + ";color:" + tagColor : null });
         if (opts.hideSecret && v === "spoiler") {
           span.appendChild(el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: prefix + t, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } }));
+        } else if (tagColor) {
+          span.appendChild(el("button", { type: "button", style: "background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:0", text: prefix + t, onclick: function () { wbGo({ view: "tagDetail", tagName: t }); } }));
         } else {
           span.textContent = prefix + t;
         }
         wrap.appendChild(span);
         return;
       }
-      var chip = el("span", { class: "ntag-chip" + (v !== "publico" ? " ntag-" + v : "") });
-      chip.appendChild(el("button", { type: "button", class: "ntag-vis", title: "Wiki: " + visInfo(v).label + " (toque p/ mudar)", text: (v !== "publico" ? visInfo(v).glyph + " " : "") + prefix + t, onclick: function () { entry.vis = nextVis(v); e[visKey][t] = entry; touch(true); } }));
+      var chip = el("span", { class: "ntag-chip" + (v !== "publico" ? " ntag-" + v : ""), style: tagColor ? "border-color:" + tagColor : null });
+      chip.appendChild(el("button", { type: "button", class: "ntag-vis", style: tagColor ? "color:" + tagColor : null, title: "Wiki: " + visInfo(v).label + " (toque p/ mudar)", text: (v !== "publico" ? visInfo(v).glyph + " " : "") + prefix + t, onclick: function () { entry.vis = nextVis(v); e[visKey][t] = entry; touch(true); } }));
       chip.appendChild(el("button", { type: "button", class: "ntag-del", "aria-label": "remover", text: "✕", onclick: function () { e[arrKey] = e[arrKey].filter(function (x) { return x !== t; }); delete e[visKey][t]; touch(true); } }));
       wrap.appendChild(chip);
       if (v === "restrito") { if (!Array.isArray(entry.allow)) entry.allow = []; wrap.appendChild(wbAllowEditor(entry.allow, touch)); }
@@ -4511,6 +4601,67 @@
       card.appendChild(tray);
     }
   }
+  // ---- Histórico de versões ----
+  // Content-only snapshot (no id/links/parentId/x/y/status/wikiId/etc — those are structural,
+  // not "what did this entry say" the user would want back). Checkpointed periodically rather
+  // than per-edit: every touch() call while actively editing would otherwise create a version
+  // for every debounced keystroke-save, which is both useless (nothing to restore that's
+  // meaningfully different) and would bloat the synced state doc fast.
+  var WB_HISTORY_GAP_MS = 20 * 60 * 1000;
+  var WB_HISTORY_MAX = 20;
+  function wbEntrySnapshot(e) {
+    return clone({
+      title: e.title, aliases: e.aliases, dispAlias: e.dispAlias, summary: e.summary, body: e.body,
+      fields: e.fields, fieldMeta: e.fieldMeta, sections: e.sections,
+      tags: e.tags, tagVis: e.tagVis, aliasVis: e.aliasVis,
+      gallery: e.gallery, cover: e.cover, coverVis: e.coverVis, coverAllow: e.coverAllow,
+      variants: e.variants
+    });
+  }
+  function wbMaybeCheckpoint(e) {
+    e.history = e.history || [];
+    var last = e.history[e.history.length - 1];
+    var now = Date.now();
+    if (last && now - last.ts < WB_HISTORY_GAP_MS) return;
+    e.history.push({ ts: now, snap: wbEntrySnapshot(e) });
+    if (e.history.length > WB_HISTORY_MAX) e.history.shift();
+  }
+  function wbRestoreVersion(e, v, touch) {
+    if (!window.confirm("Restaurar essa versão? O estado atual também fica salvo no histórico antes, então nada se perde.")) return;
+    e.history.push({ ts: Date.now(), snap: wbEntrySnapshot(e) });
+    if (e.history.length > WB_HISTORY_MAX) e.history.shift();
+    var snap = clone(v.snap);
+    Object.keys(snap).forEach(function (k) { e[k] = snap[k]; });
+    touch(true);
+  }
+  function wbHistoryModal(e, touch) {
+    var root = document.getElementById("modalRoot");
+    var m = el("div", { class: "modal-wrap", onclick: function (ev) { if (ev.target === m) root.innerHTML = ""; } });
+    var box = el("div", { class: "modal" });
+    box.appendChild(el("h3", { text: "Histórico de versões" }));
+    box.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Uma versão fica salva a cada ~20 minutos de edição ativa. Restaurar guarda o estado atual antes, então dá pra voltar." }));
+    var list = (e.history || []).slice().reverse();
+    if (!list.length) box.appendChild(el("div", { class: "empty", text: "Ainda não há versões salvas dessa entrada." }));
+    list.forEach(function (v) {
+      var d = new Date(v.ts);
+      var label = d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      box.appendChild(el("div", { class: "row" }, [
+        el("div", { class: "row-body" }, [
+          el("div", { class: "row-title", text: label }),
+          el("div", { class: "row-meta", text: (v.snap.title || "(sem título)") + (v.snap.summary ? " · " + v.snap.summary.slice(0, 60) : "") })
+        ]),
+        el("button", { class: "btn ghost sm", type: "button", text: "restaurar", onclick: function () {
+          wbRestoreVersion(e, v, touch);
+          root.innerHTML = "";
+        } })
+      ]));
+    });
+    box.appendChild(el("div", { class: "modal-actions" }, [
+      el("button", { class: "btn ghost", type: "button", text: "Fechar", onclick: function () { root.innerHTML = ""; } })
+    ]));
+    m.appendChild(box);
+    root.appendChild(m);
+  }
   function wbEntryRead(v, e) {
     var w = wbState();
     var f = flowerById(e.universeId);
@@ -4519,7 +4670,7 @@
     var hideSecret = reading === "leitor";
     var ro = !!reading;                              // read-only chrome
     function cat(t, toc) { var d = el("div", { class: "cathead", text: t }); if (toc) d.setAttribute("data-toc", toc); return d; }
-    function touch(reRender) { e.updated = todayKey(); save(); flashSaved(); if (reRender) render(); }
+    function touch(reRender) { wbMaybeCheckpoint(e); e.updated = todayKey(); save(); flashSaved(); if (reRender) render(); }
 
     var readCycle = { "null": { next: "limpa", label: "📖 ler", t: "Ver em leitura limpa" }, "limpa": { next: "leitor", label: "👥 prévia do grupo", t: "Ver como o grupo veria (esconde segredos)" }, "leitor": { next: null, label: "✍ editar", t: "Voltar a editar" } };
     var rc = readCycle[reading ? reading : "null"];
@@ -4601,6 +4752,7 @@
       el("span", { style: "display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-left:auto" }, [
         statusBtn,
         el("button", { class: "wb-lockbtn" + (e.secret ? " on" : ""), type: "button", title: "Não publicar no wiki compartilhado", text: e.secret ? "🔒 secreta" : "🔓 pública", onclick: function () { e.secret = !e.secret; touch(true); } }),
+        !ro ? el("button", { class: "btn ghost sm", type: "button", title: "Histórico de versões", text: "🕓" + ((e.history || []).length ? " " + e.history.length : ""), onclick: function () { wbHistoryModal(e, touch); } }) : null,
         el("button", { class: "wb-star" + (e.favorite ? " on" : ""), type: "button", "aria-label": "Favoritar", text: "★", onclick: function () { e.favorite = !e.favorite; save(); render(); } })
       ])
     ]));
@@ -4778,7 +4930,7 @@
     }
 
     // tags
-    var tagWrap = wbVisChipList(e, "tags", "tagVis", "#", touch, { hideSecret: hideSecret, ro: ro });
+    var tagWrap = wbVisChipList(e, "tags", "tagVis", "#", touch, { hideSecret: hideSecret, ro: ro, colored: true });
     tagWrap.style.marginTop = "16px";
     if (!ro) tagWrap.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ marcador", onclick: function () {
       var t = window.prompt("Marcador:");
@@ -5607,6 +5759,79 @@
     return v;
   }
 
+  function wbTagsIndexView(v) {
+    v.appendChild(el("div", { class: "wb-unihead" }, [
+      el("button", { class: "link", type: "button", text: "← multiverso", onclick: function () { wbGo({ view: "home" }); } }),
+      el("h2", { style: "font-size:26px", text: "🏷 Tags" })
+    ]));
+    var card = el("div", { class: "card" });
+    card.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Cor e hierarquia são só organização — não mudam o que aparece em buscas ou filtros." }));
+    var names = wbAllTagNames();
+    if (!names.length) { card.appendChild(el("div", { class: "empty", text: "Nenhuma tag em uso ainda." })); v.appendChild(card); return v; }
+    names.forEach(function (name) {
+      var def = wbTagDef(name);
+      var n = wbEntriesWithTag(name).length;
+      var swatch = el("input", { type: "color", value: wbTagColor(name).indexOf("hsl") === 0 ? "#8a7d5e" : wbTagColor(name), style: "width:28px;height:28px;padding:0;border:0;border-radius:50%;overflow:hidden;cursor:pointer" });
+      swatch.addEventListener("change", function () { wbEnsureTagDef(name).color = swatch.value; save(); render(); });
+      var parentSel = el("select", { class: "field", style: "padding:3px 6px;font-size:12px" });
+      parentSel.appendChild(el("option", { value: "", text: "— sem tag-pai —" }));
+      names.filter(function (o) { return o !== name; }).forEach(function (o) {
+        parentSel.appendChild(el("option", { value: o, text: o, selected: def && def.parentId && wbTagDef(o) && def.parentId === wbTagDef(o).id ? "selected" : null }));
+      });
+      parentSel.addEventListener("change", function () {
+        var d = wbEnsureTagDef(name);
+        d.parentId = parentSel.value ? wbEnsureTagDef(parentSel.value).id : null;
+        save(); render();
+      });
+      card.appendChild(el("div", { class: "row" }, [
+        swatch,
+        el("div", { class: "row-body" }, [
+          el("div", { class: "row-title", text: "#" + name }),
+          el("div", { class: "row-meta", text: n + " entrada(s)" })
+        ]),
+        parentSel,
+        el("button", { class: "btn ghost sm", type: "button", text: "renomear", onclick: function () {
+          var nn = window.prompt("Novo nome pra #" + name + ":", name);
+          if (!nn) return; nn = nn.trim(); if (!nn) return;
+          wbRenameTag(name, nn); save(); render();
+        } }),
+        el("button", { class: "btn ghost sm", type: "button", text: "ver", onclick: function () { wbGo({ view: "tagDetail", tagName: name }); } })
+      ]));
+    });
+    v.appendChild(card);
+    return v;
+  }
+  function wbTagDetailView(v, tagName) {
+    var def = wbTagDef(tagName);
+    var color = wbTagColor(tagName);
+    v.appendChild(el("div", { class: "wb-unihead" }, [
+      el("button", { class: "link", type: "button", text: "← tags", onclick: function () { wbGo({ view: "tagsIndex" }); } }),
+      el("h2", { style: "font-size:26px" }, [el("span", { style: "color:" + color, text: "#" + tagName })])
+    ]));
+    var card = el("div", { class: "card" });
+    var children = wbAllTagNames().filter(function (o) { var d = wbTagDef(o); return d && def && d.parentId === def.id; });
+    if (children.length) {
+      card.appendChild(sectionLabel("Sub-tags"));
+      var chWrap = el("div", { class: "note-tags" });
+      children.forEach(function (c) { chWrap.appendChild(el("button", { type: "button", class: "ntag", style: "border-color:" + wbTagColor(c) + ";color:" + wbTagColor(c) + ";cursor:pointer", text: "#" + c, onclick: function () { wbGo({ view: "tagDetail", tagName: c }); } })); });
+      card.appendChild(chWrap);
+    }
+    card.appendChild(sectionLabel("Entradas com essa tag"));
+    var withTag = wbEntriesWithTag(tagName);
+    if (!withTag.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma entrada com essa tag." }));
+    withTag.forEach(function (e) {
+      card.appendChild(el("div", { class: "row" }, [
+        el("div", { class: "row-body" }, [
+          el("div", { class: "row-title", text: (e.favorite ? "★ " : "") + wbDisplayName(e) }),
+          el("div", { class: "row-meta", text: flowerById(e.universeId).name + " · " + typeTag(e.type) })
+        ]),
+        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
+      ]));
+    });
+    v.appendChild(card);
+    return v;
+  }
+
   function wbCompareView(v) {
     var w = wbState(), e = wbEntry(w.entryId);
     v.appendChild(el("div", { class: "wb-unihead" }, [
@@ -5878,8 +6103,8 @@
 
     var foot = el("div", { class: "side-foot" });
     (isMesa()
-      ? [["mapa geral", "multimap"], ["notas gerais", "multirules"], ["modelos de entrada", "settings"]]
-      : [["mapa do multiverso", "multimap"], ["regras do multiverso", "multirules"], ["modelos de entrada", "settings"]]
+      ? [["mapa geral", "multimap"], ["notas gerais", "multirules"], ["🏷 tags", "tagsIndex"], ["modelos de entrada", "settings"]]
+      : [["mapa do multiverso", "multimap"], ["regras do multiverso", "multirules"], ["🏷 tags", "tagsIndex"], ["modelos de entrada", "settings"]]
     ).forEach(function (p) {
       foot.appendChild(el("button", { class: "side-mini", type: "button", text: p[0], onclick: function () { closeSide(); wbGo({ view: p[1] }); } }));
     });
