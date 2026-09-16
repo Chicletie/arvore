@@ -202,6 +202,60 @@
     return "ano " + ev.y;
   }
   function wbEventSortKey(ev) { return ev.y * 100000 + (ev.m || 0) * 100 + (ev.d || 0); }
+  // ---- sorteio diário determinístico (Citação/Personagem/Nota/Entrada/Ano do dia) ----
+  // Sem servidor nem escrita nenhuma: o mesmo dia sempre produz a mesma escolha, pra qualquer
+  // visitante, em qualquer navegador — só um hash+PRNG semeado (mulberry32) pela data+nome do
+  // widget. O "cooldown contra repetição" pedido vira embutido no próprio esquema: embaralha o
+  // pool inteiro uma vez por CICLO (ciclo = tamanho do pool) e percorre essa ordem dia a dia, o
+  // que garante cada item aparecer exatamente uma vez antes de qualquer repetição, sem nunca
+  // travar num acervo pequeno (pool de 1 sempre mostra esse 1; de 3, roda de 3 em 3 dias) — e
+  // sem precisar lembrar "o que já foi mostrado" em lugar nenhum.
+  function wbHashSeed(s) {
+    var h = 1779033703 ^ s.length;
+    for (var i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+    return function () {
+      h = Math.imul(h ^ (h >>> 16), 2246822507);
+      h = Math.imul(h ^ (h >>> 13), 3266489909);
+      h ^= h >>> 16;
+      return (h >>> 0) / 4294967296;
+    };
+  }
+  function wbSeededShuffle(arr, seed) {
+    var rnd = wbHashSeed(seed), out = arr.slice();
+    for (var i = out.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)); var t = out[i]; out[i] = out[j]; out[j] = t; }
+    return out;
+  }
+  function wbDayIndex() { return Math.floor(Date.now() / 86400000); }
+  function wbDailyPick(pool, seedName) {
+    if (!pool || !pool.length) return null;
+    var day = wbDayIndex(), n = pool.length, cycle = Math.floor(day / n), pos = day % n;
+    return wbSeededShuffle(pool, seedName + ":" + cycle)[pos];
+  }
+  var WB_MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  function wbMdToDoy(md) {
+    var p = md.split("-"), m = +p[0], d = +p[1], doy = d;
+    for (var i = 0; i < m - 1; i++) doy += WB_MONTH_DAYS[i];
+    return doy;
+  }
+  function wbTodayMD() {
+    var d = new Date();
+    return (d.getMonth() + 1 < 10 ? "0" : "") + (d.getMonth() + 1) + "-" + (d.getDate() < 10 ? "0" : "") + d.getDate();
+  }
+  // Um aniversariante não deve sortear como personagem-do-dia ALEATÓRIO num dia qualquer
+  // dentro do próprio mês de aniversário — pareceria erro/coincidência estranha perto da data
+  // real. Janela = o mês inteiro do aniversário, com folga de 15 dias pro mês vizinho quando o
+  // aniversário cai perto da virada do mês (não só os 15 dias ao redor da data exata).
+  function wbInBirthdayWindow(todayMD, birthdayMD) {
+    var YLEN = 366;
+    function norm(x) { return ((x - 1) % YLEN + YLEN) % YLEN + 1; }
+    var bDoy = wbMdToDoy(birthdayMD), bm = +birthdayMD.split("-")[0];
+    var monthStart = 1;
+    for (var i = 0; i < bm - 1; i++) monthStart += WB_MONTH_DAYS[i];
+    var monthEnd = monthStart + WB_MONTH_DAYS[bm - 1] - 1;
+    var start = norm(Math.min(monthStart, bDoy - 15)), end = norm(Math.max(monthEnd, bDoy + 15));
+    var t = wbMdToDoy(todayMD);
+    return start <= end ? (t >= start && t <= end) : (t >= start || t <= end);
+  }
   // Um [[Nome]] dentro de um texto normalmente vira só texto em negrito (.wl-plain) — a wiki
   // isolada não tem como saber se aquele nome é uma página publicada sem mais contexto. Mas
   // dentro da descrição de um evento, JÁ temos esse contexto: os links/backlinks reais desta
@@ -1012,6 +1066,105 @@
       wrap.appendChild(el("div", { class: "empty", text: "Nenhuma página publicada ainda." }));
       page.appendChild(wrap);
       return;
+    }
+
+    // Citação do dia / Personagem do dia (+ aniversariante) / Nota do dia / Entrada do dia /
+    // Ano em foco — só no Paradise Gate (a wiki geral fica com o layout original). Sorteio
+    // diário determinístico (ver wbDailyPick), então todo visitante vê a mesma escolha no
+    // mesmo dia sem precisar de nenhum estado gravado em lugar nenhum.
+    if (pg) {
+      var todayMD = wbTodayMD();
+
+      // Citação do dia
+      var quotePool = [];
+      entries.forEach(function (e) { (e.citacoes || []).forEach(function (q) { quotePool.push(Object.assign({ speakerId: e.id, speakerTitle: e.title }, q)); }); });
+      var quotePick = wbDailyPick(quotePool, "citacao");
+      var quoteWrap = el("div", { class: "spotlight-quote" });
+      if (quotePick) {
+        quoteWrap.appendChild(el("div", { class: "spotlight-quote-text", text: "“" + quotePick.text + "”" }));
+        var attrBits = [el("a", { href: wikiHref(quotePick.speakerId), text: quotePick.speakerTitle })];
+        var workName = quotePick.contextTitle || quotePick.group;
+        if (workName) {
+          attrBits.push(document.createTextNode(", em "));
+          attrBits.push(quotePick.contextId ? el("a", { href: wikiHref(quotePick.contextId), text: workName }) : document.createTextNode(workName));
+        }
+        var attrEl = el("div", { class: "spotlight-quote-attr" }, [document.createTextNode("— ")].concat(attrBits));
+        quoteWrap.appendChild(attrEl);
+      } else {
+        quoteWrap.appendChild(el("div", { class: "spotlight-quote-text spotlight-empty", text: "Nenhuma citação publicada ainda — o multiverso ainda está em silêncio." }));
+      }
+      wrap.appendChild(quoteWrap);
+
+      // Personagem do dia — se alguém publicado faz aniversário hoje, ganha prioridade (com
+      // tag de aniversariante); senão sorteia entre os Personagens, excluindo quem está na
+      // própria janela de aniversário (pra não parecer coincidência estranha perto da data).
+      var personagens = entries.filter(function (e) { return e.type === "Personagem"; });
+      var birthdayFolks = personagens.filter(function (e) { return e.birthdayMD === todayMD; });
+      var isAniversariante = birthdayFolks.length > 0;
+      var charPool = isAniversariante ? birthdayFolks : personagens.filter(function (e) { return !e.birthdayMD || !wbInBirthdayWindow(todayMD, e.birthdayMD); });
+      var charPick = wbDailyPick(charPool, "personagem");
+
+      // Nota do dia
+      var notePool = [];
+      entries.forEach(function (e) { (e.posts || []).forEach(function (p) { notePool.push({ id: p.id, title: p.title, date: p.date, entryId: e.id, entryTitle: e.title }); }); });
+      var notePick = wbDailyPick(notePool, "nota");
+
+      // Entrada do dia — qualquer tipo menos Personagem (que já tem seu próprio destaque acima).
+      var entradaPool = entries.filter(function (e) { return e.type !== "Personagem"; });
+      var entradaPick = wbDailyPick(entradaPool, "entrada");
+
+      // Ano em foco — sorteia entre os anos que têm ao menos um evento "principal", depois
+      // lista TODOS os eventos principais daquele ano (de qualquer entrada).
+      var yearEvents = {};
+      entries.forEach(function (e) { (e.events || []).forEach(function (ev) { if (ev.major) { (yearEvents[ev.y] = yearEvents[ev.y] || []).push(Object.assign({ entryId: e.id, entryTitle: e.title }, ev)); } }); });
+      var yearsPool = Object.keys(yearEvents).map(Number);
+      var yearPick = wbDailyPick(yearsPool, "ano");
+
+      var spotGrid = el("div", { class: "spotlight-grid" });
+      var spotLeft = el("div");
+
+      function charCard(e, badge) {
+        var kids = [];
+        if (e.cover) kids.push(el("img", { class: "spotlight-char-cover", src: e.cover, alt: "", loading: "lazy", style: "object-position:" + objPos(e.coverFocus) }));
+        var body = el("div", { class: "spotlight-char-body" }, [
+          el("div", { class: "spotlight-char-eyebrow", text: "Personagem do dia" }),
+          el("div", { class: "spotlight-char-title", text: e.title || "(sem título)" })
+        ]);
+        kids.push(body);
+        var a = el("a", { class: "spotlight-char", href: wikiHref(e.id) }, kids);
+        if (badge) a.appendChild(el("div", { class: "spotlight-badge", text: "🎂 aniversariante" }));
+        return a;
+      }
+      if (charPick) spotLeft.appendChild(charCard(charPick, isAniversariante));
+      else spotLeft.appendChild(el("div", { class: "spotlight-char" }, [el("div", { class: "spotlight-char-body" }, [el("div", { class: "spotlight-char-eyebrow", text: "Personagem do dia" }), el("div", { class: "spotlight-empty", text: "Ainda sem personagens publicados." })])]));
+
+      var pairWrap = el("div", { class: "spotlight-pair" });
+      function miniCard(eyebrow, title, href, emptyText) {
+        if (!title) return el("div", { class: "spotlight-mini" }, [el("div", { class: "spotlight-mini-eyebrow", text: eyebrow }), el("div", { class: "spotlight-empty", text: emptyText })]);
+        return el("a", { class: "spotlight-mini", href: href }, [el("div", { class: "spotlight-mini-eyebrow", text: eyebrow }), el("div", { class: "spotlight-mini-title", text: title })]);
+      }
+      pairWrap.appendChild(notePick ? miniCard("Nota do dia", notePick.title || "(sem título)", wikiHref(notePick.entryId) + "#posts") : miniCard("Nota do dia", null, null, "Nenhuma nota ainda."));
+      pairWrap.appendChild(entradaPick ? miniCard("Entrada do dia", entradaPick.title, wikiHref(entradaPick.id)) : miniCard("Entrada do dia", null, null, "Nenhuma entrada ainda."));
+      spotLeft.appendChild(pairWrap);
+      spotGrid.appendChild(spotLeft);
+
+      var yearWrap = el("div", { class: "spotlight-year" });
+      yearWrap.appendChild(el("div", { class: "spotlight-year-head", text: "Ano em foco" }));
+      if (yearPick != null) {
+        yearWrap.appendChild(el("a", { class: "spotlight-year-num", href: wikiHref("_timeline") + "?ano=" + yearPick, text: String(yearPick) }));
+        var yList = el("div", { class: "spotlight-year-list" });
+        yearEvents[yearPick].sort(function (a, b) { return wbEventSortKey(a) - wbEventSortKey(b); }).forEach(function (ev) {
+          yList.appendChild(el("a", { class: "timeline-event major", href: wikiHref(ev.entryId) }, [
+            el("span", { class: "ev-date", text: wbFmtEventDate(ev) }),
+            el("span", { class: "ev-text", text: ev.label })
+          ]));
+        });
+        yearWrap.appendChild(yList);
+      } else {
+        yearWrap.appendChild(el("div", { class: "spotlight-empty", text: "Nenhum evento principal marcado ainda." }));
+      }
+      spotGrid.appendChild(yearWrap);
+      wrap.appendChild(spotGrid);
     }
 
     // Novidades — as páginas mais recentemente publicadas/atualizadas primeiro, pra quem não

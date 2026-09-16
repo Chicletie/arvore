@@ -1,5 +1,5 @@
 /* tree — service worker (offline + atualização) */
-var CACHE = "arvore-cache-v79";
+var CACHE = "arvore-cache-v80";
 var SHELL = ["./tree/", "./tree/index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", function (e) {

@@ -4555,7 +4555,11 @@
       posts: (snap.posts || []).filter(function (p) { return p.vis === "publico"; }).map(function (p) { return { id: p.id, title: p.title, date: p.date }; }),
       // Eventos (já vêm só "publico" do snapshot) — alimentam a timeline geral da wiki e o
       // "ano em foco" da home (que só sorteia entre os marcados "major").
-      events: (snap.events || []).map(function (ev) { return { label: ev.label, y: ev.y, m: ev.m, d: ev.d, note: ev.note, major: !!ev.major }; })
+      events: (snap.events || []).map(function (ev) { return { label: ev.label, y: ev.y, m: ev.m, d: ev.d, note: ev.note, major: !!ev.major }; }),
+      // Citações — só "publico" (não spoiler): a "Citação do dia" da home mostra o texto sem
+      // nenhum contexto de reveal-ao-clicar, então uma citação spoiler não pode aparecer ali
+      // fora da própria página onde o clique-pra-revelar existe.
+      citacoes: (snap.citacoes || []).filter(function (q) { return q.vis === "publico"; }).map(function (q) { return { id: q.id, text: q.text, group: q.group, note: q.note, contextTitle: q.contextTitle, contextId: q.contextId }; })
     };
   }
   function wbWikiUrl(id) { return location.origin + location.pathname.replace(/index\.html$/, "") + "wiki/" + id; }
