@@ -349,6 +349,9 @@
           } else if (it.kind === "sessao") {
             slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: (it.title || "Sessão") + (it.date ? " · " + it.date : "") }));
             slot.appendChild(renderMarkdown(it.recap));
+          } else if (it.kind === "post") {
+            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: (it.date ? it.date + " — " : "") + (it.title || "Post") }));
+            slot.appendChild(renderMarkdown(it.body));
           }
         });
       }).catch(function () { /* not signed in as anyone with access to this item — nothing to show */ });
@@ -459,15 +462,22 @@
         if (f.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
         else article.appendChild(renderMarkdown(f.value));
       });
+      // <details> em vez de div — dá pro leitor recolher uma seção que não interessa (o autor já
+      // podia fazer isso no próprio editor do tree; aqui era sempre tudo aberto, sem opção).
+      // Aberta por padrão: colapsar é uma conveniência de quem está lendo, não um estado que o
+      // autor "herda" pra decidir o que o visitante vê de cara.
       (bundle.sections || []).forEach(function (s) {
-        article.appendChild(el("div", { class: "cathead", id: s._anchor, text: (s.title || "Seção") + (s.vis === "spoiler" ? " 🙈" : "") }));
-        if (s.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(s.body); }));
-        else article.appendChild(renderMarkdown(s.body));
+        var det = el("details", { class: "wiki-section", id: s._anchor, open: "open" });
+        det.appendChild(el("summary", { class: "cathead", text: (s.title || "Seção") + (s.vis === "spoiler" ? " 🙈" : "") }));
+        if (s.vis === "spoiler") det.appendChild(spoilerCover(function () { return renderMarkdown(s.body); }));
+        else det.appendChild(renderMarkdown(s.body));
+        article.appendChild(det);
       });
       return article;
     }
     var hasLinks = (data.links && data.links.length) || (data.backlinks && data.backlinks.length);
     var sharedToc = [];
+    if (data.posts && data.posts.length) sharedToc.push({ id: "posts", label: "Posts" });
     if (data.gallery && data.gallery.length) sharedToc.push({ id: "galeria", label: "Galeria" });
     if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
@@ -492,6 +502,22 @@
       articles.forEach(function (a, i) { a.hidden = i !== 0; card.appendChild(a); });
     } else {
       card.appendChild(buildArticle(data, "geral-", sharedToc));
+    }
+
+    // posts — diário datado da própria entrada (mais recente primeiro; já vem ordenado do
+    // snapshot). É sobre a entrada inteira, não de uma variante de obra específica, então mora
+    // aqui fora do buildArticle, igual Galeria/Ligações.
+    if (data.posts && data.posts.length) {
+      var pwrap = el("div", { class: "posts-wrap" });
+      pwrap.appendChild(el("div", { class: "cathead", id: "posts", text: "Posts" }));
+      data.posts.forEach(function (p) {
+        var det = el("details", { class: "wiki-section post", open: "open" });
+        det.appendChild(el("summary", { class: "post-summary", text: (p.date ? p.date + " — " : "") + (p.title || "(sem título)") + (p.vis === "spoiler" ? " 🙈" : "") }));
+        if (p.vis === "spoiler") det.appendChild(spoilerCover(function () { return renderMarkdown(p.body); }));
+        else det.appendChild(renderMarkdown(p.body));
+        pwrap.appendChild(det);
+      });
+      card.appendChild(pwrap);
     }
 
     // galeria — agrupada por rótulo livre (ex: "Primeira Temporada", "Segunda Temporada")
@@ -544,6 +570,15 @@
       });
       card.appendChild(tagWrap);
     }
+
+    // Um índice que aponta pra uma seção recolhida precisa reabri-la antes de rolar até lá —
+    // senão o clique "funciona" (rola) mas mostra só o título fechado, parecendo quebrado.
+    card.querySelectorAll(".toc a[href^='#']").forEach(function (a) {
+      a.addEventListener("click", function () {
+        var t = document.getElementById(a.getAttribute("href").slice(1));
+        if (t && t.tagName === "DETAILS") t.open = true;
+      });
+    });
 
     mountRestrito(card, wikiId);
     mountSuggestBox(loginBar, wikiId, data.title, function () { return currentTabLabel; }, card);

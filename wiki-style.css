@@ -74,6 +74,18 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .cathead:first-of-type { margin-top: 22px; }
 .restrito-mark { color: var(--gold-ink); }
 
+/* seções recolhíveis — <details> nativo, sem JS próprio pra abrir/fechar */
+details.wiki-section > summary.cathead { cursor: pointer; scroll-margin-top: 14px; }
+details.wiki-section > summary.cathead::marker { color: var(--muted); }
+details.wiki-section[open] > summary.cathead { margin-bottom: 10px; }
+
+/* posts — diário datado da entrada, mais recente primeiro */
+.posts-wrap { clear: both; margin-top: 8px; }
+details.wiki-section.post { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px; }
+details.wiki-section.post:last-child { border-bottom: 0; }
+.post-summary { cursor: pointer; font-family: var(--font-wb); font-size: 16px; font-weight: 600; color: var(--ink); }
+.post-summary::marker { color: var(--muted); }
+
 /* galeria — full width, abaixo do corpo, agrupada por rótulo (ex: temporadas) */
 .gallery-wrap { clear: both; margin-top: 8px; }
 .gal-grouphead { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold-ink); font-weight: 600; margin: 16px 0 8px; }

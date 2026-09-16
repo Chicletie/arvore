@@ -293,18 +293,12 @@
   .sync-dot.saving, .sync-dot.connecting { color: var(--faint); }
   .sync-dot.off, .sync-dot.signin { color: var(--faint); }
 
-  .view-head { margin-bottom: 20px; }
   .eyebrow, .wb-eyebrow, .section-label {
     font-family: var(--font-body);
     text-transform: uppercase; letter-spacing: 0.16em;
     font-size: 10.5px; font-weight: 600; color: var(--faint);
   }
   .eyebrow { margin: 0 0 7px; }
-  .view-head h2 {
-    font-family: var(--font-display); font-weight: 500; font-size: 32px; line-height: 1.1;
-    margin: 0; letter-spacing: 0.005em;
-  }
-  .view-head p { color: var(--muted); margin: 8px 0 0; font-family: var(--font-wb); font-size: 16px; }
 
   /* ---------- Cards ---------- */
   .card {
@@ -356,20 +350,8 @@
     padding: 11px 0; border-bottom: 1px solid var(--border);
   }
   .row:last-child { border-bottom: none; }
-  .check {
-    width: 24px; height: 24px; border-radius: 8px;
-    border: 1.5px solid var(--border-strong); background: var(--surface);
-    display: grid; place-items: center; flex-shrink: 0;
-    transition: background .16s, border-color .16s;
-  }
-  .check svg { width: 13px; height: 13px; opacity: 0; transform: scale(.5); transition: opacity .16s, transform .2s var(--ease-spring); }
-  .check.on { background: var(--gold); border-color: var(--gold); }
-  .check.on svg { opacity: 1; transform: scale(1); }
-  .check:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
   .row-body { flex: 1; min-width: 0; }
   .row-title { font-weight: 500; font-family: var(--font-wb); font-size: 17px; line-height: 1.3; }
-  .row-title.done { color: var(--faint); text-decoration: line-through; }
   .row-meta { font-size: 12px; color: var(--faint); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-family: var(--font-body); }
 
   .icon-btn {
@@ -693,6 +675,15 @@
   .saved-flash.show { animation: flash 1.5s ease forwards; }
   @keyframes flash { 0% { opacity: 0; } 15% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
 
+  .wb-undo-toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 60;
+    display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px);
+    background: var(--ink); color: var(--bg); border-radius: var(--radius); padding: 10px 14px;
+    box-shadow: var(--shadow); font-size: 13px; animation: rise .25s var(--ease-spring);
+  }
+  .wb-undo-toast .btn { color: var(--bg); border-color: color-mix(in srgb, var(--bg) 45%, transparent); flex-shrink: 0; }
+  .wb-undo-toast .btn:hover { border-color: var(--bg); }
+
   .detail-strip { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
   .detail-strip summary { list-style: none; cursor: pointer; color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600; }
   .detail-strip summary::-webkit-details-marker { display: none; }
@@ -705,6 +696,9 @@
   .wb-ord { width: 24px; height: 18px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 5px; font-size: 9px; line-height: 1; display: grid; place-items: center; }
   .wb-ord:disabled { opacity: 0.3; }
   .wb-ord:not(:disabled):hover { border-color: var(--gold); color: var(--ink); }
+  .wb-drag-handle { cursor: grab; color: var(--faint); font-size: 16px; padding: 0 6px; user-select: none; align-self: stretch; display: flex; align-items: center; }
+  .wb-drag-handle:hover { color: var(--muted); }
+  .wb-scene-row.wb-dragging { opacity: 0.5; background: var(--surface-2); }
 
   /* graph */
   .wb-graph-host {
@@ -853,6 +847,16 @@
   .dd-restrito, .wb-sec-restrito > .wb-sec-head { background: repeating-linear-gradient(90deg, transparent, transparent 8px, color-mix(in srgb, var(--accent) 12%, transparent) 8px, color-mix(in srgb, var(--accent) 12%, transparent) 16px); }
   .wb-allow-editor { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 4px 0 8px; }
   .wb-allow-editor select { padding: 2px 6px; font-size: 11px; }
+  /* ---- version-history diff ---- */
+  .wb-diff-bits { margin: 4px 0 10px; padding-left: 18px; font-size: 13px; }
+  .wb-diff-bits li { margin: 2px 0; }
+  .wb-diff-lab { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin: 10px 0 3px; }
+  .wb-diff { font-family: var(--font-mono); font-size: 12px; line-height: 1.55; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+  .wb-diff-same, .wb-diff-add, .wb-diff-del { padding: 1px 8px; white-space: pre-wrap; word-break: break-word; }
+  .wb-diff-same { color: var(--faint); }
+  .wb-diff-add { background: color-mix(in srgb, var(--pos) 16%, transparent); color: var(--ink); }
+  .wb-diff-del { background: color-mix(in srgb, var(--neg) 14%, transparent); color: var(--faint); text-decoration: line-through; }
+  .wb-diff-skip { padding: 2px 8px; color: var(--faint); font-style: italic; text-align: center; background: var(--surface-2); }
   /* ---- markdown spoiler tags (||texto||) — click to reveal, both in-app and on published wikis ---- */
   .md-spoiler { background: var(--ink); color: transparent; border-radius: 3px; cursor: pointer; padding: 0 2px; transition: color .12s, background .12s; user-select: none; }
   .md-spoiler.on { background: var(--accent-wash); color: inherit; cursor: text; user-select: text; }
@@ -966,7 +970,6 @@
   .modal h3 { margin: 0 0 14px; font-family: var(--font-display); font-weight: 600; font-size: 21px; }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
 
-  .av-main .view-head h2 { font-family: var(--font-display); }
   .stagger > * { animation: rise .4s var(--ease-bloom) both; }
   .stagger > *:nth-child(1) { animation-delay: .02s; }
   .stagger > *:nth-child(2) { animation-delay: .06s; }
@@ -1039,16 +1042,7 @@
   function addDaysKey(k, n) { var d = parseKey(k); d.setDate(d.getDate() + n); return keyOf(d); }
   function diffDays(a, b) { return Math.round((parseKey(a) - parseKey(b)) / MS_DAY); }
   var WD = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
-  var WD_SHORT = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
   var MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-  function weekday(k) { return WD[parseKey(k).getDay()]; }
-  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-  function weekdayShort(k) { return WD_SHORT[parseKey(k).getDay()]; }
-  function dm(k) { var p = k.split("-"); return p[2] + "/" + p[1]; }
-  function longDate(k) { var d = parseKey(k); return d.getDate() + " de " + MONTHS[d.getMonth()]; }
-  function monthKey(k) { return k.slice(0, 7); }
-  function curMonthKey() { return todayKey().slice(0, 7); }
-  function monthLabel(mk) { var p = mk.split("-"); return MONTHS[parseInt(p[1], 10) - 1] + " de " + p[0]; }
   function relDay(k) {
     var d = diffDays(k, todayKey());
     if (d === 0) return "hoje";
@@ -1059,61 +1053,7 @@
     return "em " + d + " dias";
   }
 
-  function brl(n) {
-    return "R$ " + (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
   function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3); }
-
-  /* ============ Moon phase ============ */
-  var SYNODIC = 29.530588853;
-  var MOON_REF = Date.UTC(2000, 0, 6, 18, 14, 0) / MS_DAY;
-  var MOON_NAMES = ["Lua Nova", "Lua Crescente", "Quarto Crescente", "Crescente Gibosa", "Lua Cheia", "Minguante Gibosa", "Quarto Minguante", "Lua Balsâmica"];
-  var MOON_GLYPHS = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
-  function moonAge(dateOrKey) {
-    var t = (typeof dateOrKey === "string" ? parseKey(dateOrKey).getTime() : dateOrKey.getTime()) / MS_DAY;
-    return (((t - MOON_REF) % SYNODIC) + SYNODIC) % SYNODIC;
-  }
-  function moonInfo(k) {
-    var age = moonAge(k || todayKey());
-    var frac = age / SYNODIC;
-    var idx = Math.floor((frac + 0.0625) * 8) % 8;
-    var toFull = (((0.5 - frac) % 1) + 1) % 1 * SYNODIC;
-    var toNew = (((1 - frac) % 1) + 1) % 1 * SYNODIC;
-    return {
-      name: MOON_NAMES[idx], glyph: MOON_GLYPHS[idx],
-      illum: Math.round((1 - Math.cos(frac * 2 * Math.PI)) / 2 * 100),
-      toFull: Math.max(0, Math.round(toFull)), toNew: Math.max(0, Math.round(toNew))
-    };
-  }
-  function nextMoonEvents(fromKey, days) {
-    // returns [{key, label}] for new/full/quarters within window
-    var out = [], seen = {};
-    for (var i = 0; i <= days; i++) {
-      var k = addDaysKey(fromKey, i);
-      var f = (moonAge(k) / SYNODIC);
-      var fPrev = (moonAge(addDaysKey(k, -1)) / SYNODIC);
-      function crossed(target) {
-        var a = fPrev, b = f;
-        if (target === 0) { return a > 0.75 && b < 0.25; }
-        return a < target && b >= target;
-      }
-      var evt = null;
-      if (crossed(0)) evt = "Lua Nova 🌑";
-      else if (crossed(0.25)) evt = "Quarto Crescente 🌓";
-      else if (crossed(0.5)) evt = "Lua Cheia 🌕";
-      else if (crossed(0.75)) evt = "Quarto Minguante 🌗";
-      if (evt && !seen[k]) { out.push({ key: k, label: evt }); seen[k] = 1; }
-    }
-    return out;
-  }
-  function findNextFullMoon(fromKey) {
-    for (var i = 0; i < 40; i++) {
-      var k = addDaysKey(fromKey, i);
-      var f = moonAge(k) / SYNODIC, fp = moonAge(addDaysKey(k, -1)) / SYNODIC;
-      if (fp < 0.5 && f >= 0.5) return k;
-    }
-    return addDaysKey(fromKey, 14);
-  }
 
   /* ============ DOM helper ============ */
   function el(tag, attrs, kids) {
@@ -1132,35 +1072,7 @@
     });
     return e;
   }
-  var I_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
   var I_TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>';
-  var I_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
-  var I_CHEV_L = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
-  var I_CHEV_R = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
-
-  var DOMAINS = {
-    geral: { label: "Geral", color: "var(--dom-geral)" },
-    estudos: { label: "Estudos", color: "var(--dom-estudos)" },
-    espiritual: { label: "Espiritual", color: "var(--dom-espiritual)" },
-    criacao: { label: "Criação", color: "var(--dom-criacao)" },
-    cozinha: { label: "Cozinha", color: "var(--dom-cozinha)" },
-    musica: { label: "Música", color: "var(--dom-musica)" },
-    saude: { label: "Saúde", color: "var(--dom-saude)" },
-    financas: { label: "Finanças", color: "var(--dom-financas)" }
-  };
-  var TAROT_MAIORES = ["O Louco", "O Mago", "A Sacerdotisa", "A Imperatriz", "O Imperador", "O Hierofante", "Os Amantes", "O Carro", "A Força", "O Eremita", "A Roda da Fortuna", "A Justiça", "O Enforcado", "A Morte", "A Temperança", "O Diabo", "A Torre", "A Estrela", "A Lua", "O Sol", "O Julgamento", "O Mundo"];
-  var TAROT_VALORES = ["Ás", "Dois", "Três", "Quatro", "Cinco", "Seis", "Sete", "Oito", "Nove", "Dez", "Valete", "Cavaleiro", "Rainha", "Rei"];
-  var TAROT_NAIPES = ["Copas", "Ouros", "Paus", "Espadas"];
-  var TAROT_DECK = TAROT_MAIORES.slice();
-  TAROT_NAIPES.forEach(function (naipe) { TAROT_VALORES.forEach(function (v) { TAROT_DECK.push(v + " de " + naipe); }); });
-  var SPREADS = {
-    "1": { label: "1 carta", pos: ["Carta"] },
-    "ppf": { label: "3 cartas — Passado / Presente / Futuro", pos: ["Passado", "Presente", "Futuro"] },
-    "soc": { label: "Situação / Obstáculo / Conselho", pos: ["Situação", "Obstáculo", "Conselho"] },
-    "cruz": { label: "Cruz Celta (10)", pos: ["Situação", "Desafio", "Base", "Passado recente", "Objetivo", "Futuro próximo", "Você", "Ambiente", "Esperanças e medos", "Resultado"] },
-    "livre": { label: "Livre", pos: null }
-  };
-  var METODOS_DIV = ["Tarot", "Pêndulo", "Runas", "Bibliomancia", "Oráculo", "Leitura de borra", "Outro"];
 
   var FLOWERS = [
     { id: "raiz", name: "Raiz", kind: "raiz", color: "#c9d3de" },
@@ -1326,17 +1238,6 @@
     });
     return Object.keys(cands).map(function (k) { return cands[k]; });
   }
-  var SABBATS = [
-    { name: "Samhain", md: [4, 30], meaning: "O véu se afina. Honrar ancestrais, encerrar ciclos, adivinhação." },
-    { name: "Yule", md: [6, 21], meaning: "Noite mais longa. O sol renasce — introspecção e esperança." },
-    { name: "Imbolc", md: [8, 1], meaning: "Primeiros sinais da primavera. Purificação, inspiração, Brígida." },
-    { name: "Ostara", md: [9, 21], meaning: "Equinócio de primavera. Equilíbrio, fertilidade, novos começos." },
-    { name: "Beltane", md: [10, 31], meaning: "Fogo e flor. União, vitalidade, desejo, proteção." },
-    { name: "Litha", md: [12, 21], meaning: "Auge do sol. Poder, abundância, ervas no ponto máximo." },
-    { name: "Lughnasadh", md: [2, 1], meaning: "Primeira colheita. Gratidão, habilidade, o sacrifício do grão." },
-    { name: "Mabon", md: [3, 20], meaning: "Equinócio de outono. Segunda colheita, equilíbrio, soltar." }
-  ];
-
   /* ============ State shape ============ */
   function emptyState() {
     var world = {
@@ -1475,6 +1376,19 @@
         delete sec.secret;
         sec.collapsed = !!sec.collapsed;
       });
+      // posts datados — diário livre por entrada, tipo Kanka: anotações com data própria, fora
+      // da linha do tempo do mundo (que é sobre o UNIVERSO, não sobre o processo de escrita).
+      if (!Array.isArray(e.posts)) e.posts = [];
+      e.posts = e.posts.filter(function (p) { return p && typeof p === "object"; });
+      e.posts.forEach(function (p) {
+        if (p.id == null) p.id = uid();
+        if (typeof p.title !== "string") p.title = "";
+        if (typeof p.date !== "string" || !p.date) p.date = todayKey();
+        if (typeof p.body !== "string") p.body = "";
+        if (WB_VIS.indexOf(p.vis) === -1) p.vis = "publico";
+        if (!Array.isArray(p.allow)) p.allow = [];
+        p.collapsed = !!p.collapsed;
+      });
       if (!Array.isArray(e.events)) e.events = [];
       e.events.forEach(function (ev) {
         if (ev.id == null) ev.id = uid();
@@ -1536,6 +1450,12 @@
           if (typeof sx.recap !== "string") sx.recap = "";
           if (typeof sx.notes !== "string") sx.notes = "";
           if (!Array.isArray(sx.present)) sx.present = [];
+          // present costumava ser só uma lista de ids ("apareceu ou não apareceu"). Agora cada
+          // item carrega uma nota livre opcional ("mencionado", "em espírito", "na forma de
+          // coruja"…) — strings antigas viram objetos com nota vazia (= presença normal).
+          sx.present = sx.present.map(function (p) {
+            return typeof p === "string" ? { id: p, note: "" } : { id: p.id, note: typeof p.note === "string" ? p.note : "" };
+          }).filter(function (p) { return p.id; });
           if (WB_VIS.indexOf(sx.vis) === -1) sx.vis = "publico";
           if (!Array.isArray(sx.allow)) sx.allow = [];
         });
@@ -1604,126 +1524,14 @@
 
   var ui = {};
 
-  /* ============ Derived: agenda ============ */
-  function occurrences(item, startKey, endKey) {
-    var out = [];
-    if (!item.recur) {
-      if (item.date >= startKey && item.date <= endKey) out.push(item.date);
-      return out;
-    }
-    var d = parseKey(item.date), end = parseKey(endKey), guard = 0;
-    while (d <= end && guard++ < 700) {
-      var k = keyOf(d);
-      if (k >= startKey) out.push(k);
-      if (item.recur === "diaria") d.setDate(d.getDate() + 1);
-      else if (item.recur === "semanal") d.setDate(d.getDate() + 7);
-      else if (item.recur === "mensal") d.setMonth(d.getMonth() + 1);
-      else break;
-    }
-    return out;
-  }
-  function isDone(item, dateKey) {
-    return item.recur ? item.doneDates.indexOf(dateKey) !== -1 : !!item.done;
-  }
-  function toggleDone(item, dateKey) {
-    if (item.recur) {
-      var i = item.doneDates.indexOf(dateKey);
-      if (i === -1) item.doneDates.push(dateKey); else item.doneDates.splice(i, 1);
-    } else { item.done = !item.done; }
-    save(); render();
-  }
-  function agendaInWindow(startKey, endKey, respectLenses) {
-    var rows = [];
-    state.agenda.forEach(function (item) {
-      if (respectLenses && !state.lenses[item.domain]) return;
-      occurrences(item, startKey, endKey).forEach(function (k) {
-        rows.push({ item: item, date: k });
-      });
-    });
-    return rows;
-  }
-  function overdueTasks() {
-    var tk = todayKey();
-    return state.agenda.filter(function (a) {
-      return a.type === "tarefa" && !a.recur && a.date < tk && !a.done;
-    }).sort(function (x, y) { return x.date < y.date ? -1 : 1; });
-  }
-
-  /* ============ Derived: finance ============ */
-  function monthTx(mk) { mk = mk || curMonthKey(); return state.transactions.filter(function (t) { return monthKey(t.date) === mk; }); }
-  function monthTotals(mk) {
-    var inc = 0, exp = 0;
-    monthTx(mk).forEach(function (t) { if (t.amount >= 0) inc += t.amount; else exp += -t.amount; });
-    return { inc: inc, exp: exp, bal: inc - exp };
-  }
-  function billShare(bill) { return bill.total / bill.participants.length; }
-  function billPaidThisMonth(bill, mk) { return bill.paid[mk || curMonthKey()] || []; }
-  function owedByPerson(mk) {
-    mk = mk || curMonthKey();
-    var map = {};
-    state.sharedBills.forEach(function (b) {
-      var paid = billPaidThisMonth(b, mk);
-      b.participants.forEach(function (p) {
-        if (p === "Você") return;
-        if (paid.indexOf(p) === -1) map[p] = (map[p] || 0) + billShare(b);
-      });
-    });
-    return map;
-  }
-  function billsPendingCount(mk) {
-    mk = mk || curMonthKey();
-    var n = 0;
-    state.sharedBills.forEach(function (b) {
-      var paid = billPaidThisMonth(b, mk);
-      b.participants.forEach(function (p) { if (p !== "Você" && paid.indexOf(p) === -1) n++; });
-    });
-    return n;
-  }
-
-  /* ============ Habits ============ */
-  function habitDone(h, k) { return !!h.log[k || todayKey()]; }
-  function toggleHabit(h, k) {
-    k = k || todayKey();
-    if (h.log[k]) delete h.log[k]; else h.log[k] = true;
-    save(); render();
-  }
-  function habitStreak(h) {
-    var n = 0;
-    for (var i = 0; i < 400; i++) {
-      var k = todayKey(-i);
-      if (h.log[k]) n++;
-      else if (i === 0) continue;
-      else break;
-    }
-    return n;
-  }
-  function habitLast(h, days) {
-    var out = [];
-    for (var i = days - 1; i >= 0; i--) out.push(!!h.log[todayKey(-i)]);
-    return out;
-  }
-
   /* ============ Shared components ============ */
   function spacer(h) { return el("div", { style: "height:" + (h || 16) + "px" }); }
-  function viewHead(eyebrow, title, sub) {
-    return el("div", { class: "view-head" }, [
-      el("p", { class: "eyebrow", text: eyebrow }),
-      el("h2", { text: title }),
-      sub ? el("p", { text: sub }) : null
-    ]);
-  }
   function segControl(options, active, onpick) {
     var s = el("div", { class: "seg" });
     options.forEach(function (o) {
       s.appendChild(el("button", { class: "seg-btn" + (o[0] === active ? " on" : ""), type: "button", text: o[1], onclick: function () { onpick(o[0]); } }));
     });
     return s;
-  }
-  function miniList(items, emptyText, rowFn) {
-    if (!items.length) return el("div", { class: "empty", text: emptyText });
-    var wrap = el("div");
-    items.forEach(function (it) { wrap.appendChild(rowFn(it)); });
-    return wrap;
   }
   function delBtn(fn) { return el("button", { class: "icon-btn", type: "button", "aria-label": "Remover", html: I_TRASH, onclick: fn }); }
   // Searchable combobox — swaps a giant <select> of entries for a type-ahead text field.
@@ -1856,193 +1664,6 @@
       linkText ? el("button", { class: "link", type: "button", text: linkText, onclick: onlink }) : null
     ]);
   }
-  function domainPill(domain) {
-    var d = DOMAINS[domain] || DOMAINS.geral;
-    return el("span", { class: "tagpill", style: "color:" + d.color, text: d.label });
-  }
-  function habitRow(h, showManage) {
-    var done = habitDone(h);
-    var streak = habitStreak(h);
-    var dots = el("div", { class: "dots" });
-    habitLast(h, 7).forEach(function (hit) { dots.appendChild(el("i", { class: hit ? "hit" : "" })); });
-    var kids = [
-      el("button", {
-        class: "check" + (done ? " on" : ""), type: "button",
-        "aria-pressed": done ? "true" : "false", "aria-label": h.name, html: I_CHECK,
-        onclick: function () { toggleHabit(h); }
-      }),
-      el("div", { class: "row-body" }, [
-        el("div", { class: "row-title" + (done ? " done" : ""), text: (h.icon ? h.icon + "  " : "") + h.name }),
-        el("div", { class: "row-meta" }, [
-          streak > 0 ? el("span", { class: "streak", text: "🔥 " + streak + (streak === 1 ? " dia" : " dias") }) : null,
-          dots
-        ])
-      ])
-    ];
-    if (showManage) kids.push(el("button", {
-      class: "icon-btn", type: "button", "aria-label": "Remover hábito", html: I_TRASH,
-      onclick: function () { state.habits = state.habits.filter(function (x) { return x.id !== h.id; }); save(); render(); }
-    }));
-    return el("div", { class: "row" }, kids);
-  }
-  function habitAddForm(domain) {
-    var f = el("form", { class: "inline", style: "margin-top:12px", onsubmit: function (e) {
-      e.preventDefault();
-      var name = f.querySelector("[name=name]").value.trim();
-      if (!name) return;
-      var icon = f.querySelector("[name=icon]").value.trim();
-      state.habits.push({ id: uid(), name: name, icon: icon || "•", domain: domain, log: {} });
-      save(); render();
-    } });
-    f.appendChild(el("input", { class: "field", name: "icon", placeholder: "✨", maxlength: "2", style: "width:52px;text-align:center" }));
-    f.appendChild(el("input", { class: "field grow", name: "name", placeholder: "Novo hábito…" }));
-    f.appendChild(el("button", { class: "btn sm", type: "submit", text: "Adicionar" }));
-    return f;
-  }
-  function waterCounter() {
-    var k = todayKey(), val = state.water[k] || 0, goal = state.waterGoal;
-    var wrap = el("div");
-    wrap.appendChild(el("div", { class: "counter" }, [
-      el("button", { type: "button", "aria-label": "Menos um copo", text: "−", onclick: function () { state.water[k] = Math.max(0, (state.water[k] || 0) - 1); save(); render(); } }),
-      el("div", { class: "cval", text: String(val) }),
-      el("button", { type: "button", "aria-label": "Mais um copo", text: "+", onclick: function () { state.water[k] = (state.water[k] || 0) + 1; save(); render(); } }),
-      el("div", { class: "cgoal", text: "de " + goal + " copos (~250 ml)" })
-    ]));
-    var track = el("div", { class: "bar-track" });
-    track.appendChild(el("div", { class: "bar-fill", style: "width:" + Math.min(100, val / goal * 100) + "%" }));
-    wrap.appendChild(track);
-    return wrap;
-  }
-  function txForm() {
-    var f = el("form", { class: "inline", onsubmit: function (e) {
-      e.preventDefault();
-      var desc = f.querySelector("[name=desc]").value.trim();
-      var amount = parseFloat(f.querySelector("[name=amount]").value.replace(",", "."));
-      if (!desc || !amount) return;
-      var type = f.querySelector("[name=type]").value;
-      state.transactions.push({
-        id: uid(), date: todayKey(), desc: desc, cat: f.querySelector("[name=cat]").value,
-        amount: type === "in" ? Math.abs(amount) : -Math.abs(amount)
-      });
-      save(); render();
-    } });
-    var ts = el("select", { class: "field", name: "type" });
-    ts.appendChild(el("option", { value: "out", text: "Despesa" }));
-    ts.appendChild(el("option", { value: "in", text: "Receita" }));
-    f.appendChild(ts);
-    f.appendChild(el("input", { class: "field grow", name: "desc", placeholder: "Descrição" }));
-    f.appendChild(el("input", { class: "field", name: "amount", placeholder: "0,00", inputmode: "decimal", style: "width:88px" }));
-    var cs = el("select", { class: "field", name: "cat" });
-    ["Alimentação", "Moradia", "Transporte", "Saúde", "Lazer", "Renda", "Contas", "Outros"].forEach(function (c) { cs.appendChild(el("option", { value: c, text: c })); });
-    f.appendChild(cs);
-    f.appendChild(el("button", { class: "btn", type: "submit", text: "Lançar" }));
-    return f;
-  }
-  function weightSpark() {
-    var data = state.weight.slice(-10);
-    if (data.length < 2) return el("div", { class: "empty", text: "Registre ao menos dois pesos para ver a evolução." });
-    var W = 620, H = 116, pad = 20;
-    var kgs = data.map(function (d) { return d.kg; });
-    var min = Math.min.apply(null, kgs) - 0.4, max = Math.max.apply(null, kgs) + 0.4;
-    var x = function (i) { return pad + i * ((W - pad * 2) / (data.length - 1)); };
-    var y = function (v) { return pad + (1 - (v - min) / (max - min)) * (H - pad * 2); };
-    var line = data.map(function (d, i) { return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(d.kg).toFixed(1); }).join(" ");
-    var area = line + " L" + x(data.length - 1).toFixed(1) + " " + (H - pad) + " L" + x(0).toFixed(1) + " " + (H - pad) + " Z";
-    var last = data[data.length - 1].kg, diff = Math.round((last - data[0].kg) * 10) / 10;
-    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-    svg.setAttribute("class", "spark");
-    svg.setAttribute("preserveAspectRatio", "none");
-    svg.innerHTML = '<path d="' + area + '" fill="var(--accent-wash)"></path><path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></path><circle cx="' + x(data.length - 1).toFixed(1) + '" cy="' + y(last).toFixed(1) + '" r="4" fill="var(--accent)"></circle>';
-    return el("div", { class: "spark-wrap" }, [
-      svg,
-      el("div", {}, [
-        el("div", { style: "font-family:var(--font-mono);font-size:16px;font-weight:500", text: String(last).replace(".", ",") + " kg" }),
-        el("div", { class: "row-meta", text: (diff === 0 ? "estável" : (diff > 0 ? "+" : "") + String(diff).replace(".", ",") + " kg") + " no período" })
-      ])
-    ]);
-  }
-
-  /* ============ Agenda item rendering ============ */
-  function agItemNode(rec, dateKey) {
-    var item = rec.item;
-    var d = DOMAINS[item.domain] || DOMAINS.geral;
-    var done = isDone(item, dateKey);
-    var left;
-    if (item.type === "tarefa") {
-      left = el("button", {
-        class: "check" + (done ? " on" : ""), type: "button", "aria-pressed": done ? "true" : "false",
-        "aria-label": item.title, html: I_CHECK, style: "margin-top:1px",
-        onclick: function () { toggleDone(item, dateKey); }
-      });
-    } else {
-      left = el("div", { class: "ag-stripe", style: "background:" + d.color });
-    }
-    return el("div", { class: "ag-item" }, [
-      left,
-      el("div", { class: "ag-time" + (item.time ? "" : " none"), text: item.time || "—" }),
-      el("div", { class: "ag-body" }, [
-        el("div", { class: "ag-title" + (done ? " done" : ""), text: item.title }),
-        item.notes ? el("div", { class: "ag-note", text: item.notes }) : null,
-        el("div", { class: "ag-badges" }, [
-          domainPill(item.domain),
-          item.recur ? el("span", { class: "row-meta", text: "↻ " + item.recur }) : null,
-          item.type === "tarefa" ? el("span", { class: "row-meta", text: "tarefa" }) : null
-        ])
-      ]),
-      el("button", { class: "icon-btn", type: "button", "aria-label": "Editar", html: I_EDIT, onclick: function () { openAgendaModal(item); } })
-    ]);
-  }
-
-  function openAgendaModal(existing) {
-    var root = document.getElementById("modalRoot");
-    var it = existing || { id: null, title: "", date: todayKey(), time: "", domain: "geral", type: "evento", notes: "", recur: "" };
-    var m = el("div", { class: "modal-wrap", onclick: function (e) { if (e.target === m) close(); } });
-    function close() { root.innerHTML = ""; }
-    var form = el("form", { onsubmit: function (e) {
-      e.preventDefault();
-      var g = function (n) { return form.querySelector("[name=" + n + "]"); };
-      var title = g("title").value.trim();
-      if (!title) return;
-      var data = {
-        title: title, date: g("date").value || todayKey(), time: g("time").value,
-        domain: g("domain").value, type: g("type").value, notes: g("notes").value.trim(), recur: g("recur").value
-      };
-      if (it.id) {
-        var t = state.agenda.find(function (x) { return x.id === it.id; });
-        Object.assign(t, data);
-      } else {
-        state.agenda.push(Object.assign({ id: uid(), done: false, doneDates: [] }, data));
-      }
-      save(); close(); render();
-    } });
-    var mkSel = function (name, opts, val) {
-      var s = el("select", { class: "field", name: name });
-      opts.forEach(function (o) { s.appendChild(el("option", { value: o[0], text: o[1], selected: o[0] === val ? "selected" : null })); });
-      return s;
-    };
-    form.appendChild(el("div", { class: "field-grid" }, [
-      el("div", { class: "full" }, [el("label", { class: "flab", text: "Título" }), el("input", { class: "field", name: "title", value: it.title, style: "width:100%", autofocus: "autofocus" })]),
-      el("div", {}, [el("label", { class: "flab", text: "Data" }), el("input", { class: "field", name: "date", type: "date", value: it.date, style: "width:100%" })]),
-      el("div", {}, [el("label", { class: "flab", text: "Hora (opcional)" }), el("input", { class: "field", name: "time", type: "time", value: it.time, style: "width:100%" })]),
-      el("div", {}, [el("label", { class: "flab", text: "Tipo" }), mkSel("type", [["evento", "Evento"], ["tarefa", "Tarefa"]], it.type)]),
-      el("div", {}, [el("label", { class: "flab", text: "Área" }), mkSel("domain", Object.keys(DOMAINS).map(function (k) { return [k, DOMAINS[k].label]; }), it.domain)]),
-      el("div", { class: "full" }, [el("label", { class: "flab", text: "Repetir" }), mkSel("recur", [["", "Não repete"], ["diaria", "Todo dia"], ["semanal", "Toda semana"], ["mensal", "Todo mês"]], it.recur)]),
-      el("div", { class: "full" }, [el("label", { class: "flab", text: "Anotações" }), el("textarea", { class: "field", name: "notes", text: it.notes })])
-    ]));
-    var actions = el("div", { class: "modal-actions" }, [
-      it.id ? el("button", { class: "icon-btn", type: "button", "aria-label": "Excluir", html: I_TRASH, style: "margin-right:auto", onclick: function () {
-        state.agenda = state.agenda.filter(function (x) { return x.id !== it.id; }); save(); close(); render();
-      } }) : null,
-      el("button", { class: "btn ghost", type: "button", text: "Cancelar", onclick: close }),
-      el("button", { class: "btn", type: "submit", text: "Salvar" })
-    ]);
-    form.appendChild(actions);
-    m.appendChild(el("div", { class: "modal" }, [el("h3", { text: it.id ? "Editar item" : "Novo na agenda" }), form]));
-    root.appendChild(m);
-    setTimeout(function () { var a = form.querySelector("[autofocus]"); if (a) a.focus(); }, 20);
-  }
-
   /* ============ Views ============ */
   var views = {};
 
@@ -2275,6 +1896,23 @@
     var n = document.getElementById("savedFlash");
     if (!n) return;
     n.classList.remove("show"); void n.offsetWidth; n.classList.add("show");
+  }
+  // Undo toast for the destructive actions that used to rely only on a window.confirm() —
+  // deletes right away (no dialog in the way) and gives a few seconds to reverse it. restoreFn
+  // does the actual reversal (usually just putting back a cloned array/object snapshotted right
+  // before the delete — simpler and more robust than trying to replay individual mutations).
+  var _undoToast = null;
+  function wbUndoToast(message, restoreFn) {
+    if (_undoToast) { clearTimeout(_undoToast.timer); _undoToast.el.remove(); }
+    var box = el("div", { class: "wb-undo-toast" }, [
+      el("span", { text: message }),
+      el("button", { type: "button", class: "btn ghost sm", text: "desfazer", onclick: function () {
+        clearTimeout(_undoToast.timer); box.remove(); _undoToast = null;
+        restoreFn(); save(); render();
+      } })
+    ]);
+    document.body.appendChild(box);
+    _undoToast = { el: box, timer: setTimeout(function () { box.remove(); _undoToast = null; }, 8000) };
   }
   function editable(opts) {
     var host = el(opts.tag || "span");
@@ -2761,6 +2399,17 @@
     });
     return list;
   }
+  // Agrupa wbIssues por entrada — uma mesma entrada pode acumular várias mensagens (ligação
+  // quebrada + sem resumo, por exemplo), e listar cada mensagem como uma linha própria fazia a
+  // mesma entrada aparecer repetida na aba de consistência, parecendo bug de duplicação.
+  function wbIssuesByEntry(uniId) {
+    var byId = {}, order = [];
+    wbIssues(uniId).forEach(function (it) {
+      if (!byId[it.e.id]) { byId[it.e.id] = { e: it.e, msgs: [] }; order.push(it.e.id); }
+      byId[it.e.id].msgs.push(it.msg);
+    });
+    return order.map(function (id) { return byId[id]; });
+  }
 
   /* ---- Home: prancha do herbário ---- */
   var ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
@@ -3141,11 +2790,11 @@
     var tab = w.uniTab || "mapa";
     v.appendChild(segControl([["mapa", "Mapa"], ["entradas", "Entradas"], ["tempo", "Tempo"], ["franquias", "Obras"]], ["mapa", "entradas", "tempo", "franquias"].indexOf(tab) === -1 ? "mapa" : tab, function (t) { wbGo({ uniTab: t }); }));
 
-    var issues = wbIssues(w.uniId);
+    var issuesByEntry = wbIssuesByEntry(w.uniId);
     var nCamp = wbCampaignsOf(w.uniId).length;
     var sub = el("div", { class: "lens-bar", style: "margin-bottom:14px" }, [
       el("button", { class: "chip", type: "button", "aria-pressed": tab === "campanhas" ? "true" : "false", onclick: function () { wbGo({ uniTab: "campanhas" }); } }, [el("span", { text: "🎲 campanhas" + (nCamp ? " (" + nCamp + ")" : "") })]),
-      el("button", { class: "chip", type: "button", "aria-pressed": tab === "consistencia" ? "true" : "false", onclick: function () { wbGo({ uniTab: "consistencia" }); } }, [el("span", { text: "✓ consistência" + (issues.length ? " (" + issues.length + ")" : "") })]),
+      el("button", { class: "chip", type: "button", "aria-pressed": tab === "consistencia" ? "true" : "false", onclick: function () { wbGo({ uniTab: "consistencia" }); } }, [el("span", { text: "✓ consistência" + (issuesByEntry.length ? " (" + issuesByEntry.length + ")" : "") })]),
       el("button", { class: "chip", type: "button", "aria-pressed": tab === "auditoria" ? "true" : "false", onclick: function () { wbGo({ uniTab: "auditoria" }); } }, [el("span", { text: "🔐 quem vê o quê" })]),
       el("button", { class: "chip", type: "button", "aria-pressed": tab === "stats" ? "true" : "false", onclick: function () { wbGo({ uniTab: "stats" }); } }, [el("span", { text: "estatísticas" })]),
       el("button", { class: "chip", type: "button", "aria-pressed": tab === "citacoes" ? "true" : "false", onclick: function () { wbGo({ uniTab: "citacoes" }); } }, [el("span", { text: "citações" })]),
@@ -3224,9 +2873,9 @@
     w.mapHide = w.mapHide || { types: {}, tags: {}, fr: {} };
     var colorBy = w.mapColorBy || "tipo";
 
-    // filter bar — "obra" here means franchise OR campaign (wbWorksOf's unification): a campanha
-    // is an obra just as much as a livro/franquia, so it needs to show up in both the colorBy
-    // grouping and the filter chips, not just the franchise-only Obras tab elsewhere.
+    // "obra" here means franchise OR campaign (wbWorksOf's unification): a campanha é uma obra
+    // tanto quanto um livro/franquia, então precisa aparecer tanto no agrupamento por cor quanto
+    // nos chips de filtro, não só na aba Obras (franquia-only) em outro lugar.
     var typesPresent = [], tagsPresent = [];
     var frs = wbFranchisesOf(uniId).map(function (fr) { return { id: fr.id, name: fr.name || "(obra)" }; })
       .concat(wbCampaignsOf(uniId).map(function (cp) { return { id: cp.id, name: (cp.name || "(campanha)") + " 🎲" }; }));
@@ -3234,7 +2883,105 @@
       if (typesPresent.indexOf(e.type) === -1) typesPresent.push(e.type);
       (e.tags || []).forEach(function (t) { if (tagsPresent.indexOf(t) === -1) tagsPresent.push(t); });
     });
+
+    var visible = entries.filter(function (e) {
+      if (w.mapHide.types[e.type]) return false;
+      var eObraIds = wbWorksOf(e).map(function (o) { return o.id; });
+      if (eObraIds.length && eObraIds.every(function (id) { return w.mapHide.fr[id]; })) return false;
+      return true;
+    });
+
+    // Monta nós/ligações ANTES da barra de filtro, pra ela conseguir mostrar quantas entradas
+    // soltas existem e a busca poder destacar uma entrada na hora — tudo calculado uma vez só.
+    var vis = {}; visible.forEach(function (e) { vis[e.id] = 1; });
+    var nodes = visible.map(function (e) {
+      var eObras = wbWorksOf(e);
+      var col = colorBy === "franquia" ? ((eObras[0] && !w.mapHide.fr[eObras[0].id]) ? franchiseColor(eObras[0].id) : "var(--faint)") : typeColor(e.type);
+      return { id: e.id, label: wbDisplayName(e), color: col, r: 19, x: e.x, y: e.y, kind: "entry", ref: e, group: colorBy === "franquia" ? ((eObras[0] && eObras[0].id) || "—") : e.type };
+    });
+    var edges = [], localCands = {}, portalSeen = {};
+    visible.forEach(function (e) {
+      (e.links || []).forEach(function (lk) {
+        var target = wbEntry(lk.to);
+        if (!target) return;
+        if (target.universeId === uniId) {
+          if (!vis[target.id]) return;
+          var key = [e.id, lk.to].sort().join("|");
+          var pr = labelPriority(lk.label);
+          if (!localCands[key] || pr < localCands[key].priority) {
+            localCands[key] = { from: e.id, to: lk.to, label: lk.label || "", style: linkStyleOf(lk.label), priority: pr };
+          }
+        } else {
+          var pid = "portal:" + lk.to;
+          if (!portalSeen[pid]) {
+            nodes.push({ id: pid, label: wbDisplayName(target) + " ↗", color: flowerById(target.universeId).color, r: 14, kind: "portal", ref: target });
+            portalSeen[pid] = 1;
+          }
+          edges.push({ from: e.id, to: pid, label: lk.label || "", style: linkStyleOf(lk.label) });
+        }
+      });
+    });
+    Object.keys(localCands).forEach(function (k) { edges.push(localCands[k]); });
+    // Criar uma entrada "dentro de" outra (parentId) não gerava NENHUMA linha no mapa — a
+    // relação de hierarquia ficava invisível, só aparecia no modo "árvore" da lista. Aqui ela
+    // vira uma linha fraca/tracejada rotulada "contém", igual ao tratamento do link com o hub
+    // do universo, só que fica clara qual entrada está dentro de qual.
+    visible.forEach(function (e) {
+      if (e.parentId && vis[e.parentId]) edges.push({ from: e.parentId, to: e.id, weak: true, label: "contém" });
+    });
+
+    // Entradas sem NENHUMA ligação real (nem link, nem contém, nem alvo de link de ninguém) só
+    // boiam soltas no meio do gráfico sem servir de referência — escondidas por padrão pra sobrar
+    // espaço/legibilidade pro que de fato se conecta. O filtro "soltas" abaixo revela de volta.
+    var degree = {};
+    edges.forEach(function (e) { degree[e.from] = (degree[e.from] || 0) + 1; degree[e.to] = (degree[e.to] || 0) + 1; });
+    var orphanIds = nodes.filter(function (n) { return n.kind === "entry" && !degree[n.id]; }).map(function (n) { return n.id; });
+    if (!w.mapShowOrphans && orphanIds.length) {
+      var orphanSet = {}; orphanIds.forEach(function (id) { orphanSet[id] = 1; });
+      nodes = nodes.filter(function (n) { return !orphanSet[n.id]; });
+    }
+
+    // Agrupamento visual: um "hub" fraco por tipo (ou por obra, seguindo o mesmo critério da
+    // cor) puxa suavemente cada entrada pra perto das outras do mesmo grupo, com uma linha fina
+    // tracejada até o rótulo do grupo — sem isso, a física pura empilha tudo num monte só, sem
+    // nenhuma organização visível além da cor do próprio ponto.
+    function groupLabel(gid) {
+      if (colorBy !== "franquia") return gid;
+      if (gid === "—") return "sem obra";
+      var fr = frs.filter(function (x) { return x.id === gid; })[0];
+      return fr ? fr.name : gid;
+    }
+    var groupsOf = {}; nodes.forEach(function (n) { if (n.kind === "entry") groupsOf[n.group] = 1; });
+    var groupIds = Object.keys(groupsOf);
+    var hubR = Math.min(230, 70 + groupIds.length * 20);
+    var hubPos = {};
+    groupIds.forEach(function (gid, i) {
+      var a = -Math.PI / 2 + i * (Math.PI * 2 / groupIds.length);
+      hubPos[gid] = { x: Math.cos(a) * hubR, y: Math.sin(a) * hubR };
+    });
+    nodes.forEach(function (n) {
+      if (n.kind !== "entry") return;
+      n.hub = hubPos[n.group];
+      edges.push({ from: n.id, to: "cluster:" + n.group, weak: true });
+    });
+    groupIds.forEach(function (gid) {
+      nodes.push({ id: "cluster:" + gid, label: groupLabel(gid), color: colorBy === "franquia" ? (gid === "—" ? "var(--faint)" : franchiseColor(gid)) : typeColor(gid), r: 7, kind: "hub", fixed: true, x: hubPos[gid].x, y: hubPos[gid].y });
+    });
+    var legendGroups = {};
+    nodes.forEach(function (n) { if (n.kind === "entry") legendGroups[groupLabel(n.group)] = n.color; });
+
+    // filter bar
     var fbar = el("div", { class: "wb-filterbar" });
+    var allEntryItems = entries.map(function (e) { return { id: e.id, label: wbDisplayName(e), meta: e.type }; }).sort(function (a, b) { return a.label.localeCompare(b.label); });
+    var searchCombo = wbCombo({
+      items: allEntryItems, wrapClass: "grow", placeholder: "🔍 achar entrada no mapa…", emptyLabel: "— limpar destaque —",
+      value: w.mapHighlight || "",
+      onChange: function (id) {
+        if (id && orphanIds.indexOf(id) !== -1) w.mapShowOrphans = true;
+        w.mapHighlight = id || null; render();
+      }
+    });
+    fbar.appendChild(el("div", { style: "display:flex;width:100%;margin-bottom:8px" }, [searchCombo]));
     fbar.appendChild(el("span", { class: "wb-fl", text: "cor:" }));
     fbar.appendChild(segControl([["tipo", "tipo"], ["franquia", "obra"]], colorBy, function (c) { wbGo({ mapColorBy: c }); }));
     if (typesPresent.length) {
@@ -3248,6 +2995,10 @@
       frs.forEach(function (fr) {
         fbar.appendChild(el("button", { class: "chip sm", type: "button", "aria-pressed": w.mapHide.fr[fr.id] ? "false" : "true", style: "color:" + franchiseColor(fr.id), onclick: function () { w.mapHide.fr[fr.id] = !w.mapHide.fr[fr.id]; render(); } }, [el("span", { class: "cdot" }), el("span", { style: "color:var(--ink)", text: fr.name })]));
       });
+    }
+    if (orphanIds.length) {
+      fbar.appendChild(el("span", { class: "wb-fl", text: "soltas:" }));
+      fbar.appendChild(el("button", { class: "chip sm", type: "button", "aria-pressed": w.mapShowOrphans ? "true" : "false", onclick: function () { w.mapShowOrphans = !w.mapShowOrphans; render(); } }, [el("span", { class: "cdot" }), el("span", { style: "color:var(--ink)", text: (w.mapShowOrphans ? "ocultar " : "mostrar ") + orphanIds.length + (orphanIds.length > 1 ? " soltas" : " solta") })]));
     }
     // saved views
     var views2 = C().mapViews.filter(function (mv) { return mv.universeId === uniId; });
@@ -3272,62 +3023,30 @@
     fbar.appendChild(vrow);
     v.appendChild(fbar);
 
-    var visible = entries.filter(function (e) {
-      if (w.mapHide.types[e.type]) return false;
-      var eObraIds = wbWorksOf(e).map(function (o) { return o.id; });
-      if (eObraIds.length && eObraIds.every(function (id) { return w.mapHide.fr[id]; })) return false;
-      return true;
-    });
-
     var card = el("div", { class: "card", style: "padding:0;overflow:hidden" });
     if (!visible.length) {
       card.appendChild(el("div", { class: "empty", style: "padding:40px 16px", text: entries.length ? "Nada visível com esses filtros." : "Universo vazio. Crie a primeira entrada." }));
     } else {
       var host = el("div", { class: "wb-graph-host" });
       card.appendChild(host);
-      var vis = {}; visible.forEach(function (e) { vis[e.id] = 1; });
-      var nodes = visible.map(function (e) {
-        var eObras = wbWorksOf(e);
-        var col = colorBy === "franquia" ? ((eObras[0] && !w.mapHide.fr[eObras[0].id]) ? franchiseColor(eObras[0].id) : "var(--faint)") : typeColor(e.type);
-        return { id: e.id, label: wbDisplayName(e), color: col, r: 19, x: e.x, y: e.y, kind: "entry", ref: e, group: colorBy === "franquia" ? ((eObras[0] && eObras[0].id) || "—") : e.type };
-      });
-      var edges = [], localCands = {}, portalSeen = {};
-      visible.forEach(function (e) {
-        (e.links || []).forEach(function (lk) {
-          var target = wbEntry(lk.to);
-          if (!target) return;
-          if (target.universeId === uniId) {
-            if (!vis[target.id]) return;
-            var key = [e.id, lk.to].sort().join("|");
-            var pr = labelPriority(lk.label);
-            if (!localCands[key] || pr < localCands[key].priority) {
-              localCands[key] = { from: e.id, to: lk.to, label: lk.label || "", style: linkStyleOf(lk.label), priority: pr };
-            }
-          } else {
-            var pid = "portal:" + lk.to;
-            if (!portalSeen[pid]) {
-              nodes.push({ id: pid, label: wbDisplayName(target) + " ↗", color: flowerById(target.universeId).color, r: 14, kind: "portal", ref: target });
-              portalSeen[pid] = 1;
-            }
-            edges.push({ from: e.id, to: pid, label: lk.label || "", style: linkStyleOf(lk.label) });
-          }
-        });
-      });
-      Object.keys(localCands).forEach(function (k) { edges.push(localCands[k]); });
-      var legendGroups = {};
-      nodes.forEach(function (n) { if (n.kind === "entry") legendGroups[n.group] = n.color; });
-      var legendGroups2 = legendGroups;
       setTimeout(function () {
         createGraph(host, {
-          nodes: nodes, edges: edges, focusId: w.mapExplore ? (w.mapFocus || null) : null, legend: legendGroups2,
+          nodes: nodes, edges: edges, hubGravity: 0.02,
+          focusId: w.mapHighlight || (w.mapExplore ? (w.mapFocus || null) : null),
+          centerOn: w.mapHighlight || null,
+          legend: legendGroups,
           onNode: function (id) {
+            if (id.indexOf("cluster:") === 0) return;
             if (id.indexOf("portal:") === 0) { var t = wbEntry(id.slice(7)); if (t) wbOpen(t); return; }
             var e = wbEntry(id);
             if (!e) return;
             if (w.mapExplore) wbGo({ mapFocus: id });
             else wbOpen(e);
           },
-          clearFocus: function () { if (w.mapExplore && w.mapFocus) wbGo({ mapFocus: null }); },
+          clearFocus: function () {
+            if (w.mapHighlight) { w.mapHighlight = null; render(); return; }
+            if (w.mapExplore && w.mapFocus) wbGo({ mapFocus: null });
+          },
           onDblCanvas: function (pt) { wbNewEntry(uniId, Math.round(pt.x), Math.round(pt.y)); },
           persist: function () { save(); }
         });
@@ -3459,10 +3178,16 @@
         var bar = el("div", { class: "hint", style: "margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px;border:1px solid var(--border-strong);border-radius:var(--radius-sm)" });
         bar.appendChild(el("span", { text: n + " selecionada(s)" }));
         bar.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "excluir", onclick: function () {
-          if (!window.confirm("Excluir " + n + " entrada(s)? Isso não pode ser desfeito.")) return;
           var ids = Object.keys(sel);
+          var entriesSnap = clone(C().entries), recentSnap = clone(C().recent);
+          // Igual à exclusão de uma entrada só: tira dos links de quem apontava pra elas, zera
+          // parentId de quem era filho — faltava isso aqui antes, deixava link quebrado/parentId
+          // órfão só na exclusão em massa (a de uma entrada só já fazia essa limpeza).
+          C().entries.forEach(function (x) { x.links = (x.links || []).filter(function (l) { return ids.indexOf(l.to) === -1; }); if (ids.indexOf(x.parentId) !== -1) x.parentId = null; });
           C().entries = C().entries.filter(function (x) { return ids.indexOf(x.id) === -1; });
+          C().recent = C().recent.filter(function (id) { return ids.indexOf(id) === -1; });
           sel = {}; save(); renderList();
+          wbUndoToast(ids.length + " entrada(s) excluída(s).", function () { C().entries = entriesSnap; C().recent = recentSnap; });
         } }));
         var statusSel = el("select", { class: "field", style: "padding:3px 6px;font-size:12px" },
           [el("option", { value: "", text: "mudar estado…" })].concat(ENTRY_STATUS.map(function (s) { return el("option", { value: s.id, text: s.glyph + " " + s.label }); })));
@@ -3653,17 +3378,18 @@
   }
 
   function wbConsistenciaView(v, uniId) {
-    var issues = wbIssues(uniId);
+    var groups = wbIssuesByEntry(uniId);
     var card = el("div", { class: "card" });
-    card.appendChild(sectionLabel("Consistência — " + issues.length));
-    if (!issues.length) card.appendChild(el("div", { class: "empty", text: "Tudo em ordem por aqui. ✨" }));
-    issues.forEach(function (it) {
+    card.appendChild(sectionLabel("Consistência — " + groups.length));
+    card.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Varredura automática só pra te avisar de coisas fáceis de deixar passar: ligações quebradas, menções [[assim]] sem entrada correspondente, entradas sem resumo, ou soltas sem nenhuma ligação. Não é obrigatório resolver nada disso — é só um lembrete." }));
+    if (!groups.length) card.appendChild(el("div", { class: "empty", text: "Tudo em ordem por aqui. ✨" }));
+    groups.forEach(function (g) {
       card.appendChild(el("div", { class: "row" }, [
         el("div", { class: "row-body" }, [
-          el("div", { class: "row-title", text: wbDisplayName(it.e) }),
-          el("div", { class: "row-meta", style: "color:var(--warn)", text: it.msg })
+          el("div", { class: "row-title", text: wbDisplayName(g.e) }),
+          el("div", { class: "row-meta", style: "color:var(--warn)", text: g.msgs.join(" · ") })
         ]),
-        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(it.e); } })
+        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(g.e); } })
       ]));
     });
     v.appendChild(card);
@@ -3935,11 +3661,26 @@
       spousesOf(s).forEach(function (cunhado) { wbLinkPair(en, cunhado, "cunhado(a) de", "cunhado(a) de"); });
     });
   }
+  // Onde esta entrada aparece "na história" — cenas (elenco OU local da cena, que antes não
+  // contava aqui, só o elenco) e sessões de campanha (via sx.present, incluindo a nota de como
+  // apareceu — "mencionado", "em espírito" etc. — já que o dado existe desde a reforma de
+  // aparições em sessão, só nunca tinha um caminho de volta pra cá).
   function wbAppearsIn(e) {
     var out = [];
     wbFranchisesOf(e.universeId).forEach(function (fr) {
       (fr.seasons || []).forEach(function (se) {
-        (se.scenes || []).forEach(function (sc) { if ((sc.entryIds || []).indexOf(e.id) !== -1) out.push({ fr: fr, se: se, sc: sc }); });
+        (se.scenes || []).forEach(function (sc) {
+          var asCast = (sc.entryIds || []).indexOf(e.id) !== -1, asLocal = sc.locationId === e.id;
+          if (asCast || asLocal) out.push({ kind: "cena", fr: fr, se: se, sc: sc, asCast: asCast, asLocal: asLocal });
+        });
+      });
+    });
+    wbCampaignsOf(e.universeId).forEach(function (cp) {
+      (cp.seasons || []).forEach(function (se) {
+        (se.sessions || []).forEach(function (sx) {
+          var p = (sx.present || []).filter(function (x) { return x.id === e.id; })[0];
+          if (p) out.push({ kind: "sessao", cp: cp, se: se, sx: sx, note: p.note });
+        });
       });
     });
     return out;
@@ -3950,12 +3691,13 @@
       if (x.id === e.id) return false;
       if ((x.links || []).some(function (l) { return l.to === e.id; })) return true;
       if (re.test(x.body || "")) return true;
-      return (x.sections || []).some(function (s) { return re.test(s.body || ""); });
+      if ((x.sections || []).some(function (s) { return re.test(s.body || ""); })) return true;
+      return (x.posts || []).some(function (p) { return re.test(p.body || ""); });
     });
   }
 
   function wbWordCount(e) {
-    var t = (e.summary || "") + " " + (e.body || "") + " " + (e.sections || []).map(function (s) { return s.body; }).join(" ");
+    var t = (e.summary || "") + " " + (e.body || "") + " " + (e.sections || []).map(function (s) { return s.body; }).join(" ") + " " + (e.posts || []).map(function (p) { return p.body; }).join(" ");
     var m = t.replace(/[#*_>`~\[\]()|-]/g, " ").match(/\S+/g);
     return m ? m.length : 0;
   }
@@ -4184,7 +3926,11 @@
         head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Wiki: " + visInfo(sec.vis).label + " (toque p/ mudar)", text: visInfo(sec.vis).glyph, onclick: function () { sec.vis = nextVis(sec.vis); touch(true); } }));
         head.appendChild(el("button", { class: "wb-ord", type: "button", text: "▲", disabled: idx === 0 ? "disabled" : null, onclick: function () { var t = e.sections[idx - 1]; e.sections[idx - 1] = sec; e.sections[idx] = t; touch(true); } }));
         head.appendChild(el("button", { class: "wb-ord", type: "button", text: "▼", disabled: idx === e.sections.length - 1 ? "disabled" : null, onclick: function () { var t = e.sections[idx + 1]; e.sections[idx + 1] = sec; e.sections[idx] = t; touch(true); } }));
-        head.appendChild(delBtn(function () { if (window.confirm("Remover esta seção?")) { e.sections.splice(idx, 1); touch(true); } }));
+        head.appendChild(delBtn(function () {
+          var removedSec = sec;
+          e.sections.splice(idx, 1); touch(true);
+          wbUndoToast("Seção removida.", function () { e.sections.splice(idx, 0, removedSec); });
+        }));
       }
       host.appendChild(head);
       if (!opts.ro && sec.vis === "restrito") host.appendChild(wbAllowEditor(sec.allow, touch));
@@ -4218,8 +3964,73 @@
       } }));
     }
   }
+  // Posts datados — mesma casca visual/interativa de wbRenderSections (mesmo "wb-sec", mesmo
+  // ciclo de visibilidade, mesmo editor inline), só que ordenados por data (mais recente
+  // primeiro) em vez de reordenáveis à mão — a ordem é o próprio ponto de ter data.
+  function wbRenderPosts(card, e, opts) {
+    var touch = opts.touch;
+    var sorted = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    sorted.forEach(function (post) {
+      if (opts.hideSecret && post.vis === "mestre") return;
+      var host = el("div", { class: "wb-sec" + (wbVisBgClass(post.vis, "wb-sec") ? " " + wbVisBgClass(post.vis, "wb-sec") : "") });
+      var head = el("div", { class: "wb-sec-head" });
+      if (!opts.ro) {
+        var di = el("input", { class: "field", type: "date", value: post.date || "", style: "width:auto;padding:4px 8px" });
+        // touch(false) de propósito (não re-renderiza) — um touch(true) aqui reconstrói a lista
+        // ordenada por data NO MEIO da interação com o <input type=date>, fechando o seletor
+        // nativo a cada passo (mesmo bug já corrigido antes na data de sessão de campanha).
+        di.addEventListener("change", function () { post.date = di.value; touch(false); });
+        head.appendChild(di);
+      } else {
+        head.appendChild(el("span", { class: "wb-lfield-lab", text: post.date || "" }));
+      }
+      if (opts.ro) head.appendChild(el("h3", { text: post.title || "(sem título)" }));
+      else head.appendChild(editable({ tag: "h3", value: post.title, placeholder: "Título do post", commit: function (nv) { post.title = nv.trim(); touch(false); } }));
+      if (post.vis !== "publico") head.appendChild(el("span", { class: wbVisMarkClass(post.vis), text: visInfo(post.vis).glyph }));
+      if (!opts.ro) {
+        head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Recolher", text: post.collapsed ? "▸" : "▾", onclick: function () { post.collapsed = !post.collapsed; touch(true); } }));
+        head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Wiki: " + visInfo(post.vis).label + " (toque p/ mudar)", text: visInfo(post.vis).glyph, onclick: function () { post.vis = nextVis(post.vis); touch(true); } }));
+        head.appendChild(delBtn(function () {
+          var removedPost = post;
+          e.posts = e.posts.filter(function (x) { return x.id !== post.id; }); touch(true);
+          wbUndoToast("Post removido.", function () { e.posts.push(removedPost); });
+        }));
+      }
+      host.appendChild(head);
+      if (!opts.ro && post.vis === "restrito") host.appendChild(wbAllowEditor(post.allow, touch));
+      if (!post.collapsed) {
+        if (opts.hideSecret && post.vis === "spoiler") {
+          host.appendChild(wbSpoilerCover(function () { var d = el("div", { class: "wb-prose" }); d.appendChild(renderMarkdown(post.body)); return d; }));
+        } else if (opts.hideSecret && post.vis === "restrito") {
+          host.appendChild(wbRestritoPlaceholder(post.allow));
+        } else {
+          var bw = el("div");
+          function showBody() {
+            bw.className = "wb-prose"; bw.textContent = ""; bw.onclick = null;
+            if (post.body) bw.appendChild(renderMarkdown(post.body));
+            else if (!opts.ro) bw.appendChild(el("span", { class: "ie placeholder", tabindex: "0", role: "button", text: "Escrever…" }));
+            if (!opts.ro) bw.onclick = function (ev) {
+              if (ev.target.closest && (ev.target.closest(".wl") || ev.target.closest("a[href]") || ev.target.closest(".wb-img") || ev.target.closest(".wb-task-box"))) return;
+              bw.className = ""; bw.textContent = ""; bw.onclick = null;
+              bw.appendChild(mdEditorUI(post.body || "", function (val) { post.body = val; touch(false); }, { uniId: e.universeId, minHeight: "20vh", onExit: showBody }));
+            };
+          }
+          showBody();
+          host.appendChild(bw);
+        }
+      }
+      card.appendChild(host);
+    });
+    if (!opts.ro) {
+      card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ post", style: "margin-top:12px", onclick: function () {
+        if (!Array.isArray(e.posts)) e.posts = [];
+        e.posts.push({ id: uid(), title: "", date: todayKey(), body: "", vis: "publico", allow: [], collapsed: false });
+        touch(true);
+      } }));
+    }
+  }
   function wbUnlinkedMentions(e) {
-    var text = ((e.body || "") + "\n" + (e.sections || []).map(function (s) { return s.body || ""; }).join("\n")).toLowerCase();
+    var text = ((e.body || "") + "\n" + (e.sections || []).map(function (s) { return s.body || ""; }).join("\n") + "\n" + (e.posts || []).map(function (p) { return p.body || ""; }).join("\n")).toLowerCase();
     var linked = {};
     (e.links || []).forEach(function (l) { linked[l.to] = 1; });
     var out = [];
@@ -4259,6 +4070,9 @@
     var sections = (e.sections || []).filter(function (s) { return okVis(s.vis, s.allow); }).map(function (s) {
       return { title: s.title || "", body: s.body || "", vis: outVis(s.vis) };
     });
+    var posts = (e.posts || []).filter(function (p) { return okVis(p.vis, p.allow); }).map(function (p) {
+      return { title: p.title || "", date: p.date || "", body: p.body || "", vis: outVis(p.vis) };
+    }).sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
     var gallery = (e.gallery || []).filter(function (g) { return okVis(g.vis, g.allow) && g.url; }).map(function (g) {
       return { group: g.group || "", url: g.url, caption: g.caption || "", vis: outVis(g.vis) };
     });
@@ -4287,6 +4101,7 @@
       coverVis: outVis(e.coverVis),
       fields: fields,
       sections: sections,
+      posts: posts,
       gallery: gallery,
       variants: variants,
       links: wbWikiLinks(e),
@@ -4341,6 +4156,7 @@
       return { key: k, type: fm.type, value: e.fields[k] || "", vis: "publico", opts: fm.opts || [] };
     });
     var sections = (e.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
+    var posts = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).map(function (p) { return { title: p.title || "", date: p.date || "", body: p.body || "", vis: "publico" }; });
     var gallery = (e.gallery || []).filter(function (g) { return g.url; }).map(function (g) { return { group: g.group || "", url: g.url, caption: g.caption || "", vis: "publico" }; });
     var links = (e.links || []).map(function (lk) {
       var t = wbEntry(lk.to);
@@ -4366,6 +4182,7 @@
       coverVis: "publico",
       fields: fields,
       sections: sections,
+      posts: posts,
       gallery: gallery,
       variants: variants,
       links: links,
@@ -4419,6 +4236,9 @@
     });
     (e.sections || []).forEach(function (s) {
       if (s.vis === "restrito") items.push({ id: "secao-" + s.id, kind: "secao", title: s.title || "", body: s.body || "", permitidos: s.allow || [] });
+    });
+    (e.posts || []).forEach(function (p) {
+      if (p.vis === "restrito") items.push({ id: "post-" + p.id, kind: "post", title: p.title || "", date: p.date || "", body: p.body || "", permitidos: p.allow || [] });
     });
     (e.tags || []).forEach(function (t) {
       var v = e.tagVis[t] || {};
@@ -4527,6 +4347,7 @@
     var parts = [snap.title, (snap.aliases || []).map(function (a) { return a.text; }).join(" "), snap.summary, snap.body];
     (snap.fields || []).forEach(function (f) { parts.push(f.value); });
     (snap.sections || []).forEach(function (s) { parts.push(s.title, s.body); });
+    (snap.posts || []).forEach(function (p) { parts.push(p.title, p.body); });
     (snap.variants || []).forEach(function (v) {
       parts.push(v.label, v.summary, v.body);
       (v.fields || []).forEach(function (f) { parts.push(f.value); });
@@ -4608,6 +4429,12 @@
       lines.push("## " + k, e.fields[k], "");
     });
     (e.sections || []).forEach(function (s) { lines.push("## " + (s.title || "Seção"), s.body || "", ""); });
+    if ((e.posts || []).length) {
+      lines.push("## Posts", "");
+      e.posts.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).forEach(function (p) {
+        lines.push("### " + (p.date || "") + (p.title ? " — " + p.title : ""), p.body || "", "");
+      });
+    }
     (e.variants || []).forEach(function (variant) {
       lines.push("## Aba: " + (variant.label || "Versão"), "");
       if (variant.summary) lines.push("> " + variant.summary, "");
@@ -4775,7 +4602,7 @@
   function wbEntrySnapshot(e) {
     return clone({
       title: e.title, aliases: e.aliases, dispAlias: e.dispAlias, summary: e.summary, body: e.body,
-      fields: e.fields, fieldMeta: e.fieldMeta, sections: e.sections,
+      fields: e.fields, fieldMeta: e.fieldMeta, sections: e.sections, posts: e.posts,
       tags: e.tags, tagVis: e.tagVis, aliasVis: e.aliasVis,
       gallery: e.gallery, cover: e.cover, coverVis: e.coverVis, coverAllow: e.coverAllow,
       variants: e.variants
@@ -4797,6 +4624,109 @@
     Object.keys(snap).forEach(function (k) { e[k] = snap[k]; });
     touch(true);
   }
+  // Diff linha-a-linha (LCS) — o histórico só mostrava título+resumo da época, sem dizer o que
+  // de fato tinha mudado. Trabalha em linhas/parágrafos (não palavras): mais barato de computar
+  // e mais legível pra prosa longa que um diff por palavra deixaria picotado.
+  function wbDiffLines(oldStr, newStr) {
+    var a = String(oldStr || "").split("\n"), b = String(newStr || "").split("\n");
+    var n = a.length, m = b.length;
+    var dp = new Array(n + 1);
+    for (var i = 0; i <= n; i++) dp[i] = new Array(m + 1).fill(0);
+    for (i = n - 1; i >= 0; i--) for (var j = m - 1; j >= 0; j--) dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    var out = []; i = 0; var jj = 0;
+    while (i < n && jj < m) {
+      if (a[i] === b[jj]) { out.push({ t: "same", text: a[i] }); i++; jj++; }
+      else if (dp[i + 1][jj] >= dp[i][jj + 1]) { out.push({ t: "del", text: a[i] }); i++; }
+      else { out.push({ t: "add", text: b[jj] }); jj++; }
+    }
+    while (i < n) { out.push({ t: "del", text: a[i] }); i++; }
+    while (jj < m) { out.push({ t: "add", text: b[jj] }); jj++; }
+    return out;
+  }
+  // Só mostra linhas iguais quando estão a até 2 linhas de distância de uma mudança de verdade —
+  // senão um corpo de texto longo com uma frase alterada no meio vira uma parede inteira de
+  // linhas repetidas só pra achar a diferença.
+  function wbDiffBlock(oldStr, newStr) {
+    var lines = wbDiffLines(oldStr, newStr);
+    if (lines.every(function (l) { return l.t === "same"; })) return null;
+    var CTX = 2;
+    var keep = lines.map(function () { return false; });
+    lines.forEach(function (l, idx) {
+      if (l.t !== "same") for (var k = Math.max(0, idx - CTX); k <= Math.min(lines.length - 1, idx + CTX); k++) keep[k] = true;
+    });
+    var wrap = el("div", { class: "wb-diff" });
+    var i = 0;
+    while (i < lines.length) {
+      if (lines[i].t === "same" && !keep[i]) {
+        var start = i;
+        while (i < lines.length && lines[i].t === "same" && !keep[i]) i++;
+        wrap.appendChild(el("div", { class: "wb-diff-skip", text: "⋯ " + (i - start) + " linha(s) iguais ⋯" }));
+      } else {
+        var l = lines[i];
+        var cls = l.t === "add" ? "wb-diff-add" : l.t === "del" ? "wb-diff-del" : "wb-diff-same";
+        var prefix = l.t === "add" ? "+ " : l.t === "del" ? "− " : "";
+        wrap.appendChild(el("div", { class: cls, text: prefix + (l.text || " ") }));
+        i++;
+      }
+    }
+    return wrap;
+  }
+  // Resumo de tudo que mudou entre um snapshot antigo e a entrada atual: bolinhas curtas pra
+  // mudanças estruturais (título, tags, campos, contagens) e diff de linhas de verdade pra
+  // resumo/descrição/corpo de seção/corpo de post — casando seções e posts pelo `id`, não pela
+  // posição no array, então reordenar não aparece como "removido e recriado".
+  function wbEntryDiffSummary(oldSnap, e) {
+    var wrap = el("div", { class: "wb-vdiff" });
+    var bits = [];
+    if ((oldSnap.title || "") !== (e.title || "")) bits.push("título: “" + (oldSnap.title || "—") + "” → “" + (e.title || "—") + "”");
+    function setDiff(oldArr, newArr, label, fmt) {
+      oldArr = oldArr || []; newArr = newArr || [];
+      var added = newArr.filter(function (x) { return oldArr.indexOf(x) === -1; });
+      var removed = oldArr.filter(function (x) { return newArr.indexOf(x) === -1; });
+      if (added.length) bits.push(label + " adicionado(s): " + added.map(fmt || function (x) { return x; }).join(", "));
+      if (removed.length) bits.push(label + " removido(s): " + removed.map(fmt || function (x) { return x; }).join(", "));
+    }
+    setDiff(oldSnap.aliases, e.aliases, "apelido");
+    setDiff(oldSnap.tags, e.tags, "tag", function (t) { return "#" + t; });
+    if ((oldSnap.cover || "") !== (e.cover || "")) bits.push("capa mudou");
+    var oldFieldKeys = Object.keys(oldSnap.fields || {}), newFieldKeys = Object.keys(e.fields || {});
+    var addedF = newFieldKeys.filter(function (k) { return oldFieldKeys.indexOf(k) === -1; });
+    var removedF = oldFieldKeys.filter(function (k) { return newFieldKeys.indexOf(k) === -1; });
+    var changedF = newFieldKeys.filter(function (k) { return oldFieldKeys.indexOf(k) !== -1 && (oldSnap.fields[k] || "") !== (e.fields[k] || ""); });
+    if (addedF.length) bits.push("campo(s) novo(s): " + addedF.join(", "));
+    if (removedF.length) bits.push("campo(s) removido(s): " + removedF.join(", "));
+    var oldGal = oldSnap.gallery || [], newGal = e.gallery || [];
+    if (oldGal.length !== newGal.length) bits.push("galeria: " + oldGal.length + " → " + newGal.length + " imagem(ns)");
+    var oldVar = oldSnap.variants || [], newVar = e.variants || [];
+    if (oldVar.length !== newVar.length) bits.push("variantes: " + oldVar.length + " → " + newVar.length);
+    if (bits.length) wrap.appendChild(el("ul", { class: "wb-diff-bits" }, bits.map(function (b) { return el("li", { text: b }); })));
+
+    function textDiff(label, a, b) {
+      if ((a || "") === (b || "")) return;
+      wrap.appendChild(el("div", { class: "wb-diff-lab", text: label }));
+      var d = wbDiffBlock(a, b); if (d) wrap.appendChild(d);
+    }
+    textDiff("Resumo", oldSnap.summary, e.summary);
+    textDiff("Descrição", oldSnap.body, e.body);
+    changedF.forEach(function (k) { textDiff("Campo: " + k, oldSnap.fields[k], e.fields[k]); });
+
+    function matchedDiff(oldList, newList, kindLabel) {
+      oldList = oldList || []; newList = newList || [];
+      var oldById = {}; oldList.forEach(function (x) { oldById[x.id] = x; });
+      var newById = {}; newList.forEach(function (x) { newById[x.id] = x; });
+      oldList.forEach(function (x) { if (!newById[x.id]) wrap.appendChild(el("div", { class: "wb-diff-lab", text: kindLabel + " removido(a): " + (x.title || x.date || kindLabel) })); });
+      newList.forEach(function (x) {
+        var old = oldById[x.id];
+        if (!old) { wrap.appendChild(el("div", { class: "wb-diff-lab", text: kindLabel + " novo(a): " + (x.title || x.date || kindLabel) })); return; }
+        if (old.title !== x.title || old.body !== x.body || old.date !== x.date) textDiff(kindLabel + ": " + (x.title || old.title || x.date || kindLabel), old.body, x.body);
+      });
+    }
+    matchedDiff(oldSnap.sections, e.sections, "Seção");
+    matchedDiff(oldSnap.posts, e.posts, "Post");
+
+    if (!wrap.childNodes.length) wrap.appendChild(el("div", { class: "empty", text: "Nada de conteúdo mudou desde essa versão." }));
+    return wrap;
+  }
   function wbHistoryModal(e, touch) {
     var root = document.getElementById("modalRoot");
     var m = el("div", { class: "modal-wrap", onclick: function (ev) { if (ev.target === m) root.innerHTML = ""; } });
@@ -4808,16 +4738,24 @@
     list.forEach(function (v) {
       var d = new Date(v.ts);
       var label = d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      var diffPanel = el("div", { style: "margin:0 0 10px" });
+      var diffBtn = el("button", { class: "btn ghost sm", type: "button", text: "ver mudanças", onclick: function () {
+        if (diffPanel.childNodes.length) { diffPanel.textContent = ""; diffBtn.textContent = "ver mudanças"; return; }
+        diffPanel.appendChild(wbEntryDiffSummary(v.snap, e));
+        diffBtn.textContent = "ocultar mudanças";
+      } });
       box.appendChild(el("div", { class: "row" }, [
         el("div", { class: "row-body" }, [
           el("div", { class: "row-title", text: label }),
           el("div", { class: "row-meta", text: (v.snap.title || "(sem título)") + (v.snap.summary ? " · " + v.snap.summary.slice(0, 60) : "") })
         ]),
+        diffBtn,
         el("button", { class: "btn ghost sm", type: "button", text: "restaurar", onclick: function () {
           wbRestoreVersion(e, v, touch);
           root.innerHTML = "";
         } })
       ]));
+      box.appendChild(diffPanel);
     });
     box.appendChild(el("div", { class: "modal-actions" }, [
       el("button", { class: "btn ghost", type: "button", text: "Fechar", onclick: function () { root.innerHTML = ""; } })
@@ -5084,11 +5022,19 @@
         });
         card.appendChild(grid);
       });
+      // pickImage() PRIMEIRO, prompt() do grupo só depois de já ter a imagem — nessa ordem, o
+      // clique no input de arquivo é sempre a reação direta e síncrona ao toque do usuário no
+      // botão. Invertido (como estava), o prompt() nativo consumia esse "gesto do usuário" no
+      // meio do caminho — em boa parte dos navegadores baseados em WebKit (Safari e, por
+      // tabela, todo navegador no iPhone) isso faz o seletor de arquivo simplesmente não abrir,
+      // sem erro nenhum: exatamente o "digitei o nome e não deixou escolher imagem" reportado.
       if (!ro) card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ imagem na galeria", onclick: function () {
-        var lastGroup = e.gallery.length ? e.gallery[e.gallery.length - 1].group : "";
-        var grp = window.prompt("Grupo (ex: Primeira Temporada) — deixe em branco pra 'Geral':", lastGroup || "");
-        if (grp == null) return;
-        pickImage(function (url) { e.gallery.push({ id: uid(), group: grp.trim(), url: url, caption: "", vis: "publico", allow: [] }); touch(true); });
+        pickImage(function (url) {
+          var lastGroup = e.gallery.length ? e.gallery[e.gallery.length - 1].group : "";
+          var grp = window.prompt("Grupo (ex: Primeira Temporada) — deixe em branco pra 'Geral':", lastGroup || "");
+          if (grp == null) return;
+          e.gallery.push({ id: uid(), group: grp.trim(), url: url, caption: "", vis: "publico", allow: [] }); touch(true);
+        });
       } }));
     }
 
@@ -5145,6 +5091,15 @@
     if (e.events.length) evFoot.appendChild(el("button", { class: "link", type: "button", text: "ver linha do tempo de " + f.name + " →", onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: "tempo" }); } }));
     if (evFoot.childNodes.length) card.appendChild(evFoot);
 
+    // posts datados (diário livre, tipo Kanka — não fazem parte da linha do tempo do MUNDO,
+    // são anotações soltas sobre esta entrada especificamente, cada uma com sua própria data)
+    if (!Array.isArray(e.posts)) e.posts = [];
+    if (e.posts.length || !ro) {
+      card.appendChild(cat("Posts", "Posts"));
+      if (!ro && !e.posts.length) card.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Anotações datadas soltas sobre esta entrada — não entram na linha do tempo do mundo." }));
+      wbRenderPosts(card, e, { hideSecret: hideSecret, ro: ro, touch: touch });
+    }
+
     // obras (franquias + campanhas — campanha é um tipo de obra; cada temporada tem seu próprio elenco)
     var frs = wbFranchisesOf(e.universeId);
     var uCamps = wbCampaignsOf(e.universeId);
@@ -5199,6 +5154,13 @@
       ].forEach(function (n) { if (n) card.appendChild(n); });
       card.appendChild(wbFamilyTree(e, fam));
     }
+
+    // grafo de relações — todas as ligações desta entrada (família incluída) num mini-diagrama
+    // em estrela, centrado nela. Distinto do mapa do universo inteiro (aquele mostra tudo de
+    // uma vez); aqui é só o que toca esta entrada, direto na própria página, sem precisar ir
+    // pro mapa e usar "explorar conexões".
+    var relGraph = wbEntryRelGraph(e);
+    if (relGraph) { card.appendChild(cat("Grafo de relações")); card.appendChild(relGraph); }
 
     // ligações (editável)
     if ((e.links || []).length || !ro) card.appendChild(cat("Ligações", "Ligações"));
@@ -5264,10 +5226,26 @@
     var apps = wbAppearsIn(e);
     if (apps.length) {
       card.appendChild(cat("Aparece em"));
-      apps.forEach(function (a) { card.appendChild(el("div", { class: "row wb-rel" }, [
-        el("div", { class: "row-body" }, [el("div", { class: "row-title", style: "font-size:14px", text: a.sc.title || "(cena)" }), el("div", { class: "row-meta", text: a.fr.name + (a.fr.seasons.length > 1 ? " · " + a.se.name : "") })]),
-        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "scene", frId: a.fr.id, seasonId: a.se.id, sceneId: a.sc.id, uniId: e.universeId }); } })
-      ])); });
+      apps.forEach(function (a) {
+        if (a.kind === "cena") {
+          var roleBits = []; if (a.asLocal) roleBits.push("local"); if (a.asCast) roleBits.push("elenco");
+          card.appendChild(el("div", { class: "row wb-rel" }, [
+            el("div", { class: "row-body" }, [
+              el("div", { class: "row-title", style: "font-size:14px", text: a.sc.title || "(cena)" }),
+              el("div", { class: "row-meta", text: a.fr.name + (a.fr.seasons.length > 1 ? " · " + a.se.name : "") + (roleBits.length ? " · " + roleBits.join(", ") : "") })
+            ]),
+            el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "scene", frId: a.fr.id, seasonId: a.se.id, sceneId: a.sc.id, uniId: e.universeId }); } })
+          ]));
+        } else {
+          card.appendChild(el("div", { class: "row wb-rel" }, [
+            el("div", { class: "row-body" }, [
+              el("div", { class: "row-title", style: "font-size:14px", text: (a.sx.title || "Sessão") + (a.sx.date ? " · " + a.sx.date : "") }),
+              el("div", { class: "row-meta", text: a.cp.name + ((a.cp.seasons || []).length > 1 ? " · " + a.se.name : "") + (a.note ? " · " + a.note : "") })
+            ]),
+            el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "campaignSeason", campId: a.cp.id, seasonId: a.se.id, uniId: e.universeId, seasonTab: "sessoes" }); } })
+          ]));
+        }
+      });
     }
 
     var qs = C().quotes.filter(function (q) { return q.speakerId === e.id; });
@@ -5322,11 +5300,12 @@
       el("div", {}, [el("label", { class: "flab", text: "Dentro de" }), parCombo])
     ]));
     det.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "Excluir entrada", style: "color:var(--neg);border-color:var(--neg);margin-top:12px", onclick: function () {
-      if (!window.confirm("Excluir esta entrada?")) return;
+      var entriesSnap = clone(C().entries), recentSnap = clone(C().recent);
       C().entries.forEach(function (x) { x.links = (x.links || []).filter(function (l) { return l.to !== e.id; }); if (x.parentId === e.id) x.parentId = null; });
       C().entries = C().entries.filter(function (x) { return x.id !== e.id; });
       C().recent = C().recent.filter(function (id) { return id !== e.id; });
       save(); wbGo({ view: "universe", uniId: e.universeId });
+      wbUndoToast("Entrada excluída.", function () { C().entries = entriesSnap; C().recent = recentSnap; });
     } }));
     card.appendChild(det);
     }
@@ -5344,10 +5323,12 @@
           var n = document.getElementById(t.id); if (n) n.scrollIntoView({ behavior: "smooth", block: "start" });
         } }));
       });
-      if ((e.sections || []).length) {
-        var anyOpen = e.sections.some(function (s) { return !s.collapsed; });
+      if ((e.sections || []).length || (e.posts || []).length) {
+        var anyOpen = e.sections.some(function (s) { return !s.collapsed; }) || (e.posts || []).some(function (p) { return !p.collapsed; });
         toc.appendChild(el("button", { type: "button", text: anyOpen ? "▾ recolher" : "▸ abrir", onclick: function () {
-          e.sections.forEach(function (s) { s.collapsed = anyOpen; }); touch(true);
+          e.sections.forEach(function (s) { s.collapsed = anyOpen; });
+          (e.posts || []).forEach(function (p) { p.collapsed = anyOpen; });
+          touch(true);
         } }));
       }
       v.appendChild(toc);
@@ -5362,9 +5343,19 @@
       el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
     ]);
   }
+  // Genealogia visual: agora 5 gerações (avós/pais/EU+irmãos+cônjuge/filhos/netos), não só
+  // pais+filhos. Avós/netos ficam tracejados (mesma convenção visual do mapa pra "relação mais
+  // distante"); irmãos/meio-irmãos ficam à esquerda do próprio nó e cônjuge(s) à direita, sem
+  // empurrar a árvore pra um layout de organograma completo (que exigiria saber qual avô é pai
+  // de qual pai — dado que a árvore não guarda essa associação, só a lista achatada).
   function wbFamilyTree(e, fam) {
-    if (!fam.parents.length && !fam.children.length) return el("span");
-    var W = 460, H = 150, cx = W / 2;
+    var sibs = fam.siblings.concat(fam.halfSiblings);
+    var hasAny = fam.parents.length || fam.children.length || fam.grandparents.length || fam.grandchildren.length || sibs.length || fam.spouses.length;
+    if (!hasAny) return el("span");
+    var selfRowN = 1 + sibs.length + fam.spouses.length;
+    var maxRowN = Math.max(fam.grandparents.length, fam.parents.length, selfRowN, fam.children.length, fam.grandchildren.length, 1);
+    var W = Math.max(460, maxRowN * 92), cx = W / 2;
+    var GP_Y = 20, P_Y = 82, SELF_Y = 144, C_Y = 206, GC_Y = 264, H = 284;
     var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "wb-famtree", width: "100%" });
     function nodeAt(x, y, label, ent, self) {
       var g = svgEl("g", { transform: "translate(" + x + "," + y + ")" });
@@ -5376,20 +5367,78 @@
       if (ent && !self) g.addEventListener("click", function () { wbOpen(ent); });
       return g;
     }
-    var pn = fam.parents.length;
-    fam.parents.forEach(function (pair, i) {
-      var px = pn === 1 ? cx : (W * 0.28 + i * (W * 0.44 / Math.max(1, pn - 1)));
-      svg.appendChild(svgEl("line", { x1: px, y1: 30, x2: cx, y2: 62, stroke: "var(--border-strong)" }));
-      svg.appendChild(nodeAt(px, 20, wbDisplayName(pair.entry, pair.link.dispAs), pair.entry));
+    function rowXs(n) {
+      if (n <= 0) return [];
+      if (n === 1) return [cx];
+      var span = Math.min(W * 0.86, (n - 1) * 92);
+      var x0 = cx - span / 2;
+      return Array.from({ length: n }, function (_, i) { return x0 + i * (span / (n - 1)); });
+    }
+    function tier(pairs, y, lineFromY, toX, toY, dashed) {
+      var xs = rowXs(pairs.length);
+      pairs.forEach(function (pair, i) {
+        var attrs = { x1: xs[i], y1: lineFromY, x2: toX, y2: toY, stroke: "var(--border-strong)" };
+        if (dashed) attrs["stroke-dasharray"] = "2 3";
+        svg.appendChild(svgEl("line", attrs));
+        svg.appendChild(nodeAt(xs[i], y, wbDisplayName(pair.entry, pair.link.dispAs), pair.entry));
+      });
+    }
+    tier(fam.grandparents, GP_Y, GP_Y + 13, cx, P_Y - 13, true);
+    tier(fam.parents, P_Y, P_Y + 13, cx, SELF_Y - 13, false);
+    var GAP = 78;
+    sibs.forEach(function (pair, i) {
+      var x = cx - GAP * (sibs.length - i);
+      svg.appendChild(svgEl("line", { x1: x, y1: SELF_Y, x2: cx - 26, y2: SELF_Y, stroke: "var(--border-strong)" }));
+      svg.appendChild(nodeAt(x, SELF_Y, wbDisplayName(pair.entry, pair.link.dispAs), pair.entry));
     });
-    svg.appendChild(nodeAt(cx, 75, e.title, e, true));
-    var cn = fam.children.length;
-    fam.children.forEach(function (pair, i) {
-      var cxx = cn === 1 ? cx : (W * 0.14 + i * (W * 0.72 / Math.max(1, cn - 1)));
-      svg.appendChild(svgEl("line", { x1: cx, y1: 88, x2: cxx, y2: 118, stroke: "var(--border-strong)" }));
-      svg.appendChild(nodeAt(cxx, 130, wbDisplayName(pair.entry, pair.link.dispAs), pair.entry));
+    svg.appendChild(nodeAt(cx, SELF_Y, e.title, e, true));
+    fam.spouses.forEach(function (pair, i) {
+      var x = cx + GAP * (i + 1);
+      svg.appendChild(svgEl("line", { x1: cx + 26, y1: SELF_Y, x2: x, y2: SELF_Y, stroke: "var(--border-strong)", "stroke-dasharray": "2 3" }));
+      svg.appendChild(nodeAt(x, SELF_Y, wbDisplayName(pair.entry, pair.link.dispAs), pair.entry));
     });
+    tier(fam.children, C_Y, C_Y - 13, cx, SELF_Y + 13, false);
+    tier(fam.grandchildren, GC_Y, GC_Y - 13, cx, C_Y + 13, true);
     return el("div", { style: "overflow-x:auto;margin-top:6px" }, [svg]);
+  }
+  // Grafo de relações da própria entrada: topologia em estrela (e no centro, um nó por ligação
+  // direta ao redor), reaproveitando o createGraph genérico. Diferente do mapa do universo (que
+  // desenha tudo de uma vez) — aqui é só o que toca ESTA entrada, ligações de saída (e.links) E
+  // de entrada (outras entradas que apontam pra ela, já que um label digitado à mão sem par no
+  // LINK_TYPES não cria o link recíproco automático — então uma ligação de entrada pode existir
+  // sem uma de saída correspondente). Uma entrada de outro universo entra como nó próprio (cor
+  // do universo dela + "↗"), sem o agrupamento por "portal" que o mapa usa pra várias entradas.
+  function wbEntryRelGraph(e) {
+    var neighbors = {};
+    (e.links || []).forEach(function (lk) {
+      var t = wbEntry(lk.to);
+      if (t && !neighbors[t.id]) neighbors[t.id] = { ent: t, label: lk.label || "", style: linkStyleOf(lk.label) };
+    });
+    C().entries.forEach(function (other) {
+      if (other.id === e.id || neighbors[other.id]) return;
+      (other.links || []).forEach(function (lk) {
+        if (lk.to === e.id && !neighbors[other.id]) neighbors[other.id] = { ent: other, label: lk.label || "", style: linkStyleOf(lk.label) };
+      });
+    });
+    var ids = Object.keys(neighbors);
+    if (!ids.length) return null;
+    var nodes = [{ id: e.id, label: wbDisplayName(e), color: typeColor(e.type), r: 19, kind: "entry", x: null, y: null }];
+    var edges = [];
+    ids.forEach(function (id) {
+      var n = neighbors[id], sameUni = n.ent.universeId === e.universeId;
+      var col = sameUni ? typeColor(n.ent.type) : flowerById(n.ent.universeId).color;
+      nodes.push({ id: id, label: wbDisplayName(n.ent) + (sameUni ? "" : " ↗"), color: col, r: 14, kind: "entry", x: null, y: null });
+      edges.push({ from: e.id, to: id, label: n.label, style: n.style });
+    });
+    var host = el("div", { class: "wb-graph-host compact" });
+    setTimeout(function () {
+      createGraph(host, {
+        nodes: nodes, edges: edges,
+        onNode: function (id) { if (id === e.id) return; var t = wbEntry(id); if (t) wbOpen(t); },
+        onDblCanvas: function () {}, persist: function () {}
+      });
+    }, 0);
+    return host;
   }
 
   /* ---- Campaigns (mesas de RPG situadas num universo) ---- */
@@ -5602,12 +5651,29 @@
         box.appendChild(editable({ tag: "div", className: "wb-ev-label", value: sx.title, placeholder: "título da sessão…", commit: function (nv) { sx.title = nv.trim(); touch(false); } }));
         box.appendChild(el("div", { class: "wb-lfield-lab", style: "margin-top:10px", text: "o que rolou" }));
         box.appendChild(mdBox(function () { return sx.recap; }, function (val) { sx.recap = val; touch(false); }, cp.universeId, { placeholder: "Resumo da sessão…", minHeight: "20vh", dropcap: false }));
-        box.appendChild(el("div", { class: "note-tags", style: "margin-top:10px" }, (sx.present || []).map(function (id) {
-          var en = wbEntry(id); if (!en) return null;
-          return el("button", { class: "ntag", type: "button", title: "tirar", text: wbDisplayName(en) + "  ✕", onclick: function () { sx.present = sx.present.filter(function (x) { return x !== id; }); touch(true); } });
-        }).filter(Boolean)));
+        box.appendChild(el("div", { class: "wb-lfield-lab", style: "margin-top:10px", text: "quem / o que apareceu" }));
+        var byType = {};
+        (sx.present || []).forEach(function (p) { var en = wbEntry(p.id); if (en) (byType[en.type] = byType[en.type] || []).push({ en: en, p: p }); });
+        Object.keys(byType).sort().forEach(function (tp) {
+          box.appendChild(el("div", { class: "cathead", style: "margin-top:6px", text: typeTag(tp) }));
+          byType[tp].forEach(function (item) {
+            var en = item.en, p = item.p;
+            box.appendChild(el("div", { class: "row", style: "padding:3px 0" }, [
+              el("div", { class: "row-body" }, [
+                el("div", { class: "row-title", style: "font-size:14px", text: wbDisplayName(en) }),
+                editable({
+                  tag: "div", className: "row-meta", value: p.note,
+                  placeholder: "presente — toque p/ marcar como mencionado, em espírito, na forma de…",
+                  commit: function (nv) { p.note = nv.trim(); touch(false); }
+                })
+              ]),
+              el("button", { class: "link", type: "button", text: "tirar", style: "color:var(--neg)", onclick: function () { sx.present = sx.present.filter(function (x) { return x.id !== p.id; }); touch(true); } })
+            ]));
+          });
+        });
+        if (!(sx.present || []).length) box.appendChild(el("div", { class: "empty", style: "padding:6px 0", text: "Ninguém marcado ainda." }));
         box.appendChild(wbEntryAdder(cp.universeId, function (en) {
-          if ((sx.present || []).indexOf(en.id) === -1) { sx.present = (sx.present || []).concat([en.id]); if (se.roster.indexOf(en.id) === -1) se.roster.push(en.id); touch(true); }
+          if (!(sx.present || []).some(function (p) { return p.id === en.id; })) { sx.present = (sx.present || []).concat([{ id: en.id, note: "" }]); if (se.roster.indexOf(en.id) === -1) se.roster.push(en.id); touch(true); }
         }, "quem apareceu"));
         box.appendChild(el("div", { class: "wb-lfield-lab", style: "margin-top:10px", text: "ganchos / pendências" }));
         box.appendChild(mdBox(function () { return sx.notes; }, function (val) { sx.notes = val; touch(false); }, cp.universeId, { placeholder: "O que ficou em aberto, ideias pra próxima…", minHeight: "16vh", dropcap: false }));
@@ -5732,7 +5798,7 @@
       if (W.wordGoal) {
         var pct = Math.min(100, Math.round(W.wordCount / W.wordGoal * 100));
         var tr = el("div", { class: "bar-track", style: "margin-top:10px" });
-        tr.appendChild(el("div", { class: "bar-fill", style: "width:" + pct + "%;background:var(--dom-criacao)" }));
+        tr.appendChild(el("div", { class: "bar-fill", style: "width:" + pct + "%;background:var(--accent)" }));
         card.appendChild(tr);
         card.appendChild(el("div", { class: "row-meta", style: "margin-top:5px", text: W.wordCount.toLocaleString("pt-BR") + " de " + W.wordGoal.toLocaleString("pt-BR") + " palavras (" + pct + "%)" }));
       } else card.appendChild(el("div", { class: "row-meta", style: "margin-top:8px", text: W.wordCount.toLocaleString("pt-BR") + " palavras no total" }));
@@ -5773,24 +5839,26 @@
       card.appendChild(wbEntryAdder(fr.universeId, function (en) { if (se.roster.indexOf(en.id) === -1) { se.roster.push(en.id); touch(true); } }, "ligar entrada existente"));
     } else if (tab === "cenas") {
       card.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "+ cena", onclick: function () {
-        se.scenes.push({ id: uid(), title: "", synopsis: "", body: "", entryIds: [], status: "rascunho" });
+        se.scenes.push({ id: uid(), title: "", synopsis: "", body: "", entryIds: [], locationId: null, status: "rascunho" });
         save(); wbGo({ view: "scene", frId: fr.id, seasonId: se.id, sceneId: se.scenes[se.scenes.length - 1].id, uniId: fr.universeId });
       } }));
       if (!se.scenes.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma cena. Monte o esqueleto da história." }));
+      if (se.scenes.length > 1) card.appendChild(el("div", { class: "hint", style: "margin:6px 0 0", text: "Arraste pelo ⠿ pra reordenar." }));
+      var scenesList = el("div", { class: "wb-scene-list" });
       se.scenes.forEach(function (s, i) {
         var who = (s.entryIds || []).map(function (id) { var en = wbEntry(id); return en ? en.title : null; }).filter(Boolean);
-        card.appendChild(el("div", { class: "row" }, [
-          el("div", { style: "display:flex;flex-direction:column;gap:1px" }, [
-            el("button", { class: "wb-ord", type: "button", "aria-label": "Subir", text: "▲", disabled: i === 0 ? "disabled" : null, onclick: function () { var t = se.scenes[i - 1]; se.scenes[i - 1] = s; se.scenes[i] = t; save(); render(); } }),
-            el("button", { class: "wb-ord", type: "button", "aria-label": "Descer", text: "▼", disabled: i === se.scenes.length - 1 ? "disabled" : null, onclick: function () { var t = se.scenes[i + 1]; se.scenes[i + 1] = s; se.scenes[i] = t; save(); render(); } })
-          ]),
+        var loc = s.locationId && wbEntry(s.locationId);
+        scenesList.appendChild(el("div", { class: "row wb-scene-row" }, [
+          el("span", { class: "wb-drag-handle", title: "arrastar pra reordenar", "aria-hidden": "true", text: "⠿" }),
           el("div", { class: "row-body" }, [
             el("div", { class: "row-title", text: (i + 1) + ". " + (s.title || "(sem título)") }),
-            el("div", { class: "row-meta", text: s.status + (who.length ? " · " + who.join(", ") : "") })
+            el("div", { class: "row-meta", text: [s.status, loc ? "📍 " + wbDisplayName(loc) : "", who.length ? who.join(", ") : ""].filter(Boolean).join(" · ") })
           ]),
           el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbGo({ view: "scene", frId: fr.id, seasonId: se.id, sceneId: s.id, uniId: fr.universeId }); } })
         ]));
       });
+      card.appendChild(scenesList);
+      setTimeout(function () { wbEnableDragReorder(scenesList, ".wb-scene-row", ".wb-drag-handle", se.scenes, function () { save(); render(); }); }, 0);
     }
 
     var det = el("details", { class: "detail-strip" });
@@ -5831,6 +5899,13 @@
     form.appendChild(el("label", { class: "flab", text: "Notas / prosa (markdown)" }));
     var bd = el("textarea", { class: "field", text: s.body, style: "min-height:120px" }); bd.addEventListener("change", function () { s.body = bd.value; save(); });
     form.appendChild(bd);
+    form.appendChild(el("label", { class: "flab", text: "Local da cena" }));
+    var locCombo = wbCombo({
+      items: wbEntriesOf(fr.universeId).filter(function (e) { return e.type === "Local"; }).map(function (e) { return { id: e.id, label: e.title || "(sem título)" }; }),
+      value: s.locationId || "", placeholder: "onde a cena acontece (opcional)…", emptyLabel: "— nenhum —",
+      onChange: function (id) { s.locationId = id || null; save(); render(); }
+    });
+    form.appendChild(el("div", { style: "margin-bottom:10px" }, [locCombo]));
     form.appendChild(el("div", { class: "cathead", text: "Quem / o que aparece" }));
     var chips = el("div", { class: "lens-bar" });
     wbEntriesOf(fr.universeId).forEach(function (e) {
@@ -5886,6 +5961,9 @@
       if (idset["hub:" + e.universeId]) edges.push({ from: e.id, to: "hub:" + e.universeId, weak: true });
     });
     edges = edges.concat(wbGraphEdges(all, function (id) { return !!idset[id]; }));
+    all.forEach(function (e) {
+      if (e.parentId && idset[e.parentId]) edges.push({ from: e.parentId, to: e.id, weak: true, label: "contém" });
+    });
     setTimeout(function () {
       createGraph(host, {
         nodes: nodes, edges: edges, hubGravity: 0.025, legend: legend,
@@ -6061,10 +6139,55 @@
     return v;
   }
 
+  // Generic pointer-based drag-to-reorder for a list of rows backed by a plain array — same
+  // pointer-capture trick as the map's node dragging (works with mouse AND touch, unlike native
+  // HTML5 drag-and-drop which mobile browsers handle inconsistently). Mutates `arr` in place and
+  // calls `afterReorder` once, on drop, only if the order actually changed.
+  function wbEnableDragReorder(listEl, rowSelector, handleSelector, arr, afterReorder) {
+    var dragEl = null, dragIdx = null;
+    function rows() { return Array.prototype.slice.call(listEl.querySelectorAll(rowSelector)); }
+    listEl.querySelectorAll(handleSelector).forEach(function (h) {
+      h.style.touchAction = "none";
+      h.addEventListener("pointerdown", function (ev) {
+        var row = h.closest(rowSelector);
+        if (!row) return;
+        dragEl = row; dragIdx = rows().indexOf(row);
+        row.classList.add("wb-dragging");
+        try { h.setPointerCapture(ev.pointerId); } catch (e) {}
+        ev.preventDefault();
+      });
+      h.addEventListener("pointermove", function (ev) {
+        if (!dragEl) return;
+        var rs = rows(), placed = false;
+        for (var i = 0; i < rs.length; i++) {
+          var r = rs[i];
+          if (r === dragEl) continue;
+          var rect = r.getBoundingClientRect();
+          if (ev.clientY < rect.top + rect.height / 2) { listEl.insertBefore(dragEl, r); placed = true; break; }
+        }
+        if (!placed) listEl.appendChild(dragEl);
+      });
+      function finish() {
+        if (!dragEl) return;
+        dragEl.classList.remove("wb-dragging");
+        var newIdx = rows().indexOf(dragEl);
+        dragEl = null;
+        if (newIdx !== -1 && newIdx !== dragIdx) {
+          var item = arr.splice(dragIdx, 1)[0];
+          arr.splice(newIdx, 0, item);
+          afterReorder();
+        }
+        dragIdx = null;
+      }
+      h.addEventListener("pointerup", finish);
+      h.addEventListener("pointercancel", finish);
+    });
+  }
+
   /* ---- Force-directed graph engine ---- */
   function createGraph(host, cfg) {
     host.innerHTML = "";
-    var W = host.clientWidth || 620, H = host.classList.contains("tall") ? 520 : 430;
+    var W = host.clientWidth || 620, H = host.classList.contains("tall") ? 520 : host.classList.contains("compact") ? 240 : 430;
     var svg = svgEl("svg", { class: "wb-graph", width: "100%", height: H, viewBox: "0 0 " + W + " " + H });
     var g = svgEl("g");
     svg.appendChild(g);
@@ -6093,6 +6216,9 @@
     var focusId = cfg.focusId || null;
     var neighborSet = {};
     if (focusId && byId[focusId]) { neighborSet[focusId] = 1; edges.forEach(function (e) { if (e.from === focusId) neighborSet[e.to] = 1; if (e.to === focusId) neighborSet[e.from] = 1; }); }
+    // Jump straight to a searched-for node instead of making the user hunt for the one
+    // undimmed dot in a crowded graph — only meaningful on first paint, not chased every tick.
+    if (cfg.centerOn && byId[cfg.centerOn]) { pan.x = -byId[cfg.centerOn].x * k; pan.y = -byId[cfg.centerOn].y * k; }
 
     function applyTransform() { g.setAttribute("transform", "translate(" + (W / 2 + pan.x) + "," + (H / 2 + pan.y) + ") scale(" + k + ")"); }
     applyTransform();
@@ -6445,8 +6571,12 @@
   }
   function pickImage(onUrl) {
     var inp = document.createElement("input");
-    inp.type = "file"; inp.accept = "image/*";
-    inp.onchange = function () { if (inp.files && inp.files[0]) uploadImage(inp.files[0], onUrl); };
+    inp.type = "file"; inp.accept = "image/*"; inp.style.display = "none";
+    // Alguns navegadores móveis são inconsistentes com .click() num <input> que nunca esteve no
+    // documento — anexa temporariamente (removido assim que o valor muda) em vez de deixá-lo solto.
+    document.body.appendChild(inp);
+    inp.onchange = function () { if (inp.files && inp.files[0]) uploadImage(inp.files[0], onUrl); inp.remove(); };
+    inp.addEventListener("cancel", function () { inp.remove(); });
     inp.click();
   }
 
