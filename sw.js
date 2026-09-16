@@ -1,5 +1,5 @@
 /* tree — service worker (offline + atualização) */
-var CACHE = "arvore-cache-v39";
+var CACHE = "arvore-cache-v40";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", function (e) {
@@ -43,9 +43,11 @@ self.addEventListener("fetch", function (e) {
     return;
   }
 
-  // Google Fonts + SDK do Firebase (gstatic): cache primeiro, atualiza em segundo plano.
+  // Google Fonts + SDK do Firebase (gstatic) + editor WYSIWYG (jsdelivr): cache primeiro,
+  // atualiza em segundo plano.
   if (url.host === "fonts.googleapis.com" || url.host === "fonts.gstatic.com" ||
-      (url.host === "www.gstatic.com" && url.pathname.indexOf("/firebasejs/") === 0)) {
+      (url.host === "www.gstatic.com" && url.pathname.indexOf("/firebasejs/") === 0) ||
+      url.host === "cdn.jsdelivr.net") {
     e.respondWith(
       caches.match(req).then(function (m) {
         var net = fetch(req).then(function (r) {
