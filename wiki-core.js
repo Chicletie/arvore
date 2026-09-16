@@ -589,7 +589,7 @@
     var wrap = el("div", { class: "card" });
     wrap.appendChild(el("div", { class: "home-title", text: homeLabel() }));
     wrap.appendChild(el("div", { class: "home-sub", text: "Wiki pública — navegue pelas páginas publicadas." }));
-    var searchBox = el("input", { class: "home-search", type: "search", placeholder: "Buscar personagens, locais, facções…", "aria-label": "Buscar" });
+    var searchBox = el("input", { class: "home-search", type: "search", placeholder: "Buscar nome, tipo ou tag…", "aria-label": "Buscar" });
     wrap.appendChild(searchBox);
 
     var entries = Object.keys(indexData.entries || {}).map(function (id) {
