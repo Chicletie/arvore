@@ -6161,7 +6161,7 @@
   function wbResetEntriesForTemplate() {
     var all = C().entries || [];
     if (!window.confirm(
-      "Isso vai zerar o CONTEÚDO de todas as " + all.length + " entradas (resumo, corpo, campos, seções, posts, galeria, capa, tags, eventos, ano; status volta a \"semente\"), mantendo nome, alcunhas, tipo, universo, posição no mapa e ligações. " +
+      "Isso vai zerar o CONTEÚDO de todas as " + all.length + " entradas (resumo, corpo, campos, seções, posts, galeria, capa, tags, eventos, ano; status volta a \"semente\") e já criar os campos do modelo novo do tipo de cada uma, prontos pra escrever — mantendo nome, alcunhas, tipo, universo, posição no mapa e ligações. " +
       "Entradas que já tiverem resumo, corpo ou algum campo preenchido são puladas automaticamente. " +
       "Cada entrada resetada recebe um checkpoint no histórico antes de zerar, então dá pra restaurar uma por uma se precisar. Confirma?"
     )) return;
@@ -6180,6 +6180,13 @@
       e.gallery = []; e.cover = null; e.coverVis = "publico"; e.coverAllow = []; e.coverFocus = { x: 50, y: 50 };
       e.events = []; e.variants = [];
       e.year = null; e.status = "semente";
+      // O ponto inteiro do reset: entrar com os campos do modelo NOVO do tipo desta entrada,
+      // já prontos (vazios) pra escrever — não só "disponíveis pra clicar" um por um no
+      // balãozinho de sugestão.
+      (C().templates[e.type] || []).forEach(function (fname) {
+        e.fields[fname] = "";
+        e.fieldMeta[fname] = { type: guessFieldType(fname), opts: [], vis: guessFieldVis(fname), allow: [] };
+      });
       e.updated = todayKey();
       resetCount++;
     });
