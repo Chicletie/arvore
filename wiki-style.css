@@ -112,8 +112,9 @@ a.tag:hover { border-color: var(--gold); }
 .links-wrap { clear: both; margin-top: 8px; }
 .links-subhead { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--faint); margin: 16px 0 8px; }
 .links-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
-.link-card { display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; text-decoration: none; color: inherit; }
+.link-card { display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 12px; text-decoration: none; color: inherit; overflow: hidden; }
 .link-card:hover { border-color: var(--gold); }
+.link-card-cover { display: block; width: calc(100% + 24px); margin: -8px -12px 8px; height: 90px; object-fit: cover; }
 .link-card-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--faint); }
 .link-card-title { font-family: var(--font-wb); font-weight: 600; font-size: 15px; color: var(--gold-ink); }
 
@@ -146,8 +147,9 @@ a.tag:hover { border-color: var(--gold); }
 .home-unihead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--gold-ink); font-weight: 600; margin: 26px 0 10px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
 .home-unihead:first-child { margin-top: 0; }
 .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-.home-card { display: block; background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; text-decoration: none; color: inherit; box-shadow: var(--shadow); transition: transform .1s, border-color .1s; }
+.home-card { display: block; background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; text-decoration: none; color: inherit; box-shadow: var(--shadow); transition: transform .1s, border-color .1s; overflow: hidden; }
 .home-card:hover { border-color: var(--gold); transform: translateY(-1px); }
+.home-card-cover { display: block; width: calc(100% + 28px); margin: -12px -14px 10px; height: 130px; object-fit: cover; }
 .home-card-title { font-family: var(--font-wb); font-weight: 600; font-size: 15.5px; }
 .home-card-meta { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 3px; }
 .home-card-snippet { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.35; }

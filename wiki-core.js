@@ -662,10 +662,11 @@
       newsSection.appendChild(el("div", { class: "home-unihead", text: "🕓 Novidades" }));
       var newsGrid = el("div", { class: "links-grid" });
       recentAll.slice(0, newsShown).forEach(function (e) {
-        newsGrid.appendChild(el("a", { class: "link-card", href: wikiHref(e.id) }, [
-          el("span", { class: "link-card-label", text: (e.updatedAt || "") + (e.type ? " · " + e.type : "") }),
-          el("span", { class: "link-card-title", text: e.title || "(sem título)" })
-        ]));
+        var kids = [];
+        if (e.cover) kids.push(el("img", { class: "link-card-cover", src: e.cover, alt: "", loading: "lazy" }));
+        kids.push(el("span", { class: "link-card-label", text: (e.updatedAt || "") + (e.type ? " · " + e.type : "") }));
+        kids.push(el("span", { class: "link-card-title", text: e.title || "(sem título)" }));
+        newsGrid.appendChild(el("a", { class: "link-card", href: wikiHref(e.id) }, kids));
       });
       newsSection.appendChild(newsGrid);
       if (recentAll.length > newsShown) {
@@ -704,19 +705,31 @@
         return !q || (e.title + " " + e.type + " " + e.universe + " " + (e.tags || []).join(" ") + " " + (e.search || "")).toLowerCase().indexOf(q) !== -1;
       });
       if (!filtered.length) { listWrap.appendChild(el("div", { class: "empty", text: "Nada encontrado." })); return; }
+      // No Paradise Gate a wiki nunca deixa entender que existem outros universos — como o
+      // índice ali só tem o Lótus mesmo, o grupo "LÓTUS" apareceria sozinho sem servir pra
+      // nada além de vazar o nome interno do universo. Agrupamento por universo só faz
+      // sentido (e só aparece) na wiki geral.
+      function cardFor(e) {
+        var card = el("a", { class: "home-card", href: wikiHref(e.id) });
+        if (e.cover) card.appendChild(el("img", { class: "home-card-cover", src: e.cover, alt: "", loading: "lazy" }));
+        card.appendChild(el("div", { class: "home-card-title", text: e.title || "(sem título)" }));
+        card.appendChild(el("div", { class: "home-card-meta", text: e.type || "" }));
+        var snip = q ? snippetFor(e, q) : null;
+        if (snip) card.appendChild(el("div", { class: "home-card-snippet", text: snip }));
+        return card;
+      }
+      if (isParadiseGateMode()) {
+        var flatGrid = el("div", { class: "home-grid" });
+        filtered.sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); }).forEach(function (e) { flatGrid.appendChild(cardFor(e)); });
+        listWrap.appendChild(flatGrid);
+        return;
+      }
       var byUni = {};
       filtered.forEach(function (e) { var k = e.universe || "Sem universo"; (byUni[k] = byUni[k] || []).push(e); });
       Object.keys(byUni).sort().forEach(function (uni) {
         listWrap.appendChild(el("div", { class: "home-unihead", text: uni }));
         var grid = el("div", { class: "home-grid" });
-        byUni[uni].sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); }).forEach(function (e) {
-          var card = el("a", { class: "home-card", href: wikiHref(e.id) });
-          card.appendChild(el("div", { class: "home-card-title", text: e.title || "(sem título)" }));
-          card.appendChild(el("div", { class: "home-card-meta", text: e.type || "" }));
-          var snip = q ? snippetFor(e, q) : null;
-          if (snip) card.appendChild(el("div", { class: "home-card-snippet", text: snip }));
-          grid.appendChild(card);
-        });
+        byUni[uni].sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); }).forEach(function (e) { grid.appendChild(cardFor(e)); });
         listWrap.appendChild(grid);
       });
     }

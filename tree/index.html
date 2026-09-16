@@ -4382,7 +4382,11 @@
       franchiseIds: e.franchiseIds || [],
       tags: (e.tags || []).filter(function (t) { return ((e.tagVis[t] || {}).vis || "publico") === "publico"; }),
       search: wbEntrySearchText(snap),
-      updatedAt: todayKey()
+      updatedAt: todayKey(),
+      // Só "publico" (não spoiler) — a home/novidades mostra essa miniatura sempre visível,
+      // sem nenhum jeito de clicar-pra-revelar, então uma capa marcada como spoiler não pode
+      // vazar ali fora do contexto da própria página.
+      cover: e.coverVis === "publico" ? (e.cover || null) : null
     };
   }
   function wbWikiUrl(id) { return location.origin + location.pathname.replace(/index\.html$/, "") + "wiki/" + id; }
