@@ -706,7 +706,6 @@
     var sharedToc = [];
     if (data.posts && data.posts.length) sharedToc.push({ id: "posts", label: "Posts" });
     var eventsSorted = (data.events || []).slice().sort(function (a, b) { return wbEventSortKey(a) - wbEventSortKey(b); });
-    if (data.gallery && data.gallery.length) sharedToc.push({ id: "galeria", label: "Galeria" });
     // Genealogia e Linha do tempo só existem como abas dentro desta seção combinada — o
     // rótulo do sumário/cabeçalho muda pra "Linha do tempo" quando a entrada tem eventos mas
     // nenhuma relação (linha do tempo é independente disso — uma entrada pode ter eventos sem
@@ -715,32 +714,73 @@
     if (relSectionLabel) sharedToc.push({ id: "relacoes", label: relSectionLabel });
     if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
-    if (data.variants && data.variants.length) {
+    // Galeria e Citações entram como abas (mesmo seletor .work-tabs de Geral/variante de
+    // obra), sempre por último, cada uma subdividida por "obra" (rótulo livre, mesmo esquema
+    // já usado na própria Galeria) — um grupo sem nenhum item nunca aparece, porque a lista de
+    // grupos só é construída a partir dos itens que de fato existem.
+    function buildGalleryPanel() {
+      var wrap = el("div", { class: "article" });
+      galGroups.forEach(function (grp) {
+        var items = data.gallery.filter(function (g) { return g.group === grp; });
+        wrap.appendChild(el("div", { class: "gal-grouphead", text: grp || "Geral" }));
+        var grid = el("div", { class: "gal-grid" });
+        items.forEach(function (g) {
+          var fig = el("figure", { class: "gal-item" });
+          var galPos = "object-position:" + objPos(g.focus);
+          if (g.vis === "spoiler") fig.appendChild(spoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "", style: galPos }); }));
+          else fig.appendChild(el("img", { src: g.url, alt: g.caption || "", style: galPos }));
+          if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
+          grid.appendChild(fig);
+        });
+        wrap.appendChild(grid);
+      });
+      return wrap;
+    }
+    var citGroups = [];
+    (data.citacoes || []).forEach(function (q) { if (citGroups.indexOf(q.group) === -1) citGroups.push(q.group); });
+    function buildCitacoesPanel() {
+      var wrap = el("div", { class: "article" });
+      citGroups.forEach(function (grp) {
+        var items = data.citacoes.filter(function (q) { return q.group === grp; });
+        wrap.appendChild(el("div", { class: "gal-grouphead", text: grp || "Geral" }));
+        var list = el("div", { class: "cit-list" });
+        items.forEach(function (q) {
+          var it = el("div", { class: "cit-item" });
+          function paintText() { var t = el("div", { class: "cit-text", text: "“" + q.text + "”" }); return t; }
+          if (q.vis === "spoiler") it.appendChild(spoilerCover(paintText)); else it.appendChild(paintText());
+          var meta = el("div", { class: "cit-meta" });
+          if (q.contextTitle) meta.appendChild(q.contextId ? el("a", { href: wikiHref(q.contextId), text: q.contextTitle }) : document.createTextNode(q.contextTitle));
+          if (q.note) { if (meta.childNodes.length) meta.appendChild(document.createTextNode(" · ")); meta.appendChild(document.createTextNode(q.note)); }
+          if (meta.childNodes.length) it.appendChild(meta);
+          list.appendChild(it);
+        });
+        wrap.appendChild(list);
+      });
+      return wrap;
+    }
+
+    var tabPanels = [{ label: "Geral", el: buildArticle(data, "geral-", sharedToc) }];
+    (data.variants || []).forEach(function (variant, vi) { tabPanels.push({ label: variant.label || "Versão", el: buildArticle(variant, "v" + vi + "-", []) }); });
+    if (data.gallery && data.gallery.length) tabPanels.push({ label: "Galeria", el: buildGalleryPanel() });
+    if (data.citacoes && data.citacoes.length) tabPanels.push({ label: "Citações", el: buildCitacoesPanel() });
+    if (tabPanels.length > 1) {
       var tabsWrap = el("div", { class: "work-tabs" });
-      var articles = [buildArticle(data, "geral-", sharedToc)];
-      data.variants.forEach(function (variant, vi) { articles.push(buildArticle(variant, "v" + vi + "-", [])); });
-      function selectTab(idx) {
-        tabsWrap.querySelectorAll(".work-tab").forEach(function (b, i) { b.classList.toggle("on", i === idx); });
-        articles.forEach(function (a, i) { a.hidden = i !== idx; });
-        currentTabLabel = idx === 0 ? "Geral" : (data.variants[idx - 1].label || "Versão");
-      }
-      var geralTab = el("button", { type: "button", class: "work-tab on", text: "Geral" });
-      geralTab.addEventListener("click", function () { selectTab(0); });
-      tabsWrap.appendChild(geralTab);
-      data.variants.forEach(function (variant, vi) {
-        var tb = el("button", { type: "button", class: "work-tab", text: variant.label || "Versão" });
-        tb.addEventListener("click", function () { selectTab(vi + 1); });
+      tabPanels.forEach(function (p, i) {
+        var tb = el("button", { type: "button", class: "work-tab" + (i === 0 ? " on" : ""), text: p.label });
+        tb.addEventListener("click", function () {
+          tabsWrap.querySelectorAll(".work-tab").forEach(function (b, j) { b.classList.toggle("on", j === i); });
+          tabPanels.forEach(function (pp, j) { pp.el.hidden = j !== i; });
+          currentTabLabel = p.label;
+        });
         tabsWrap.appendChild(tb);
       });
       card.appendChild(tabsWrap);
-      articles.forEach(function (a, i) { a.hidden = i !== 0; card.appendChild(a); });
-    } else {
-      card.appendChild(buildArticle(data, "geral-", sharedToc));
     }
+    tabPanels.forEach(function (p, i) { p.el.hidden = i !== 0; card.appendChild(p.el); });
 
     // posts — diário datado da própria entrada (mais recente primeiro; já vem ordenado do
     // snapshot). É sobre a entrada inteira, não de uma variante de obra específica, então mora
-    // aqui fora do buildArticle, igual Galeria/Ligações.
+    // aqui fora do buildArticle, igual Ligações.
     if (data.posts && data.posts.length) {
       var pwrap = el("div", { class: "posts-wrap" });
       pwrap.appendChild(el("div", { class: "cathead", id: "posts", text: "Posts" }));
@@ -752,27 +792,6 @@
         pwrap.appendChild(det);
       });
       card.appendChild(pwrap);
-    }
-
-    // galeria — agrupada por rótulo livre (ex: "Primeira Temporada", "Segunda Temporada")
-    if (data.gallery && data.gallery.length) {
-      var gwrap = el("div", { class: "gallery-wrap" });
-      gwrap.appendChild(el("div", { class: "cathead", id: "galeria", text: "Galeria" }));
-      galGroups.forEach(function (grp) {
-        var items = data.gallery.filter(function (g) { return g.group === grp; });
-        gwrap.appendChild(el("div", { class: "gal-grouphead", text: grp || "Geral" }));
-        var grid = el("div", { class: "gal-grid" });
-        items.forEach(function (g) {
-          var fig = el("figure", { class: "gal-item" });
-          var galPos = "object-position:" + objPos(g.focus);
-          if (g.vis === "spoiler") fig.appendChild(spoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "", style: galPos }); }));
-          else fig.appendChild(el("img", { src: g.url, alt: g.caption || "", style: galPos }));
-          if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
-          grid.appendChild(fig);
-        });
-        gwrap.appendChild(grid);
-      });
-      card.appendChild(gwrap);
     }
 
     // Relações + Genealogia + Linha do tempo dividem uma seção, tabbed (reusa .work-tabs, o

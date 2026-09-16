@@ -1421,6 +1421,13 @@
         if (WB_VIS.indexOf(ev.vis) === -1) ev.vis = "publico";
       });
     });
+    cr.quotes = cr.quotes.filter(function (q) { return q && typeof q === "object"; });
+    cr.quotes.forEach(function (q) {
+      if (q.id == null) q.id = uid();
+      if (typeof q.group !== "string") q.group = "";
+      if (WB_VIS.indexOf(q.vis) === -1) q.vis = "publico";
+      if (!Array.isArray(q.allow)) q.allow = [];
+    });
     cr.franchises.forEach(function (fr) {
       delete fr.rpg;
       if (!Array.isArray(fr.seasons)) {
@@ -3521,7 +3528,7 @@
       var g = function (n) { return form.querySelector("[name=" + n + "]").value; };
       var txt = g("text").trim();
       if (!txt) return;
-      C().quotes.unshift({ id: uid(), universeId: uniId, text: txt, speakerId: spCombo.value || "", contextId: cxCombo.value || "", note: g("note").trim() });
+      C().quotes.unshift({ id: uid(), universeId: uniId, text: txt, speakerId: spCombo.value || "", contextId: cxCombo.value || "", note: g("note").trim(), group: g("group").trim(), vis: "publico", allow: [] });
       form.reset(); spCombo.value = ""; cxCombo.value = ""; save(); render();
     } });
     form.appendChild(el("textarea", { class: "field", name: "text", placeholder: "\"A fala, a descrição, o trecho…\"", style: "min-height:70px;width:100%" }));
@@ -3529,17 +3536,25 @@
     var spCombo = wbCombo({ items: comboItems, placeholder: "quem diz / de quem é… (opcional)", wrapClass: "grow" });
     var cxCombo = wbCombo({ items: comboItems, placeholder: "onde / contexto… (opcional)", wrapClass: "grow" });
     form.appendChild(el("div", { class: "inline", style: "margin-top:8px" }, [spCombo, cxCombo]));
-    form.appendChild(el("input", { class: "field", name: "note", placeholder: "nota", style: "width:100%;margin-top:8px" }));
+    form.appendChild(el("div", { class: "inline", style: "margin-top:8px" }, [
+      el("input", { class: "field grow", name: "group", placeholder: "obra (opcional — ex: nome do livro/publicação)" }),
+      el("input", { class: "field grow", name: "note", placeholder: "nota" })
+    ]));
     form.appendChild(el("button", { class: "btn sm", type: "submit", text: "Guardar", style: "margin-top:8px" }));
     card.appendChild(form);
     if (!qs.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma citação guardada." }));
     qs.forEach(function (q) {
       var sp2 = q.speakerId && wbEntry(q.speakerId), cx2 = q.contextId && wbEntry(q.contextId);
-      card.appendChild(el("div", { class: "entry" }, [
-        el("div", { class: "world-body", style: "font-family:var(--font-wb);font-size:17px;font-style:italic", text: "“" + q.text + "”" }),
-        el("div", { class: "row-meta", style: "margin-top:5px", text: [sp2 ? "por " + sp2.title : "", cx2 ? cx2.title : "", q.note].filter(Boolean).join(" · ") }),
-        el("button", { class: "link", type: "button", text: "remover", style: "color:var(--neg);margin-top:4px", onclick: function () { C().quotes = C().quotes.filter(function (x) { return x.id !== q.id; }); save(); render(); } })
-      ]));
+      function touch(rerender) { save(); if (rerender) render(); }
+      var host = el("div", { class: "entry" + (wbVisBgClass(q.vis, "wb-sec") ? " " + wbVisBgClass(q.vis, "wb-sec") : "") });
+      var head = el("div", { class: "wb-sec-head" });
+      head.appendChild(el("div", { class: "world-body", style: "font-family:var(--font-wb);font-size:17px;font-style:italic;flex:1", text: "“" + q.text + "”" }));
+      head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Wiki: " + visInfo(q.vis).label + " (toque p/ mudar)", text: visInfo(q.vis).glyph, onclick: function () { q.vis = nextVis(q.vis); touch(true); } }));
+      head.appendChild(delBtn(function () { C().quotes = C().quotes.filter(function (x) { return x.id !== q.id; }); touch(true); }));
+      host.appendChild(head);
+      if (q.vis === "restrito") host.appendChild(wbAllowEditor(q.allow, touch));
+      host.appendChild(el("div", { class: "row-meta", style: "margin-top:5px", text: [sp2 ? "por " + sp2.title : "", cx2 ? cx2.title : "", q.group ? "obra: " + q.group : "", q.note].filter(Boolean).join(" · ") }));
+      card.appendChild(host);
     });
     v.appendChild(card);
   }
@@ -4135,6 +4150,14 @@
     var events = (e.events || []).filter(function (ev) { return ev.vis === "publico"; }).map(function (ev) {
       return { id: ev.id, label: ev.label || "", y: ev.y, m: ev.m, d: ev.d, note: ev.note || "", major: !!ev.major };
     });
+    // Citações — aparecem na página de QUEM disse (o falante), agrupadas por "obra" (texto
+    // livre, igual à galeria) dentro da própria aba de Citações. Só as que o falante é esta
+    // entrada mesma; a entrada de contexto (se publicada) vira um link, senão fica só o nome.
+    var citacoes = C().quotes.filter(function (q) { return q.speakerId === e.id && okVis(q.vis, q.allow); }).map(function (q) {
+      var cx = q.contextId && wbEntry(q.contextId);
+      var cxLinked = cx && cx.wikiId && !cx.secret;
+      return { id: q.id, text: q.text, group: q.group || "", note: q.note || "", vis: outVis(q.vis), contextTitle: cx ? wbDisplayName(cx) : "", contextId: cxLinked ? cx.wikiId : null };
+    });
     var variants = (e.variants || []).map(function (variant) {
       var vfields = [];
       Object.keys(variant.fields || {}).forEach(function (k) {
@@ -4164,6 +4187,7 @@
       posts: posts,
       gallery: gallery,
       events: events,
+      citacoes: citacoes,
       variants: variants,
       links: wbWikiLinks(e),
       backlinks: wbWikiBacklinks(e),
@@ -4220,6 +4244,10 @@
     var posts = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).map(function (p) { return { id: p.id, title: p.title || "", date: p.date || "", body: p.body || "", vis: "publico" }; });
     var gallery = (e.gallery || []).filter(function (g) { return g.url; }).map(function (g) { return { group: g.group || "", url: g.url, caption: g.caption || "", vis: "publico", focus: g.focus || null }; });
     var events = (e.events || []).map(function (ev) { return { id: ev.id, label: ev.label || "", y: ev.y, m: ev.m, d: ev.d, note: ev.note || "", major: !!ev.major }; });
+    var citacoes = C().quotes.filter(function (q) { return q.speakerId === e.id; }).map(function (q) {
+      var cx = q.contextId && wbEntry(q.contextId);
+      return { id: q.id, text: q.text, group: q.group || "", note: q.note || "", vis: "publico", contextTitle: cx ? wbDisplayName(cx) : "", contextId: cx && cx.wikiId ? cx.wikiId : null };
+    });
     var links = (e.links || []).map(function (lk) {
       var t = wbEntry(lk.to);
       return t ? { label: lk.label || "", targetId: t.wikiId || null, targetTitle: wbDisplayName(t, lk.dispAs) } : null;
@@ -4248,6 +4276,7 @@
       posts: posts,
       gallery: gallery,
       events: events,
+      citacoes: citacoes,
       variants: variants,
       links: links,
       backlinks: [],

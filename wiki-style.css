@@ -143,13 +143,19 @@ details.wiki-section.post:last-child { border-bottom: 0; }
 .wb-tl-empty { font-size: 13px; color: var(--faint); font-style: italic; }
 @media (max-width: 480px) { .wb-tl-body { padding-left: 6px; } }
 
-/* galeria — full width, abaixo do corpo, agrupada por rótulo (ex: temporadas) */
-.gallery-wrap { clear: both; margin-top: 8px; }
+/* galeria — agrupada por rótulo (ex: temporadas), dentro da aba própria */
 .gal-grouphead { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold-ink); font-weight: 600; margin: 16px 0 8px; }
 .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 .gal-item { margin: 0; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
 .gal-item img { width: 100%; height: 130px; object-fit: cover; display: block; }
 .gal-item figcaption { font-size: 11.5px; color: var(--muted); padding: 5px 8px; }
+
+/* citações — aba própria, agrupada por "obra" igual à galeria */
+.cit-list { display: flex; flex-direction: column; gap: 14px; }
+.cit-item { padding: 2px 16px; border-left: 3px solid var(--gold); }
+.cit-text { font-family: var(--font-wb); font-style: italic; font-size: 16.5px; line-height: 1.5; }
+.cit-meta { margin-top: 5px; font-size: 12.5px; color: var(--muted); }
+.cit-meta a { color: var(--gold-ink); }
 
 dl.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 0; clear: both; }
 dl.fields dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
