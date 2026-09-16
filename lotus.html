@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Lótus</title>
+<link rel="icon" href="./icon.svg?v=3" type="image/svg+xml" />
+<link rel="stylesheet" href="./wiki-style.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&display=swap" />
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<!-- Wiki exclusiva do universo Lótus — pública por padrão, sem nenhum sinal de que existem
+     outros universos. Mesmo motor que wiki.html/404.html (wiki-core.js detecta o modo pelo
+     próprio caminho da URL, ver isLotusMode()), só que essa entrada nunca mostra nada fora
+     do Lótus: o índice que ela busca (wikiIndex/lotus) só tem entradas do Lótus. -->
+<div class="page" id="page"><div class="empty">Carregando…</div></div>
+<script src="./wiki-core.js"></script>
+<script>wikiCoreBoot();</script>
+</body>
+</html>

@@ -1571,6 +1571,7 @@
     s.wikiPlayers.forEach(function (p) {
       if (typeof p.label !== "string") p.label = "";
       if (typeof p.addedAt !== "string") p.addedAt = todayKey();
+      if (!Array.isArray(p.universes)) p.universes = [];
     });
     return s;
   }
@@ -4299,11 +4300,17 @@
   // stale (point nowhere new) until the far side gets published and THIS entry is republished —
   // an accepted tradeoff, discussed with the user, in exchange for staying a static snapshot
   // instead of a live per-link Firestore check on every page view.
+  // A Lótus entry never links OUTSIDE Lótus in its own snapshot — Lótus is the one universe
+  // meant to carry zero signal that the rest of the multiverse exists, so even a cross-universe
+  // "manifesta-se como" mention has to be invisible from the Lótus side (the other universe's
+  // OWN page can still freely link back to the published Lótus entry — nothing there needs to
+  // hide that Lótus exists, only the reverse).
   function wbWikiLinks(e) {
     var out = [];
     (e.links || []).forEach(function (lk) {
       var t = wbEntry(lk.to);
       if (!t || !t.wikiId || t.secret) return;
+      if (e.universeId === "lotus" && t.universeId !== "lotus") return;
       out.push({ label: lk.label || "", style: linkStyleOf(lk.label), targetId: t.wikiId, targetTitle: wbDisplayName(t, lk.dispAs) });
     });
     return out;
@@ -4312,6 +4319,7 @@
     var out = [];
     C().entries.forEach(function (other) {
       if (other.id === e.id || !other.wikiId || other.secret) return;
+      if (e.universeId === "lotus" && other.universeId !== "lotus") return;
       (other.links || []).forEach(function (lk) {
         if (lk.to !== e.id) return;
         out.push({ label: lk.label || "", style: linkStyleOf(lk.label), targetId: other.wikiId, targetTitle: wbDisplayName(other) });
@@ -4453,6 +4461,23 @@
       return batch.commit();
     });
   }
+  // Espelha state.wikiPlayers[].universes num documento por universo (wikiUniverseAccess/{id},
+  // {emails:[...]}) — a regra do Firestore só sabe checar uma lista simples de emails contra um
+  // "in", não vasculhar um array de objetos aninhado, então essa é a forma achatada que a regra
+  // realmente consegue ler. Lótus fica de fora de propósito — é o único universo público por
+  // padrão, nunca precisa de uma lista de acesso. Chamado sempre que o elenco de jogadores ou
+  // as permissões por universo de alguém mudam.
+  function wbSyncUniverseAccess() {
+    if (!fbFs) return Promise.resolve();
+    var byUni = {};
+    FLOWERS.forEach(function (f) { if (f.id !== "lotus") byUni[f.id] = []; });
+    (state.wikiPlayers || []).forEach(function (p) {
+      (p.universes || []).forEach(function (uid) { if (byUni[uid]) byUni[uid].push(p.email); });
+    });
+    var batch = fbFs.batch();
+    Object.keys(byUni).forEach(function (uid) { batch.set(fbFs.collection("wikiUniverseAccess").doc(uid), { emails: byUni[uid] }); });
+    return batch.commit().catch(function () {});
+  }
   // Wiki id = a slug of the title (not a random uid) so the link reads as "wiki/leonel-bianchi"
   // instead of a random string — generated once at first publish and kept stable afterwards
   // (republishing never reslugs, so an already-shared link never breaks).
@@ -4467,8 +4492,10 @@
     while (taken(slug)) { slug = base + "-" + n; n++; }
     return slug;
   }
-  // Metadata kept in the shared wikiPublic/_index doc — powers the wiki home page, search and
-  // cross-entry links, without every visitor having to fetch every published entry to browse.
+  // Metadata kept in the per-universe wikiIndex/<universeId> doc — powers the wiki home page,
+  // search and cross-entry links, without every visitor having to fetch every published entry
+  // to browse. Split per-universe (not one shared doc) so the Firestore rule can gate reading
+  // an entire universe's index at once — see the universe-access rule this all depends on.
   // Strips common markdown syntax down to plain text for search indexing — doesn't need to be
   // pretty, just needs to turn "**Nome** vive em ||a Cripta||" into "Nome vive em a Cripta" so a
   // substring search on the word "Cripta" works.
@@ -4534,15 +4561,15 @@
     var snap = wbBuildWikiSnapshot(e);
     fbFs.collection("wikiPublic").doc(id).set(snap).then(function () {
       var idxUpdate = {}; idxUpdate["entries." + id] = wbIndexEntry(e, snap);
-      return fbFs.collection("wikiPublic").doc("_index").set({ entries: {} }, { merge: true }).then(function () {
-        return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate);
+      return fbFs.collection("wikiIndex").doc(e.universeId).set({ entries: {} }, { merge: true }).then(function () {
+        return fbFs.collection("wikiIndex").doc(e.universeId).update(idxUpdate);
       });
     }).then(function () {
       return wbSyncRestrito(id, wbRestritoItems(e));
     }).then(function () {
       e.wikiId = id; e.wikiPublishedAt = todayKey(); touch(true);
     }).catch(function (err) {
-      window.alert("Não consegui publicar: " + (err && err.message ? err.message : err) + "\n\nSe for erro de permissão, a coleção \"wikiPublic\" ainda não tem a regra de leitura pública no Firestore.");
+      window.alert("Não consegui publicar: " + (err && err.message ? err.message : err) + "\n\nSe for erro de permissão, confira se as regras do Firestore já cobrem wikiPublic/wikiIndex.");
     });
   }
   function wbUnpublishWiki(e, touch) {
@@ -4553,7 +4580,7 @@
     fbFs.collection("wikiPublic").doc(id).delete().then(function () {
       return wbSyncRestrito(id, []);
     }).then(function () {
-      return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate).catch(function () {});
+      return fbFs.collection("wikiIndex").doc(e.universeId).update(idxUpdate).catch(function () {});
     }).then(function () {
       e.wikiId = null; e.wikiPublishedAt = ""; touch(true);
     }).catch(function (err) { window.alert("Não consegui despublicar: " + (err && err.message ? err.message : err)); });
@@ -4627,6 +4654,7 @@
       campaignName: cp.name || "",
       seasonName: se.name || "",
       universe: f ? f.name : "",
+      universeId: cp.universeId,
       sessions: sessions,
       publishedAt: todayKey()
     };
@@ -4653,8 +4681,8 @@
     var snap = wbBuildSeasonSnapshot(cp, se);
     fbFs.collection("wikiPublic").doc(id).set(snap).then(function () {
       var idxUpdate = {}; idxUpdate["entries." + id] = { title: (cp.name || "Campanha") + " — " + (se.name || "Temporada"), type: "Temporada", universe: flowerById(cp.universeId) ? flowerById(cp.universeId).name : "", universeId: cp.universeId, franchiseIds: [], tags: [], search: wbSeasonSearchText(snap), updatedAt: todayKey() };
-      return fbFs.collection("wikiPublic").doc("_index").set({ entries: {} }, { merge: true }).then(function () {
-        return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate);
+      return fbFs.collection("wikiIndex").doc(cp.universeId).set({ entries: {} }, { merge: true }).then(function () {
+        return fbFs.collection("wikiIndex").doc(cp.universeId).update(idxUpdate);
       });
     }).then(function () {
       return wbSyncRestrito(id, wbSeasonRestritoItems(se));
@@ -4664,7 +4692,7 @@
       window.alert("Não consegui publicar: " + (err && err.message ? err.message : err));
     });
   }
-  function wbUnpublishSeason(se, touch) {
+  function wbUnpublishSeason(cp, se, touch) {
     if (!se.wikiId || !fbFs) return;
     if (!window.confirm("Despublicar essa temporada? O link para de funcionar.")) return;
     var id = se.wikiId;
@@ -4672,7 +4700,7 @@
     fbFs.collection("wikiPublic").doc(id).delete().then(function () {
       return wbSyncRestrito(id, []);
     }).then(function () {
-      return fbFs.collection("wikiPublic").doc("_index").update(idxUpdate).catch(function () {});
+      return fbFs.collection("wikiIndex").doc(cp.universeId).update(idxUpdate).catch(function () {});
     }).then(function () {
       se.wikiId = null; se.wikiPublishedAt = ""; touch(true);
     }).catch(function (err) { window.alert("Não consegui despublicar: " + (err && err.message ? err.message : err)); });
@@ -4687,7 +4715,7 @@
       row.appendChild(el("code", { style: "font-size:11px;word-break:break-all", text: url }));
       row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "copiar link", onclick: function () { if (navigator.clipboard) navigator.clipboard.writeText(url); } }));
       row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "atualizar", onclick: function () { wbPublishSeason(cp, se, touch); } }));
-      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "despublicar", onclick: function () { wbUnpublishSeason(se, touch); } }));
+      row.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "despublicar", onclick: function () { wbUnpublishSeason(cp, se, touch); } }));
     }
     return row;
   }
@@ -6697,13 +6725,26 @@
     }
 
     box.appendChild(el("div", { class: "section-label", style: "margin-top:14px", text: "Jogadores da wiki" }));
-    box.appendChild(el("div", { class: "hint", style: "margin:-4px 0 8px", text: "Quem pode ver conteúdo marcado \"🔐 restrito\" nas suas entradas publicadas." }));
+    box.appendChild(el("div", { class: "hint", style: "margin:-4px 0 8px", text: "Quem pode ver conteúdo marcado \"🔐 restrito\", e em quais universos (fora o Lótus, que é público a todos)." }));
     (state.wikiPlayers || []).forEach(function (p) {
+      var uniRow = el("div", { class: "note-tags", style: "margin:4px 0 8px" });
+      FLOWERS.filter(function (f) { return f.id !== "lotus"; }).forEach(function (f) {
+        var on = (p.universes || []).indexOf(f.id) !== -1;
+        uniRow.appendChild(el("button", {
+          type: "button", class: "chip sm", "aria-pressed": on ? "true" : "false",
+          onclick: function () {
+            p.universes = p.universes || [];
+            var i = p.universes.indexOf(f.id);
+            if (i === -1) p.universes.push(f.id); else p.universes.splice(i, 1);
+            save(); wbSyncUniverseAccess(); root.innerHTML = ""; document.getElementById("menuBtn").click();
+          }
+        }, [el("span", { text: (on ? "✓ " : "") + f.name })]));
+      });
       box.appendChild(el("div", { class: "row" }, [
-        el("div", { class: "row-body" }, [el("div", { class: "row-title", text: p.label || p.email }), el("div", { class: "row-meta", text: p.email })]),
+        el("div", { class: "row-body" }, [el("div", { class: "row-title", text: p.label || p.email }), el("div", { class: "row-meta", text: p.email }), uniRow]),
         delBtn(function () {
           state.wikiPlayers = state.wikiPlayers.filter(function (x) { return x.email !== p.email; });
-          save(); root.innerHTML = ""; document.getElementById("menuBtn").click();
+          save(); wbSyncUniverseAccess(); root.innerHTML = ""; document.getElementById("menuBtn").click();
         })
       ]));
     });
