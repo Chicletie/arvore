@@ -464,7 +464,17 @@
       var email = emailInp.value.trim();
       if (!email) { err.textContent = "Digite seu email ali em cima primeiro."; return; }
       err.textContent = ""; forgot.disabled = true; forgot.textContent = "enviando…";
-      firebase.auth().sendPasswordResetEmail(email).then(function () {
+      // O Firebase Console recusou customizar a Action URL pelo editor clássico de templates
+      // neste projeto ("atualizações de modelo não disponíveis... contate o suporte" — provável
+      // sinal de que o projeto está numa config, tipo Identity Platform, que trava esse editor).
+      // Contorna sem precisar do Console: actionCodeSettings com handleCodeInApp:true faz o
+      // Firebase montar o link do email apontando DIRETO pra reset-senha.html (com mode/oobCode
+      // já na própria URL, exatamente o que aquela página já espera receber), pulando de vez a
+      // página padrão hospedada pelo Firebase. Exige que "paradisegate.com.br" esteja na lista
+      // de domínios autorizados (Authentication > Settings > Authorized domains) — só
+      // "chicletie.github.io" tinha sido confirmado lá antes da compra do domínio próprio.
+      var actionCodeSettings = { url: "https://paradisegate.com.br/reset-senha.html", handleCodeInApp: true };
+      firebase.auth().sendPasswordResetEmail(email, actionCodeSettings).then(function () {
         forgot.textContent = "Email enviado! Confira sua caixa de entrada.";
       }).catch(function () {
         forgot.disabled = false; forgot.textContent = "esqueci minha senha";
