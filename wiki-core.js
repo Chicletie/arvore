@@ -42,6 +42,32 @@
     narrative: { color: "#7d6a9d", dash: "4 3" }, multiversal: { color: "#8f5cc9", dash: "6 4" },
     neutral: { color: "var(--border-strong)", dash: "" }
   };
+  // Ursprung only (never Paradise Gate — that has its own separate identity, see pg-theme in
+  // wiki-style.css, and the two never apply at once since PG's index only ever has Lótus pages).
+  // Each flower keeps the herbarium's bg/paper/ink untouched and just gets its own accent
+  // (links, tags, active tab, hover borders — everything already driven by --gold/--gold-ink/
+  // --accent-wash) tinted toward that universe's own color from tree/index.html's FLOWERS array.
+  // Values here are deepened/muted from that raw hex, not copied verbatim — the raw brand colors
+  // (esp. Girassol's yellow and Miosótis's light blue) are too light to read as text on the cream
+  // --paper background or as a work-tab's active background under light text; --gold-ink in
+  // particular has to hold its own as body text, so it needs real contrast, not just correct hue.
+  // Set via inline custom properties on <body> per page load (not a CSS class per universe) since
+  // that is the minimal-code way to reuse every existing --gold/--gold-ink/--accent-wash consumer
+  // for free — deliberately the "simple" version asked for, vs. a bespoke per-universe redesign.
+  var UNI_ACCENT = {
+    "Rosa": { gold: "#c23848", ink: "#8f2231", wash: "#f6dde0" },
+    "Crisântemo": { gold: "#c26a24", ink: "#8f4d15", wash: "#f7e3d0" },
+    "Girassol": { gold: "#b8901f", ink: "#7d5f12", wash: "#f7ecd0" },
+    "Cravo": { gold: "#3d8a4e", ink: "#276334", wash: "#dcefe1" },
+    "Miosótis": { gold: "#3f86b8", ink: "#235f85", wash: "#dcedf7" },
+    "Violeta": { gold: "#7a49ac", ink: "#562f82", wash: "#e9def5" },
+    "Lótus": { gold: "#c2618c", ink: "#8f3d64", wash: "#f7dfeb" }
+  };
+  function applyUniAccent(uniName) {
+    var b = document.body.style, c = UNI_ACCENT[uniName];
+    if (c) { b.setProperty("--gold", c.gold); b.setProperty("--gold-ink", c.ink); b.setProperty("--accent-wash", c.wash); }
+    else { b.removeProperty("--gold"); b.removeProperty("--gold-ink"); b.removeProperty("--accent-wash"); }
+  }
   function slugifyAnchor(s, i) { return "sec-" + i + "-" + String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 30); }
 
   // /wiki/leonel-bianchi and /wiki.html and /404.html all need to agree on where "the site
@@ -509,6 +535,7 @@
   }
 
   function renderEntry(data, wikiId) {
+    if (!isParadiseGateMode()) applyUniAccent(data.universe);
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = data.title || "wiki";
@@ -756,6 +783,7 @@
   // Recaps de sessão de uma temporada de campanha — mesma casca (topbar, login, restrito), mas
   // o conteúdo é uma lista de sessões em vez de campos/seções de uma entrada.
   function renderSeason(data, wikiId) {
+    if (!isParadiseGateMode()) applyUniAccent(data.universe);
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = data.title || "wiki";
@@ -902,7 +930,9 @@
       var byUni = {};
       filtered.forEach(function (e) { var k = e.universe || "Sem universo"; (byUni[k] = byUni[k] || []).push(e); });
       Object.keys(byUni).sort().forEach(function (uni) {
-        listWrap.appendChild(el("div", { class: "home-unihead", text: uni }));
+        var c = UNI_ACCENT[uni];
+        var headStyle = c ? "color:" + c.ink + ";border-bottom-color:" + c.gold : null;
+        listWrap.appendChild(el("div", { class: "home-unihead", style: headStyle, text: uni }));
         var grid = el("div", { class: "home-grid" });
         byUni[uni].sort(function (a, b) { return (a.title || "").localeCompare(b.title || ""); }).forEach(function (e) { grid.appendChild(cardFor(e)); });
         listWrap.appendChild(grid);
