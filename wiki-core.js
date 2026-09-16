@@ -909,11 +909,36 @@
       });
       return wrap;
     }
+    // Taxonomia — só Criatura (campo próprio, não confundir com os campos curtos/longos da
+    // aba Geral): fatos curtos viram uma tabela igual a infobox (mesmo clima de ficha de
+    // classificação científica), campos longos viram blocos de prosa abaixo, com cathead.
+    function buildTaxonomyPanel() {
+      var wrap = el("div", { class: "article" });
+      var taxShort = (data.taxonomy || []).filter(function (f) { return f.type !== "nota"; });
+      var taxLong = (data.taxonomy || []).filter(function (f) { return f.type === "nota"; });
+      if (taxShort.length) {
+        var table = el("table", { class: "infobox-facts" });
+        taxShort.forEach(function (f) {
+          var td = el("td");
+          if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
+          else mdInline(td, f.value);
+          table.appendChild(el("tr", {}, [el("th", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }), td]));
+        });
+        wrap.appendChild(table);
+      }
+      taxLong.forEach(function (f) {
+        wrap.appendChild(el("div", { class: "cathead", text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
+        if (f.vis === "spoiler") wrap.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
+        else wrap.appendChild(renderMarkdown(f.value));
+      });
+      return wrap;
+    }
 
     var tabPanels = [{ label: "Geral", el: buildArticle(data, "geral-", sharedToc) }];
     (data.variants || []).forEach(function (variant, vi) { tabPanels.push({ label: variant.label || "Versão", el: buildArticle(variant, "v" + vi + "-", []) }); });
     if (data.gallery && data.gallery.length) tabPanels.push({ label: "Galeria", el: buildGalleryPanel() });
     if (data.citacoes && data.citacoes.length) tabPanels.push({ label: "Citações", el: buildCitacoesPanel() });
+    if (data.taxonomy && data.taxonomy.length) tabPanels.push({ label: "Taxonomia", el: buildTaxonomyPanel() });
     if (tabPanels.length > 1) {
       var tabsWrap = el("div", { class: "work-tabs" });
       tabPanels.forEach(function (p, i) {

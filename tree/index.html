@@ -1108,6 +1108,21 @@
     "Língua / Povo": ["Território", "Língua", "História", "Costumes", "Crenças", "Relações externas"],
     "Conceito": []
   };
+  // Aba de Taxonomia — só pra Criatura (2026-09-16): separa a ficha classificatória/científica
+  // da descrição narrativa/fantasiosa de sempre. Tipos fixos aqui em vez de guessFieldType
+  // porque são nomes curtos e específicos (ex: "Ordem", "Gênero") que a heurística genérica não
+  // reconheceria bem sozinha.
+  var TAXONOMY_TEMPLATE = [
+    { key: "Nome científico", type: "texto" },
+    { key: "Reino", type: "texto" },
+    { key: "Filo", type: "texto" },
+    { key: "Classe", type: "texto" },
+    { key: "Ordem", type: "texto" },
+    { key: "Família", type: "texto" },
+    { key: "Gênero", type: "texto" },
+    { key: "Espécie", type: "texto" },
+    { key: "Notas taxonômicas", type: "nota" }
+  ];
   var ENTRY_STATUS = [
     { id: "semente", label: "semente", glyph: "🌱" },
     { id: "rascunho", label: "rascunho", glyph: "✍" },
@@ -1406,6 +1421,22 @@
         if (!Array.isArray(fm.allow)) fm.allow = [];
         delete fm.secret;
       });
+      // Taxonomia (só Criatura, opt-in): fica ausente (undefined) até o usuário clicar "+
+      // adicionar aba de Taxonomia" — não força a chave em toda entrada, só normaliza quando já
+      // existe. Mesma filosofia de "confidential" nos campos: ausência = nunca usado.
+      if (e.taxonomy && typeof e.taxonomy === "object") {
+        if (!e.taxonomy.fields || typeof e.taxonomy.fields !== "object") e.taxonomy.fields = {};
+        if (!e.taxonomy.fieldMeta || typeof e.taxonomy.fieldMeta !== "object") e.taxonomy.fieldMeta = {};
+        Object.keys(e.taxonomy.fieldMeta).forEach(function (k) {
+          var fm = e.taxonomy.fieldMeta[k]; if (!fm || typeof fm !== "object") { delete e.taxonomy.fieldMeta[k]; return; }
+          if (FIELD_TYPES.map(function (x) { return x.id; }).indexOf(fm.type) === -1) fm.type = "texto";
+          if (!Array.isArray(fm.opts)) fm.opts = [];
+          fm.vis = wbMigrateVis(fm.vis, false);
+          if (!Array.isArray(fm.allow)) fm.allow = [];
+        });
+      } else {
+        delete e.taxonomy;
+      }
       e.links.forEach(function (l) { if (typeof l.note !== "string") l.note = ""; if (typeof l.dispAs !== "string") l.dispAs = ""; });
       if (!Array.isArray(e.sections)) e.sections = [];
       e.sections = e.sections.filter(function (sec) { return sec && typeof sec === "object"; });
@@ -4206,6 +4237,18 @@
       if (asEmail && (fm.confidential || "").trim() && (fm.confidentialAllow || []).indexOf(asEmail) !== -1) val = fm.confidential;
       fields.push({ key: k, type: fm.type, value: val, vis: outVis(fm.vis), opts: fm.opts || [] });
     });
+    // Taxonomia (só Criatura, opt-in) — mesma filtragem por vis dos campos normais, já que
+    // reaproveita o mesmíssimo wbFieldMeta/fieldMeta por baixo (ver o editor em wbEntryView).
+    var taxonomy = [];
+    if (e.taxonomy) {
+      Object.keys(e.taxonomy.fields || {}).forEach(function (k) {
+        var fm = wbFieldMeta(e.taxonomy, k);
+        if (!okVis(fm.vis, fm.allow)) return;
+        var val = e.taxonomy.fields[k] || "";
+        if (asEmail && (fm.confidential || "").trim() && (fm.confidentialAllow || []).indexOf(asEmail) !== -1) val = fm.confidential;
+        taxonomy.push({ key: k, type: fm.type, value: val, vis: outVis(fm.vis), opts: fm.opts || [] });
+      });
+    }
     var sections = (e.sections || []).filter(function (s) { return okVis(s.vis, s.allow); }).map(function (s) {
       return { title: s.title || "", body: s.body || "", vis: outVis(s.vis) };
     });
@@ -4259,6 +4302,7 @@
       coverVis: outVis(e.coverVis),
       coverFocus: e.coverFocus || null,
       fields: fields,
+      taxonomy: taxonomy,
       sections: sections,
       posts: posts,
       gallery: gallery,
@@ -4341,6 +4385,10 @@
       var fm = wbFieldMeta(e, k);
       return { key: k, type: fm.type, value: e.fields[k] || "", vis: "publico", opts: fm.opts || [] };
     });
+    var taxonomy = e.taxonomy ? Object.keys(e.taxonomy.fields || {}).map(function (k) {
+      var fm = wbFieldMeta(e.taxonomy, k);
+      return { key: k, type: fm.type, value: e.taxonomy.fields[k] || "", vis: "publico", opts: fm.opts || [] };
+    }) : [];
     var sections = (e.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
     var posts = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).map(function (p) { return { id: p.id, title: p.title || "", date: p.date || "", body: p.body || "", vis: "publico" }; });
     var gallery = (e.gallery || []).filter(function (g) { return g.url; }).map(function (g) { return { group: g.group || "", url: g.url, caption: g.caption || "", vis: "publico", focus: g.focus || null }; });
@@ -4378,6 +4426,7 @@
       coverVis: "publico",
       coverFocus: e.coverFocus || null,
       fields: fields,
+      taxonomy: taxonomy,
       sections: sections,
       posts: posts,
       gallery: gallery,
@@ -5273,6 +5322,51 @@
     }
     } else {
       wbRenderVariantContent(card, e, activeVariant, { hideSecret: hideSecret, ro: ro, touch: touch, cat: cat });
+    }
+
+    // Taxonomia — só Criatura: aba própria separando a ficha classificatória/científica da
+    // descrição narrativa de sempre ("nem todo mundo quer ler minha bobalhada taxonômica").
+    // Reaproveita literalmente wbFieldMeta/wbAddField/wbRenderField/wbRenderLongField apontando
+    // pra e.taxonomy em vez de e — funciona de graça porque essas funções só nunca tocam em
+    // nada além de .fields/.fieldMeta de quem quer que seja passado (mesmo truque das variantes
+    // de obra). Vira uma aba de verdade na wiki (ver wiki-core.js), não uma seção — só uma aba
+    // fica de fato escondida até quem quiser clicar, uma seção sempre aparece expandida lá.
+    if (e.type === "Criatura" && (e.taxonomy || !ro)) {
+      card.appendChild(cat("Taxonomia"));
+      if (!e.taxonomy) {
+        if (!ro) card.appendChild(el("button", { class: "field-ghost", type: "button", text: "🔬 + adicionar aba de Taxonomia", onclick: function () { e.taxonomy = { fields: {}, fieldMeta: {} }; touch(true); } }));
+      } else {
+        if (!ro) card.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Vira uma aba própria na wiki, separada da descrição principal — quem só quer o resumo narrativo não precisa ver isso." }));
+        var tax = e.taxonomy;
+        var taxShort = Object.keys(tax.fields).filter(function (k) { return wbFieldMeta(tax, k).type !== "nota"; });
+        var taxLong = Object.keys(tax.fields).filter(function (k) { return wbFieldMeta(tax, k).type === "nota"; });
+        if (taxShort.length) {
+          var taxDl = el("dl", { class: "wb-fields" });
+          taxShort.forEach(function (k) { wbRenderField(taxDl, tax, k, { hideSecret: hideSecret, ro: ro, touch: touch }); });
+          card.appendChild(taxDl);
+        }
+        taxLong.forEach(function (k) {
+          if (ro && !(tax.fields[k] || "").trim()) return;
+          card.appendChild(wbRenderLongField(tax, k, { hideSecret: hideSecret, ro: ro, touch: touch }));
+        });
+        if (!ro) {
+          var taxMissing = TAXONOMY_TEMPLATE.filter(function (f) { return !(f.key in tax.fields); });
+          var taxTray = el("div", { class: "ghost-tray" });
+          if (taxMissing.length) taxTray.appendChild(el("div", { class: "ghost-head", text: "campos sugeridos" }));
+          taxMissing.forEach(function (f) {
+            taxTray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ " + f.key, onclick: function () { tax.fields[f.key] = ""; tax.fieldMeta[f.key] = { type: f.type, opts: [], vis: "publico", allow: [] }; touch(true); } }));
+          });
+          taxTray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ campo livre", style: "font-style:italic", onclick: function () {
+            var k = window.prompt("Nome do campo:");
+            if (k) wbAddField(tax, k, touch);
+          } }));
+          taxTray.appendChild(el("button", { class: "field-ghost", type: "button", style: "color:var(--neg)", text: "✕ remover aba de Taxonomia", onclick: function () {
+            if (!window.confirm("Remover a aba de Taxonomia inteira? O conteúdo se perde.")) return;
+            delete e.taxonomy; touch(true);
+          } }));
+          card.appendChild(taxTray);
+        }
+      }
     }
 
     // galeria — imagens agrupadas por "temporada"/rótulo livre, exportadas do mesmo jeito na wiki
