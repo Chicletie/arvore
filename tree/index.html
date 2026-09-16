@@ -3233,6 +3233,21 @@
           Object.keys(sel).forEach(function (id) { var en = wbEntry(id); if (en && en.tags.indexOf(t) === -1) en.tags.push(t); });
           save(); renderList();
         } }));
+        bar.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "🔗 publicar selecionadas", onclick: function () {
+          var chosen = Object.keys(sel).map(wbEntry).filter(Boolean);
+          var secretOnes = chosen.filter(function (en) { return en.secret; });
+          var publishable = chosen.filter(function (en) { return !en.secret; });
+          if (!publishable.length) { window.alert("Nenhuma das selecionadas pode ser publicada (todas marcadas como secretas)."); return; }
+          var msg = "Publicar " + publishable.length + " entrada(s) na wiki?";
+          if (secretOnes.length) msg += "\n(" + secretOnes.length + " selecionada(s) está(ão) marcada(s) como secreta(s) e será(ão) ignorada(s).)";
+          if (!window.confirm(msg)) return;
+          // Mesmo padrão do "republicar todas as desatualizadas" do painel de publicação: cada
+          // publicação é independente (uma falha de uma não trava as outras), touch salva e
+          // atualiza a lista local a cada sucesso em vez de esperar todas terminarem.
+          function touch(re) { save(); if (re) renderList(); }
+          publishable.forEach(function (en) { wbPublishWiki(en, touch); });
+          sel = {};
+        } }));
         listHost.appendChild(bar);
       }
       listHost.appendChild(card);
