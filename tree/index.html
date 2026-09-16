@@ -4407,6 +4407,18 @@
     (snap.sessions || []).forEach(function (sx) { parts.push(sx.title, sx.recap); });
     return wbMdToPlain(parts.join(" ")).slice(0, WB_SEARCH_CAP);
   }
+  // Contagem de palavras a partir do SNAPSHOT já filtrado por visibilidade (não da entrada
+  // ao vivo, que ainda carrega conteúdo secreto/restrito) — os totais que aparecem na home
+  // pública (tira de estatísticas) só podem somar o que um visitante de fato consegue ler,
+  // nunca vazar volume de conteúdo escondido através de um número agregado.
+  function wbSnapWordCount(snap) {
+    var t = (snap.summary || "") + " " + (snap.body || "") + " " +
+      (snap.fields || []).map(function (f) { return f.value; }).join(" ") + " " +
+      (snap.sections || []).map(function (s) { return s.body; }).join(" ") + " " +
+      (snap.posts || []).map(function (p) { return p.body; }).join(" ");
+    var m = t.replace(/[#*_>`~\[\]()|-]/g, " ").match(/\S+/g);
+    return m ? m.length : 0;
+  }
   function wbIndexEntry(e, snap) {
     var f = flowerById(e.universeId);
     return {
@@ -4422,7 +4434,11 @@
       // sem nenhum jeito de clicar-pra-revelar, então uma capa marcada como spoiler não pode
       // vazar ali fora do contexto da própria página.
       cover: e.coverVis === "publico" ? (e.cover || null) : null,
-      coverFocus: e.coverFocus || null
+      coverFocus: e.coverFocus || null,
+      // Pra tira de estatísticas da home (Paradise Gate): páginas/palavras/conexões/notas.
+      wordCount: wbSnapWordCount(snap),
+      linkCount: (snap.links || []).length,
+      postsCount: (snap.posts || []).length
     };
   }
   function wbWikiUrl(id) { return location.origin + location.pathname.replace(/index\.html$/, "") + "wiki/" + id; }

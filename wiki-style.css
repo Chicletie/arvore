@@ -179,6 +179,21 @@ a.tag:hover { border-color: var(--gold); }
 .home-search { display: block; width: 100%; max-width: 460px; margin: 0 auto 10px; padding: 11px 16px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: 15px; }
 .home-random { display: block; margin: 0 auto 26px; background: none; border: 1px solid var(--border-strong); border-radius: 999px; padding: 7px 16px; color: var(--gold-ink); font-family: var(--font-body); font-size: 12.5px; cursor: pointer; }
 .home-random:hover { background: var(--accent-wash); }
+/* Paradise Gate home only: cabeçalho compacto (marca+busca dentro do .site-header), tira de
+   estatísticas e nuvem de tags — ver renderHome em wiki-core.js. Tudo dentro do mesmo .card
+   cream de sempre, então reaproveita os tokens normais (--ink/--gold-ink/--border), nada
+   novo precisa ser definido. */
+.site-header .brand { font-family: var(--font-display); font-size: 17px; font-weight: 600; flex: none; }
+.site-header .brand a { color: var(--gold-ink); text-decoration: none; letter-spacing: 0.02em; }
+.header-search { flex: 1 1 200px; min-width: 0; max-width: none; margin: 0; padding: 8px 15px; font-size: 14px; }
+.stats-strip { display: flex; justify-content: center; flex-wrap: wrap; gap: 30px; padding: 14px 4px; margin: 20px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.stat-item { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.stat-num { font-family: var(--font-display); font-size: 24px; font-weight: 600; color: var(--ink); }
+.stat-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); }
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.tag-chip { font-size: 12px; color: var(--gold-ink); background: var(--accent-wash); border: 1px solid var(--border); padding: 5px 12px; border-radius: 999px; text-decoration: none; }
+.tag-chip:hover { border-color: var(--gold); }
+
 .home-unihead { font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--gold-ink); font-weight: 600; margin: 26px 0 10px; padding-bottom: 5px; border-bottom: 1px solid var(--border); }
 .home-unihead:first-child { margin-top: 0; }
 .home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }

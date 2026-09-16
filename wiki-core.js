@@ -193,6 +193,7 @@
   // Ponto de foco escolhido no editor (em vez de recorte fixo) — vira object-position aqui,
   // a mesma imagem original renderiza certo em qualquer proporção (infobox, miniatura, galeria).
   function objPos(focus) { return (focus && focus.x != null ? focus.x : 50) + "% " + (focus && focus.y != null ? focus.y : 50) + "%"; }
+  function wbFmtCompact(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n); }
 
   // Login only matters for "restrito" content — público/spoiler never need it. A signed-in
   // session persists across page loads (Firebase's own local persistence), so a player who logs
@@ -847,14 +848,26 @@
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = homeLabel() + " · Wiki";
+    var pg = isParadiseGateMode();
     var header = el("div", { class: "site-header" });
+    var searchBox = el("input", { class: "home-search", type: "search", placeholder: "Buscar nome, tipo ou tag…", "aria-label": "Buscar" });
+    // Paradise Gate: cabeçalho compacto (marca + busca + entrar numa linha só) — o antigo
+    // bloco grande (título+subtítulo+busca centralizados) empurrava o feed de verdade pra
+    // baixo da dobra sem motivo, já que a marca já aparece aqui. Ursprung mantém o layout
+    // original (não foi pedido mexer ali, e o agrupamento por universo pede mais respiro).
+    if (pg) {
+      header.appendChild(el("div", { class: "brand" }, [el("a", { href: homeHref(), text: homeLabel() })]));
+      searchBox.classList.add("header-search");
+      header.appendChild(searchBox);
+    }
     mountLoginBar(header);
     page.appendChild(header);
     var wrap = el("div", { class: "card" });
-    wrap.appendChild(el("div", { class: "home-title", text: homeLabel() }));
-    wrap.appendChild(el("div", { class: "home-sub", text: "Wiki pública. Navegue pelas páginas publicadas." }));
-    var searchBox = el("input", { class: "home-search", type: "search", placeholder: "Buscar nome, tipo ou tag…", "aria-label": "Buscar" });
-    wrap.appendChild(searchBox);
+    if (!pg) {
+      wrap.appendChild(el("div", { class: "home-title", text: homeLabel() }));
+      wrap.appendChild(el("div", { class: "home-sub", text: "Wiki pública. Navegue pelas páginas publicadas." }));
+      wrap.appendChild(searchBox);
+    }
 
     var entries = Object.keys(indexData.entries || {}).map(function (id) {
       return Object.assign({ id: id }, indexData.entries[id]);
@@ -901,7 +914,38 @@
       var pick = entries[Math.floor(Math.random() * entries.length)];
       location.href = wikiHref(pick.id);
     });
-    wrap.appendChild(randomBtn);
+    if (!pg) wrap.appendChild(randomBtn);
+
+    // Paradise Gate only: tira de estatísticas (soma os campos que wbIndexEntry manda desde
+    // 2026-09-16 — entradas publicadas antes disso simplesmente somam 0 até republicarem,
+    // não quebra) + nuvem das tags mais usadas + o botão de página aleatória reposicionado
+    // pra cá (antes ficava logo após Novidades; esse espaço fazia mais sentido pra ele já
+    // que ambos são "descoberta", não "o que mudou").
+    if (pg) {
+      var totalWords = 0, totalLinks = 0, totalPosts = 0;
+      var tagFreq = {};
+      entries.forEach(function (e) {
+        totalWords += e.wordCount || 0;
+        totalLinks += e.linkCount || 0;
+        totalPosts += e.postsCount || 0;
+        (e.tags || []).forEach(function (t) { tagFreq[t] = (tagFreq[t] || 0) + 1; });
+      });
+      var statsStrip = el("div", { class: "stats-strip" });
+      [["Páginas", entries.length], ["Palavras", wbFmtCompact(totalWords)], ["Conexões", totalLinks], ["Notas", totalPosts]].forEach(function (s) {
+        statsStrip.appendChild(el("div", { class: "stat-item" }, [el("span", { class: "stat-num", text: String(s[1]) }), el("span", { class: "stat-lbl", text: s[0] })]));
+      });
+      wrap.appendChild(statsStrip);
+
+      var topTags = Object.keys(tagFreq).sort(function (a, b) { return tagFreq[b] - tagFreq[a]; }).slice(0, 10);
+      if (topTags.length) {
+        wrap.appendChild(el("div", { class: "cathead", text: "🏷 Tags em destaque" }));
+        var tagCloud = el("div", { class: "tag-cloud" });
+        topTags.forEach(function (t) { tagCloud.appendChild(el("a", { class: "tag-chip", href: homeHref() + "?q=" + encodeURIComponent(t), text: "#" + t })); });
+        wrap.appendChild(tagCloud);
+      }
+      randomBtn.style.marginTop = "12px";
+      wrap.appendChild(randomBtn);
+    }
 
     var listWrap = el("div", { class: "home-groups" });
     wrap.appendChild(listWrap);
