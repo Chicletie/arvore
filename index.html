@@ -5412,11 +5412,17 @@
       card.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ criar entrada nova nesta temporada", style: "margin-top:10px", onclick: function () { wbNewEntry(cp.universeId, null, null, null, cp.id, se.id); } }));
     } else if (tab === "sessoes") {
       card.appendChild(wbWikiSeasonPublishRow(cp, se, touch));
-      card.appendChild(el("button", { class: "btn", type: "button", text: "＋ nova sessão", onclick: function () {
-        se.sessions.push({ id: uid(), date: todayKey(), title: "", recap: "", notes: "", present: [], vis: "publico", allow: [] });
-        touch(true);
-      } }));
-      var sess = se.sessions.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+      var sessOrder = w.sessOrder === "asc" ? "asc" : "desc";
+      card.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0" }, [
+        el("button", { class: "btn", type: "button", text: "＋ nova sessão", onclick: function () {
+          se.sessions.push({ id: uid(), date: todayKey(), title: "", recap: "", notes: "", present: [], vis: "publico", allow: [] });
+          touch(true);
+        } }),
+        segControl([["desc", "mais recente primeiro"], ["asc", "mais antiga primeiro"]], sessOrder, function (o) { wbGo({ sessOrder: o }); })
+      ]));
+      var sess = se.sessions.slice().sort(function (a, b) {
+        return sessOrder === "asc" ? (a.date || "").localeCompare(b.date || "") : (b.date || "").localeCompare(a.date || "");
+      });
       if (!sess.length) card.appendChild(el("div", { class: "empty", text: "Nenhuma sessão registrada." }));
       sess.forEach(function (sx) {
         var n = se.sessions.indexOf(sx) + 1;
