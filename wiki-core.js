@@ -661,7 +661,9 @@
     var sharedToc = [];
     if (data.posts && data.posts.length) sharedToc.push({ id: "posts", label: "Posts" });
     if (data.gallery && data.gallery.length) sharedToc.push({ id: "galeria", label: "Galeria" });
-    if (famTree) sharedToc.push({ id: "familia", label: "Família" });
+    // Genealogia only ever exists alongside Relações (a family link is also a relation, so
+    // relNeighbors always picks it up too) — never the other way around, which is why this is
+    // gated on relGraph alone: one combined section, tabbed, Relações first/default.
     if (relGraph) sharedToc.push({ id: "relacoes", label: "Relações" });
     if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
@@ -725,13 +727,27 @@
       card.appendChild(gwrap);
     }
 
-    if (famTree) {
-      card.appendChild(el("div", { class: "cathead", id: "familia", text: "Família" }));
-      card.appendChild(famTree);
-    }
+    // Relações + Genealogia share one section, tabbed (reuses .work-tabs/.work-tab, same look
+    // as the obra/campanha variant switcher above) — Relações is always the default tab, and
+    // Genealogia only exists as a second tab when there's actually a family tree to show.
     if (relGraph) {
       card.appendChild(el("div", { class: "cathead", id: "relacoes", text: "Relações" }));
+      if (famTree) {
+        famTree.hidden = true;
+        var relTabRel = el("button", { type: "button", class: "work-tab on", text: "Relações" });
+        var relTabFam = el("button", { type: "button", class: "work-tab", text: "Genealogia" });
+        relTabRel.addEventListener("click", function () {
+          relTabRel.classList.add("on"); relTabFam.classList.remove("on");
+          relGraph.hidden = false; famTree.hidden = true;
+        });
+        relTabFam.addEventListener("click", function () {
+          relTabFam.classList.add("on"); relTabRel.classList.remove("on");
+          relGraph.hidden = true; famTree.hidden = false;
+        });
+        card.appendChild(el("div", { class: "work-tabs" }, [relTabRel, relTabFam]));
+      }
       card.appendChild(relGraph);
+      if (famTree) card.appendChild(famTree);
     }
 
     // ligações — só aparece pra quem também está publicado; o resto fica de fora de propósito
