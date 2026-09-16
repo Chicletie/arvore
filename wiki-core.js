@@ -26,6 +26,22 @@
     (kids || []).forEach(function (c) { if (c == null || c === false) return; e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
     return e;
   }
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function svgEl(name, attrs) {
+    var e = document.createElementNS(SVGNS, name);
+    if (attrs) for (var k in attrs) { if (attrs[k] != null) e.setAttribute(k, attrs[k]); }
+    return e;
+  }
+  // Same palette as index.html's EDGE_STYLE (tree/index.html ~line 1197) — only the color/dash
+  // pair is needed here since the snapshot already ships each link's `style` key precomputed.
+  var EDGE_STYLE = {
+    ally: { color: "#3f9d5f", dash: "" }, rival: { color: "#d05a45", dash: "" },
+    family: { color: "#b58a2e", dash: "" }, romance: { color: "#c9527a", dash: "" },
+    friend: { color: "#8a9d3f", dash: "" }, bond: { color: "#a67c3d", dash: "" },
+    faction: { color: "#3f7d94", dash: "" }, location: { color: "#4a8f7d", dash: "" },
+    narrative: { color: "#7d6a9d", dash: "4 3" }, multiversal: { color: "#8f5cc9", dash: "6 4" },
+    neutral: { color: "var(--border-strong)", dash: "" }
+  };
   function slugifyAnchor(s, i) { return "sec-" + i + "-" + String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 30); }
 
   // /wiki/leonel-bianchi and /wiki.html and /404.html all need to agree on where "the site
@@ -365,6 +381,133 @@
     firebase.auth().onAuthStateChanged(refresh);
   }
 
+  // Same bucketing rule as tree/index.html's wbFamily() — a link only lands here via one of
+  // these exact labels, which the app itself always creates on BOTH sides (manual add or the
+  // sibling/grandparent/family-extras auto-inference), so reading only `data.links` (never
+  // backlinks) here mirrors the author's own view exactly.
+  var FAMILY_LABEL_BUCKET = {
+    "é filho(a) de": "parents", "é pai/mãe de": "children",
+    "irmão/irmã de": "siblings", "meio-irmão/meia-irmã de": "halfSiblings",
+    "casado(a) com": "spouses", "avô/avó de": "grandchildren", "neto(a) de": "grandparents"
+  };
+  function familyOf(links) {
+    var fam = { parents: [], children: [], siblings: [], halfSiblings: [], spouses: [], grandparents: [], grandchildren: [] };
+    (links || []).forEach(function (lk) { var b = FAMILY_LABEL_BUCKET[lk.label]; if (b) fam[b].push(lk); });
+    return fam;
+  }
+  // Static port of wbFamilyTree (tree/index.html) — same 5-tier layout, but reading plain
+  // {label,targetId,targetTitle} link objects from the snapshot instead of live entry refs, and
+  // navigating via a real page load (wikiHref) instead of an in-app route change. A link only
+  // ever reaches this snapshot if its target is ALSO published (see wbWikiLinks) — an unpublished
+  // relative just doesn't show up, same "only what's public" rule as the rest of the wiki. The
+  // one exception is the GM's own local "ver como wiki" preview, where an unpublished target can
+  // carry a null targetId — rendered as a plain, non-clickable node rather than a dead link.
+  function buildFamilyTree(data) {
+    var fam = familyOf(data.links);
+    var sibs = fam.siblings.concat(fam.halfSiblings);
+    var hasAny = fam.parents.length || fam.children.length || fam.grandparents.length || fam.grandchildren.length || sibs.length || fam.spouses.length;
+    if (!hasAny) return null;
+    var selfRowN = 1 + sibs.length + fam.spouses.length;
+    var maxRowN = Math.max(fam.grandparents.length, fam.parents.length, selfRowN, fam.children.length, fam.grandchildren.length, 1);
+    var W = Math.max(460, maxRowN * 92), cx = W / 2;
+    var GP_Y = 20, P_Y = 82, SELF_Y = 144, C_Y = 206, GC_Y = 264, H = 284;
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "wb-famtree", width: "100%" });
+    function nodeAt(x, y, lk, self) {
+      var label = self ? data.title : lk.targetTitle;
+      var g = svgEl("g", { transform: "translate(" + x + "," + y + ")" });
+      var w2 = Math.max(60, label.length * 6.4 + 14);
+      g.appendChild(svgEl("rect", { x: -w2 / 2, y: -13, width: w2, height: 26, rx: 7, fill: self ? "var(--accent-wash)" : "var(--surface)", stroke: self ? "var(--gold)" : "var(--border-strong)" }));
+      var t = svgEl("text", { class: "wb-ft-label", y: 4 });
+      t.textContent = label.length > 16 ? label.slice(0, 15) + "…" : label;
+      g.appendChild(t);
+      if (!self && lk.targetId) { g.style.cursor = "pointer"; g.addEventListener("click", function () { location.href = wikiHref(lk.targetId); }); }
+      return g;
+    }
+    function rowXs(n) {
+      if (n <= 0) return [];
+      if (n === 1) return [cx];
+      var span = Math.min(W * 0.86, (n - 1) * 92), x0 = cx - span / 2;
+      return Array.from({ length: n }, function (_, i) { return x0 + i * (span / (n - 1)); });
+    }
+    function tier(links, y, lineFromY, toX, toY, dashed) {
+      var xs = rowXs(links.length);
+      links.forEach(function (lk, i) {
+        var attrs = { x1: xs[i], y1: lineFromY, x2: toX, y2: toY, stroke: "var(--border-strong)" };
+        if (dashed) attrs["stroke-dasharray"] = "2 3";
+        svg.appendChild(svgEl("line", attrs));
+        svg.appendChild(nodeAt(xs[i], y, lk, false));
+      });
+    }
+    tier(fam.grandparents, GP_Y, GP_Y + 13, cx, P_Y - 13, true);
+    tier(fam.parents, P_Y, P_Y + 13, cx, SELF_Y - 13, false);
+    var GAP = 78;
+    sibs.forEach(function (lk, i) {
+      var x = cx - GAP * (sibs.length - i);
+      svg.appendChild(svgEl("line", { x1: x, y1: SELF_Y, x2: cx - 26, y2: SELF_Y, stroke: "var(--border-strong)" }));
+      svg.appendChild(nodeAt(x, SELF_Y, lk, false));
+    });
+    svg.appendChild(nodeAt(cx, SELF_Y, null, true));
+    fam.spouses.forEach(function (lk, i) {
+      var x = cx + GAP * (i + 1);
+      svg.appendChild(svgEl("line", { x1: cx + 26, y1: SELF_Y, x2: x, y2: SELF_Y, stroke: "var(--border-strong)", "stroke-dasharray": "2 3" }));
+      svg.appendChild(nodeAt(x, SELF_Y, lk, false));
+    });
+    tier(fam.children, C_Y, C_Y - 13, cx, SELF_Y + 13, false);
+    tier(fam.grandchildren, GC_Y, GC_Y - 13, cx, C_Y + 13, true);
+    return el("div", { class: "wb-famtree-wrap" }, [svg]);
+  }
+  // Star-topology relation graph, ported from wbEntryRelGraph but as a fixed radial layout
+  // instead of the live force-sim/drag engine (createGraph) — that engine is ~250 lines of
+  // physics+pan+zoom+persisted-position code built for an author actively arranging a map; a
+  // read-only wiki page just needs to SHOW the relations, not let a visitor rearrange them, so a
+  // static circle is the right amount of engineering here, not a cut corner. Neighbors come from
+  // BOTH data.links (outgoing) and data.backlinks (incoming, deduped by target) — mirrors the
+  // author's own dual-scan, since a hand-typed label with no LINK_TYPES inverse only ever creates
+  // one direction.
+  function relNeighbors(data) {
+    var seen = {}, out = [];
+    (data.links || []).forEach(function (lk) { var key = lk.targetId || ("t:" + lk.targetTitle); if (!seen[key]) { seen[key] = 1; out.push(lk); } });
+    (data.backlinks || []).forEach(function (lk) { var key = lk.targetId || ("t:" + lk.targetTitle); if (!seen[key]) { seen[key] = 1; out.push(lk); } });
+    return out;
+  }
+  function buildRelGraph(data) {
+    var neighbors = relNeighbors(data);
+    if (!neighbors.length) return null;
+    var W = 460, cx = W / 2, cy = 150, n = neighbors.length;
+    var R = Math.min(150, 60 + n * 12);
+    var H = Math.round(cy + R + 40);
+    var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "wb-relgraph", width: "100%" });
+    neighbors.forEach(function (lk, i) {
+      var angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+      var x = cx + R * Math.cos(angle), y = cy + R * Math.sin(angle);
+      var st = EDGE_STYLE[lk.style] || EDGE_STYLE.neutral;
+      var lineAttrs = { x1: cx, y1: cy, x2: x, y2: y, stroke: st.color };
+      if (st.dash) lineAttrs["stroke-dasharray"] = st.dash;
+      svg.appendChild(svgEl("line", lineAttrs));
+      if (lk.label) {
+        var lt = svgEl("text", { class: "wb-rg-edge-label", x: cx + (x - cx) * 0.55, y: cy + (y - cy) * 0.55 });
+        lt.textContent = lk.label;
+        svg.appendChild(lt);
+      }
+      var g = svgEl("g", { transform: "translate(" + x + "," + y + ")" });
+      var w2 = Math.max(50, Math.min(120, lk.targetTitle.length * 6.2 + 14));
+      g.appendChild(svgEl("rect", { x: -w2 / 2, y: -12, width: w2, height: 24, rx: 12, fill: "var(--surface)", stroke: st.color }));
+      var t = svgEl("text", { class: "wb-rg-node-label", y: 4 });
+      t.textContent = lk.targetTitle.length > 15 ? lk.targetTitle.slice(0, 14) + "…" : lk.targetTitle;
+      g.appendChild(t);
+      if (lk.targetId) { g.style.cursor = "pointer"; g.addEventListener("click", function () { location.href = wikiHref(lk.targetId); }); }
+      svg.appendChild(g);
+    });
+    var self = svgEl("g", { transform: "translate(" + cx + "," + cy + ")" });
+    var sw = Math.max(60, Math.min(150, data.title.length * 6.6 + 18));
+    self.appendChild(svgEl("rect", { x: -sw / 2, y: -15, width: sw, height: 30, rx: 8, fill: "var(--accent-wash)", stroke: "var(--gold)" }));
+    var st2 = svgEl("text", { class: "wb-rg-node-label wb-rg-self", y: 5 });
+    st2.textContent = data.title.length > 18 ? data.title.slice(0, 17) + "…" : data.title;
+    self.appendChild(st2);
+    svg.appendChild(self);
+    return el("div", { class: "wb-relgraph-wrap" }, [svg]);
+  }
+
   function renderEntry(data, wikiId) {
     var page = document.getElementById("page");
     page.textContent = "";
@@ -486,9 +629,13 @@
       return article;
     }
     var hasLinks = (data.links && data.links.length) || (data.backlinks && data.backlinks.length);
+    var famTree = buildFamilyTree(data);
+    var relGraph = buildRelGraph(data);
     var sharedToc = [];
     if (data.posts && data.posts.length) sharedToc.push({ id: "posts", label: "Posts" });
     if (data.gallery && data.gallery.length) sharedToc.push({ id: "galeria", label: "Galeria" });
+    if (famTree) sharedToc.push({ id: "familia", label: "Família" });
+    if (relGraph) sharedToc.push({ id: "relacoes", label: "Relações" });
     if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
     if (data.variants && data.variants.length) {
@@ -549,6 +696,15 @@
         gwrap.appendChild(grid);
       });
       card.appendChild(gwrap);
+    }
+
+    if (famTree) {
+      card.appendChild(el("div", { class: "cathead", id: "familia", text: "Família" }));
+      card.appendChild(famTree);
+    }
+    if (relGraph) {
+      card.appendChild(el("div", { class: "cathead", id: "relacoes", text: "Relações" }));
+      card.appendChild(relGraph);
     }
 
     // ligações — só aparece pra quem também está publicado; o resto fica de fora de propósito
