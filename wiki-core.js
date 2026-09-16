@@ -1140,7 +1140,14 @@
         return a;
       }
       if (charPick) spotLeft.appendChild(charCard(charPick, isAniversariante));
-      else spotLeft.appendChild(el("div", { class: "spotlight-char" }, [el("div", { class: "spotlight-char-body" }, [el("div", { class: "spotlight-char-eyebrow", text: "Personagem do dia" }), el("div", { class: "spotlight-empty", text: "Ainda sem personagens publicados." })])]));
+      else {
+        // Dois motivos bem diferentes levam a nenhum pick: ou não existe NENHUM Personagem
+        // publicado, ou existem mas todos caíram na própria janela de aniversário hoje (ex:
+        // uma wiki pequena com 2 personagens nascidos no mesmo mês) — a mensagem tem que dizer
+        // qual dos dois é, senão "sem personagens" engana quem tem personagens publicados sim.
+        var charEmptyMsg = personagens.length ? "Todo mundo publicado está no próprio mês de aniversário — ninguém elegível pro sorteio de hoje." : "Ainda sem personagens publicados.";
+        spotLeft.appendChild(el("div", { class: "spotlight-char" }, [el("div", { class: "spotlight-char-body" }, [el("div", { class: "spotlight-char-eyebrow", text: "Personagem do dia" }), el("div", { class: "spotlight-empty", text: charEmptyMsg })])]));
+      }
 
       var pairWrap = el("div", { class: "spotlight-pair" });
       function miniCard(eyebrow, title, href, emptyText) {

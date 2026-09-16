@@ -1220,13 +1220,23 @@
     multiversal: { color: "#8f5cc9", dash: "6 4" },
     neutral: { color: "var(--border-strong)", dash: "" }
   };
+  // Toda relação ASSIMÉTRICA (label ≠ inverse) só é declarada em UMA direção no array — família/
+  // romance/amizade são a exceção porque cada lado já tem sua própria entrada (ou são auto-
+  // recíprocas). Isso significa que o lado "inverso" de qualquer outra categoria (ex: "é
+  // liderado(a) por", criado automaticamente no outro extremo de todo "lidera") NUNCA aparece
+  // como .label de ninguém — só bater por .label, como as duas funções abaixo faziam até
+  // 2026-09-16, fazia esse lado sempre cair em "neutral"/cinza no mapa e na lista de Ligações,
+  // mesmo a relação tendo uma cor própria declarada. Bug real, achado numa varredura lógica;
+  // corrigido batendo por .label OU .inverse. LABEL_PRIORITY (abaixo) já fazia isso certo.
   function linkStyleOf(label) {
-    var lt = LINK_TYPES.filter(function (l) { return l.label === label; })[0];
+    var lt = LINK_TYPES.filter(function (l) { return l.label === label || l.inverse === label; })[0];
     return lt ? lt.style : "neutral";
   }
   function linkInverseOf(label) {
     var lt = LINK_TYPES.filter(function (l) { return l.label === label; })[0];
-    return lt ? lt.inverse : null;
+    if (lt) return lt.inverse;
+    lt = LINK_TYPES.filter(function (l) { return l.inverse === label; })[0];
+    return lt ? lt.label : null;
   }
   // Canonical direction for an edge shown between two entries that link to each other both ways
   // (auto-reciprocal pairs like "é pai/mãe de" / "é filho(a) de"): whichever label was declared
@@ -4164,11 +4174,14 @@
     });
     // Citações — aparecem na página de QUEM disse (o falante), agrupadas por "obra" (texto
     // livre, igual à galeria) dentro da própria aba de Citações. Só as que o falante é esta
-    // entrada mesma; a entrada de contexto (se publicada) vira um link, senão fica só o nome.
+    // entrada mesma; a entrada de contexto só aparece (como link) se ELA TAMBÉM estiver
+    // publicada e não secreta — mesma regra de wbWikiLinks. Um contexto secreto/não publicado
+    // fica de fora por completo (nem o nome vaza): igual aos links normais, a wiki nunca é uma
+    // menção morta a algo deliberadamente não publicado.
     var citacoes = C().quotes.filter(function (q) { return q.speakerId === e.id && okVis(q.vis, q.allow); }).map(function (q) {
       var cx = q.contextId && wbEntry(q.contextId);
       var cxLinked = cx && cx.wikiId && !cx.secret;
-      return { id: q.id, text: q.text, group: q.group || "", note: q.note || "", vis: outVis(q.vis), contextTitle: cx ? wbDisplayName(cx) : "", contextId: cxLinked ? cx.wikiId : null };
+      return { id: q.id, text: q.text, group: q.group || "", note: q.note || "", vis: outVis(q.vis), contextTitle: cxLinked ? wbDisplayName(cx) : "", contextId: cxLinked ? cx.wikiId : null };
     });
     var ancestors = wbWikiAncestors(e);
     var children = wbWikiChildren(e);
