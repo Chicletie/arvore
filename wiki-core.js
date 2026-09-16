@@ -225,7 +225,11 @@
     for (var i = out.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)); var t = out[i]; out[i] = out[j]; out[j] = t; }
     return out;
   }
-  function wbDayIndex() { return Math.floor(Date.now() / 86400000); }
+  // Dia LOCAL do visitante (não UTC): Date.now()/86400000 viraria o "dia" à meia-noite UTC, que
+  // no Brasil é 21h — ficaria fora de sincronia com wbTodayMD (que usa getMonth()/getDate()
+  // locais), fazendo a exclusão de aniversário e o próprio sorteio discordarem sobre "hoje"
+  // bem na virada da noite.
+  function wbDayIndex() { var d = new Date(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); }
   function wbDailyPick(pool, seedName) {
     if (!pool || !pool.length) return null;
     var day = wbDayIndex(), n = pool.length, cycle = Math.floor(day / n), pos = day % n;
