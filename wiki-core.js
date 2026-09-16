@@ -94,7 +94,7 @@
   // URL segment it checks changed from "paradisegate" to "wiki" — same concept, new address.)
   function isParadiseGateMode() { return /\/wiki(\.html)?(\/|$)/.test(location.pathname); }
   function wikiHref(id) { return ROOT + (isParadiseGateMode() ? "wiki/" : "ursprung/") + encodeURIComponent(id); }
-  function homeLabel() { return isParadiseGateMode() ? "🌸 Paradise Gate" : "🌿 Herbário do Multiverso"; }
+  function homeLabel() { return isParadiseGateMode() ? "🪶 Paradise Gate" : "🌿 Herbário do Multiverso"; }
   function homeHref() { return ROOT + (isParadiseGateMode() ? "wiki" : "ursprung"); }
 
   function resolveSlug() {
