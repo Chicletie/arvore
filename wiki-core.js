@@ -134,7 +134,7 @@
 
   function spoilerCover(buildInner) {
     var wrap = el("div", { class: "spoiler-block" });
-    var btn = el("button", { class: "spoiler-reveal", type: "button", text: "🙈 spoiler — toque para revelar" });
+    var btn = el("button", { class: "spoiler-reveal", type: "button", text: "🙈 spoiler, toque para revelar" });
     btn.addEventListener("click", function () { wrap.className = "spoiler-block revealed"; wrap.textContent = ""; wrap.appendChild(buildInner()); });
     wrap.appendChild(btn);
     return wrap;
@@ -251,13 +251,13 @@
       }).then(function () {
         box.textContent = "";
         box.appendChild(el("h3", { text: "Enviado!" }));
-        box.appendChild(el("div", { text: "Obrigado — sua sugestão vai aparecer pro autor da wiki." }));
+        box.appendChild(el("div", { text: "Obrigado! Sua sugestão vai aparecer pro autor da wiki." }));
         var close = el("button", { class: "submit", type: "button", style: "margin-top:10px", text: "Fechar" });
         close.addEventListener("click", function () { wrap.remove(); });
         box.appendChild(close);
       }).catch(function () {
         submitBtn.disabled = false; submitBtn.textContent = "Enviar sugestão";
-        err.textContent = "Não consegui enviar — tenta de novo em instantes.";
+        err.textContent = "Não consegui enviar. Tenta de novo em instantes.";
       });
     }
     submitBtn.addEventListener("click", doSubmit);
@@ -285,7 +285,7 @@
         wrap.remove();
       }).catch(function (e) {
         submitBtn.disabled = false; submitBtn.textContent = "Entrar";
-        err.textContent = "Não consegui entrar — confira email e senha.";
+        err.textContent = "Não consegui entrar. Confira email e senha.";
       });
     }
     submitBtn.addEventListener("click", doSubmit);
@@ -297,10 +297,10 @@
       if (!email) { err.textContent = "Digite seu email ali em cima primeiro."; return; }
       err.textContent = ""; forgot.disabled = true; forgot.textContent = "enviando…";
       firebase.auth().sendPasswordResetEmail(email).then(function () {
-        forgot.textContent = "Email enviado — confira sua caixa de entrada.";
+        forgot.textContent = "Email enviado! Confira sua caixa de entrada.";
       }).catch(function () {
         forgot.disabled = false; forgot.textContent = "esqueci minha senha";
-        err.textContent = "Não consegui enviar — confira o email digitado.";
+        err.textContent = "Não consegui enviar. Confira o email digitado.";
       });
     });
     box.appendChild(forgot);
@@ -350,7 +350,7 @@
             slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: (it.title || "Sessão") + (it.date ? " · " + it.date : "") }));
             slot.appendChild(renderMarkdown(it.recap));
           } else if (it.kind === "post") {
-            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: (it.date ? it.date + " — " : "") + (it.title || "Post") }));
+            slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: (it.date ? it.date + " · " : "") + (it.title || "Post") }));
             slot.appendChild(renderMarkdown(it.body));
           }
         });
@@ -374,15 +374,6 @@
     var eyebrowBits = [data.type, data.universe].filter(Boolean);
     if (eyebrowBits.length) card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: eyebrowBits.join(" · ") })]));
     card.appendChild(el("h1", { text: data.title || "(sem título)" }));
-    if (data.aliases && data.aliases.length) {
-      var aliasLine = el("div", { class: "aliases" }, [el("span", { text: "também: " })]);
-      data.aliases.forEach(function (a, i) {
-        if (i) aliasLine.appendChild(document.createTextNode(", "));
-        if (a.vis === "spoiler") aliasLine.appendChild(spoilerSpan(a.text));
-        else aliasLine.appendChild(document.createTextNode(a.text));
-      });
-      card.appendChild(aliasLine);
-    }
 
     var shortFields = (data.fields || []).filter(function (f) { return f.type !== "nota"; });
     var galGroups = [];
@@ -392,7 +383,8 @@
     // gallery, the portrait becomes switchable: one tab per group (ex: "Primeira Temporada",
     // "Segunda Temporada"), each showing that group's first image — same idea as a fandom
     // infobox's season-switcher, tabs sit right above the picture.
-    if (data.cover || shortFields.length || galGroups.length) {
+    var hasAliases = data.aliases && data.aliases.length;
+    if (data.cover || shortFields.length || galGroups.length || hasAliases) {
       var info = el("div", { class: "infobox" });
       var portraitOptions = [];
       if (data.cover) portraitOptions.push({ label: "Capa", url: data.cover, vis: data.coverVis || "publico" });
@@ -423,8 +415,18 @@
         }
         info.appendChild(portraitSlot);
       }
-      if (shortFields.length) {
+      if (hasAliases || shortFields.length) {
         var itable = el("table", { class: "infobox-facts" });
+        if (hasAliases) {
+          var aliasTd = el("td");
+          data.aliases.forEach(function (a) {
+            var line = el("div", { class: "infobox-alias-line" });
+            if (a.vis === "spoiler") line.appendChild(spoilerSpan(a.text));
+            else line.appendChild(document.createTextNode(a.text));
+            aliasTd.appendChild(line);
+          });
+          itable.appendChild(el("tr", {}, [el("th", { text: "Também conhecido(a) como" }), aliasTd]));
+        }
         shortFields.forEach(function (f) {
           var td = el("td");
           if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
@@ -512,7 +514,7 @@
       pwrap.appendChild(el("div", { class: "cathead", id: "posts", text: "Posts" }));
       data.posts.forEach(function (p) {
         var det = el("details", { class: "wiki-section post", open: "open" });
-        det.appendChild(el("summary", { class: "post-summary", text: (p.date ? p.date + " — " : "") + (p.title || "(sem título)") + (p.vis === "spoiler" ? " 🙈" : "") }));
+        det.appendChild(el("summary", { class: "post-summary", text: (p.date ? p.date + " · " : "") + (p.title || "(sem título)") + (p.vis === "spoiler" ? " 🙈" : "") }));
         if (p.vis === "spoiler") det.appendChild(spoilerCover(function () { return renderMarkdown(p.body); }));
         else det.appendChild(renderMarkdown(p.body));
         pwrap.appendChild(det);
@@ -619,11 +621,11 @@
   function renderHome(indexData) {
     var page = document.getElementById("page");
     page.textContent = "";
-    document.title = homeLabel() + " — Wiki";
+    document.title = homeLabel() + " · Wiki";
     mountLoginBar(page);
     var wrap = el("div", { class: "card" });
     wrap.appendChild(el("div", { class: "home-title", text: homeLabel() }));
-    wrap.appendChild(el("div", { class: "home-sub", text: "Wiki pública — navegue pelas páginas publicadas." }));
+    wrap.appendChild(el("div", { class: "home-sub", text: "Wiki pública. Navegue pelas páginas publicadas." }));
     var searchBox = el("input", { class: "home-search", type: "search", placeholder: "Buscar nome, tipo ou tag…", "aria-label": "Buscar" });
     wrap.appendChild(searchBox);
 
@@ -695,7 +697,7 @@
       });
       if (!filtered.length) { listWrap.appendChild(el("div", { class: "empty", text: "Nada encontrado." })); return; }
       var byUni = {};
-      filtered.forEach(function (e) { var k = e.universe || "—"; (byUni[k] = byUni[k] || []).push(e); });
+      filtered.forEach(function (e) { var k = e.universe || "Sem universo"; (byUni[k] = byUni[k] || []).push(e); });
       Object.keys(byUni).sort().forEach(function (uni) {
         listWrap.appendChild(el("div", { class: "home-unihead", text: uni }));
         var grid = el("div", { class: "home-grid" });
