@@ -4429,6 +4429,20 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
+  // Backup de verdade (2026-09-16): os exports em .md acima são pra LER fora do app, não pra
+  // restaurar de um desastre — perdem estrutura (campos tipados, visibilidade, ids, ligações).
+  // Este baixa o `state` inteiro (multiverso + mesa + configurações) em JSON, byte a byte igual
+  // ao que está salvo — o usuário guarda esse arquivo onde quiser (Drive, etc). Sem restauração
+  // automática de propósito: reimportar um backup por cima do estado atual é uma operação
+  // destrutiva que merece ser pedida explicitamente, não uma função qualquer no menu.
+  function wbDownloadBackup() {
+    var blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "tree-backup-" + todayKey() + ".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
   function wbEntryToMarkdown(e) {
     var f = flowerById(e.universeId);
     var lines = ["# " + (e.title || "(sem título)")];
@@ -6165,6 +6179,11 @@
       el("h2", { style: "font-size:26px", text: "Modelos de entrada" })
     ]));
     v.appendChild(el("p", { class: "hint", style: "margin-top:0", text: "Cada tipo pode ter um ícone, uma cor e campos padrão que aparecem ao criar uma entrada nova." }));
+    v.appendChild(el("div", { class: "card" }, [
+      el("div", { class: "wb-eyebrow", text: "Backup" }),
+      el("p", { class: "hint", style: "margin:4px 0 8px", text: "Baixa uma cópia completa de tudo (multiverso, mesa, configurações) num arquivo. Os dados só existem no Firebase hoje, sem cópia independente — guarde esse arquivo em algum lugar seu (ex: Google Drive) de vez em quando, principalmente antes de mudanças grandes." }),
+      el("button", { class: "btn ghost sm", type: "button", text: "💾 baixar backup completo (.json)", onclick: wbDownloadBackup })
+    ]));
     v.appendChild(el("div", { class: "card" }, [
       el("div", { class: "wb-eyebrow", text: "Uso único" }),
       el("p", { class: "hint", style: "margin:4px 0 8px", text: "Zera o conteúdo das entradas vazias que você criou antes desses modelos novos, mantendo nome e alcunhas, pra escrever do zero com os campos atualizados." }),
