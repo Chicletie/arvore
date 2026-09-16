@@ -21,6 +21,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-functions-compat.js"></script>
 <!-- Editor WYSIWYG (Toast UI Editor 2.5.3 precisa do CodeMirror 5 como dependência externa,
      mesmo só usando o modo wysiwyg — o pacote é um bundle UMD que espera window.CodeMirror
      já definido antes de si mesmo, por isso vem primeiro). Cacheado offline por sw.js igual
@@ -6610,7 +6611,7 @@
   var lastLocalWrite = 0;
   var syncState = "off";
 
-  var fbAuth = null, fbFs = null, fbUser = null, fbStorage = null;
+  var fbAuth = null, fbFs = null, fbUser = null, fbStorage = null, fbFunctions = null;
 
   /* ---- Image upload (downscale client-side, store in Firebase Storage) ---- */
   function downscaleImage(file, maxDim, quality, cb) {
@@ -6743,6 +6744,7 @@
     fbAuth = firebase.auth();
     fbFs = firebase.firestore();
     try { if (firebase.storage) fbStorage = firebase.storage(); } catch (e) { fbStorage = null; }
+    try { if (firebase.functions) fbFunctions = firebase.functions(); } catch (e) { fbFunctions = null; }
     try { fbFs.enablePersistence({ synchronizeTabs: true }).catch(function () {}); } catch (e) {}
     setSync("connecting");
     fbAuth.onAuthStateChanged(function (user) {
@@ -6787,35 +6789,18 @@
     return m[code] || ("Erro: " + code);
   }
   // Creates a real Firebase Auth account for a player (so they can log in on the public wiki
-  // and unlock content marked "restrito" for them), WITHOUT ever touching the GM's own signed-in
-  // session — createUserWithEmailAndPassword on the normal firebase.auth() would sign the GM out
-  // and sign in as the new player instead, which is exactly the bug this sidesteps by doing the
-  // creation on a throwaway secondary app instance. The player never learns the random password
-  // this generates (nobody needs to relay it) — they get Firebase's own "escolha sua senha" email
-  // instead and pick their own.
+  // and unlock content marked "restrito" for them) via the createPlayerAccount Cloud Function
+  // (functions/index.js), which uses the Admin SDK to bypass the "Enable create (sign-up)"
+  // restriction — left permanently OFF on purpose (see project-infra) — without ever needing to
+  // toggle it on/off by hand. The Function itself treats "already has an account" as a normal
+  // success case, so the client always just proceeds to send the reset email either way. The
+  // player never learns any password (nobody needs to relay one) — they get Firebase's own
+  // "escolha sua senha" email instead and pick their own.
   function wbInvitePlayer(email, onDone) {
-    if (typeof firebase === "undefined" || !fbAuth) { onDone(new Error("Sem conexão com a nuvem agora.")); return; }
-    var tempPass = uid() + uid() + "Aa1!";
-    var secondaryApp;
-    try {
-      secondaryApp = (firebase.apps || []).filter(function (a) { return a.name === "invite"; })[0] || firebase.initializeApp(FIREBASE_CONFIG, "invite");
-    } catch (err) { onDone(err); return; }
-    var secondaryAuth = secondaryApp.auth();
-    secondaryAuth.createUserWithEmailAndPassword(email, tempPass).then(function () {
-      return secondaryAuth.signOut();
-    }).then(function () {
-      return secondaryApp.delete();
-    }).then(function () {
+    if (!fbFunctions || !fbAuth) { onDone(new Error("Sem conexão com a nuvem agora.")); return; }
+    fbFunctions.httpsCallable("createPlayerAccount")({ email: email }).then(function () {
       return fbAuth.sendPasswordResetEmail(email);
     }).then(function () { onDone(null); }).catch(function (err) {
-      if (err && err.code === "auth/email-already-in-use") {
-        // Already has an account (maybe invited before, maybe something else) — nothing to
-        // create, just make sure they have a fresh way in.
-        secondaryApp.delete().catch(function () {});
-        fbAuth.sendPasswordResetEmail(email).then(function () { onDone(null); }).catch(function (e2) { onDone(e2); });
-        return;
-      }
-      secondaryApp.delete().catch(function () {});
       onDone(err);
     });
   }
