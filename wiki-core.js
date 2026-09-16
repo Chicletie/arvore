@@ -527,6 +527,25 @@
     tier(fam.grandchildren, GC_Y, GC_Y - 13, cx, C_Y + 13, true);
     return el("div", { class: "wb-famtree-wrap" }, [svg]);
   }
+  // Mesmo princípio de FAMILY_LABEL_BUCKET acima, mas para as categorias "practice"/"nature"
+  // (2026-09-16) — vínculos que, sem isso, se perderiam anônimos dentro da lista genérica de
+  // Ligações: quem pratica/acredita/fala/caça uma entrada, e o que ela mesma afeta/pratica/etc.
+  // Ordem fixa (não a ordem de criação dos links) pra sempre agrupar do mesmo jeito. Só lê
+  // data.links, nunca backlinks, pelo mesmo motivo do family: o app sempre cria os dois lados.
+  var AFFINITY_LABELS = [
+    "pratica", "é praticado(a) por",
+    "acredita em", "é uma crença de",
+    "afeta", "é afetado(a) por",
+    "fala", "é falado(a) por",
+    "caça", "é caçado(a) por"
+  ];
+  function cap1(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function affinitiesOf(links) {
+    var byLabel = {};
+    (links || []).forEach(function (lk) { if (AFFINITY_LABELS.indexOf(lk.label) !== -1) (byLabel[lk.label] = byLabel[lk.label] || []).push(lk); });
+    return AFFINITY_LABELS.filter(function (lbl) { return byLabel[lbl] && byLabel[lbl].length; })
+      .map(function (lbl) { return { label: cap1(lbl), items: byLabel[lbl] }; });
+  }
   // Star-topology relation graph, ported from wbEntryRelGraph but as a fixed radial layout
   // instead of the live force-sim/drag engine (createGraph) — that engine is ~250 lines of
   // physics+pan+zoom+persisted-position code built for an author actively arranging a map; a
@@ -728,6 +747,7 @@
     var hasLinks = (data.links && data.links.length) || (data.backlinks && data.backlinks.length);
     var famTree = buildFamilyTree(data);
     var relGraph = buildRelGraph(data);
+    var affinityGroups = affinitiesOf(data.links);
     var sharedToc = [];
     if (data.posts && data.posts.length) sharedToc.push({ id: "posts", label: "Posts" });
     var eventsSorted = (data.events || []).slice().sort(function (a, b) { return wbEventSortKey(a) - wbEventSortKey(b); });
@@ -737,6 +757,7 @@
     // ter nenhuma relação registrada), senão fica "Relações" com as outras abas dentro.
     var relSectionLabel = relGraph ? "Relações" : (eventsSorted.length ? "Linha do tempo" : null);
     if (relSectionLabel) sharedToc.push({ id: "relacoes", label: relSectionLabel });
+    if (affinityGroups.length) sharedToc.push({ id: "afinidades", label: "Afinidades" });
     if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
     // Galeria e Citações entram como abas (mesmo seletor .work-tabs de Geral/variante de
@@ -843,6 +864,26 @@
         card.appendChild(relTabs);
       }
       relPanels.forEach(function (p, i) { p.el.hidden = i !== 0; card.appendChild(p.el); });
+    }
+
+    // Afinidades — destaque próprio pros vínculos de "practice"/"nature" (quem pratica/acredita/
+    // fala/caça esta entrada, e o que ela mesma afeta/pratica/etc.), em vez de eles se perderem
+    // anônimos dentro da lista genérica de Ligações logo abaixo (que ainda os lista também, de
+    // propósito — mesma duplicação que já existe entre Genealogia e a lista de Ligações).
+    if (affinityGroups.length) {
+      var awrap = el("div", { class: "links-wrap" });
+      awrap.appendChild(el("div", { class: "cathead", id: "afinidades", text: "Afinidades" }));
+      affinityGroups.forEach(function (g, i) {
+        if (i) awrap.appendChild(el("div", { class: "links-subhead", text: g.label }));
+        else awrap.appendChild(el("div", { class: "links-subhead", text: g.label, style: "margin-top:0" }));
+        var grow = el("div", { class: "links-grid" });
+        g.items.forEach(function (lk) {
+          var kids = [el("span", { class: "link-card-title", text: lk.targetTitle })];
+          grow.appendChild(lk.targetId ? el("a", { class: "link-card", href: wikiHref(lk.targetId) }, kids) : el("div", { class: "link-card", style: "cursor:default", "aria-disabled": "true" }, kids));
+        });
+        awrap.appendChild(grow);
+      });
+      card.appendChild(awrap);
     }
 
     // ligações — só aparece pra quem também está publicado; o resto fica de fora de propósito
