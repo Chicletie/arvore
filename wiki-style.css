@@ -16,14 +16,15 @@
   }
 }
 /* Paradise Gate ("pg-theme", set by wiki-core.js only when the URL is under /wiki/) — expands
-   the invite email's identity into the wiki itself: a royal-blue "envelope" behind cream
-   "letter" panels, same contrast that made the email work, rather than a flat navy wash. So
-   --paper/--surface/--border/--ink/--muted/--faint below are the herbarium's own LIGHT values,
-   restated verbatim (not left to inherit) so a visitor's OS dark-mode preference can't swap them
-   out from under this — PG is one fixed design either way, same as the email itself. Only --bg
-   goes navy, and --gold/--gold-ink/--accent-wash shift from warm gold to cool silver-blue for
-   links/tags/accents on the cream card. Every component already reads its colors purely from
-   these variables, so this one block is enough — no selector-by-selector changes needed. */
+   the invite email's identity into the wiki itself: a royal-blue "envelope" behind "letter"
+   panels, same contrast that made the email work, rather than a flat navy wash. Unlike the
+   herbarium above, PG DOES still follow the visitor's OS light/dark preference — just with its
+   own pair of parchments instead of inheriting the herbarium's, so --bg stays navy either way
+   but --paper/--surface/etc are restated explicitly in both branches (not left to inherit).
+   Light branch = cream parchment (the herbarium's own light values) + steel-blue ink, echoing
+   the email's paper-on-navy exactly. Dark branch = a dark, blue-leaning vellum (lighter than
+   --bg so it still reads as a distinct card, not black-on-navy) + silver ink, so dark-mode
+   readers get a parchment that belongs to this palette instead of the herbarium's warm walnut. */
 body.pg-theme {
   --bg: #0a1730;
   --paper: #f5ecd6; --surface: #f6eeda; --surface-2: #ece0c3; --border: #d2bf98; --border-strong: #a98f61;
@@ -31,6 +32,14 @@ body.pg-theme {
   --gold: #6b7a94; --gold-ink: #3d4c68; --accent-wash: #eef1f4; --warn: #b07d24;
   --shadow: 0 2px 10px rgba(2,6,20,0.35), 0 24px 55px -22px rgba(2,6,20,0.65);
   --font-display: "Cinzel", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  body.pg-theme {
+    --paper: #17233f; --surface: #1b2847; --surface-2: #20304f; --border: #33436b; --border-strong: #4c5f8c;
+    --ink: #dfe4ea; --muted: #a7b1bf; --faint: #7f8a9a;
+    --gold: #9aa7bd; --gold-ink: #e8edf3; --accent-wash: #223460; --warn: #d6a24a;
+    --shadow: 0 2px 10px rgba(0,0,0,0.5), 0 24px 55px -22px rgba(0,0,0,0.75);
+  }
 }
 body.pg-theme h1, body.pg-theme .home-title, body.pg-theme .topbar a { letter-spacing: 0.02em; }
 
