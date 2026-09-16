@@ -194,6 +194,14 @@
   // a mesma imagem original renderiza certo em qualquer proporção (infobox, miniatura, galeria).
   function objPos(focus) { return (focus && focus.x != null ? focus.x : 50) + "% " + (focus && focus.y != null ? focus.y : 50) + "%"; }
   function wbFmtCompact(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n); }
+  // Formato genérico (sem nome de mês do calendário do universo, que não é publicado) — só
+  // números, mas ainda deixa claro a precisão (ano só / mês+ano / dia+mês+ano).
+  function wbFmtEventDate(ev) {
+    if (ev.d != null && ev.m != null) return ev.d + "/" + ev.m + "/" + ev.y;
+    if (ev.m != null) return ev.m + "/" + ev.y;
+    return "ano " + ev.y;
+  }
+  function wbEventSortKey(ev) { return ev.y * 100000 + (ev.m || 0) * 100 + (ev.d || 0); }
 
   // Login only matters for "restrito" content — público/spoiler never need it. A signed-in
   // session persists across page loads (Firebase's own local persistence), so a player who logs
@@ -661,6 +669,8 @@
     var relGraph = buildRelGraph(data);
     var sharedToc = [];
     if (data.posts && data.posts.length) sharedToc.push({ id: "posts", label: "Posts" });
+    var eventsSorted = (data.events || []).slice().sort(function (a, b) { return wbEventSortKey(a) - wbEventSortKey(b); });
+    if (eventsSorted.length) sharedToc.push({ id: "linha-do-tempo", label: "Linha do tempo" });
     if (data.gallery && data.gallery.length) sharedToc.push({ id: "galeria", label: "Galeria" });
     // Genealogia only ever exists alongside Relações (a family link is also a relation, so
     // relNeighbors always picks it up too) — never the other way around, which is why this is
@@ -705,6 +715,24 @@
         pwrap.appendChild(det);
       });
       card.appendChild(pwrap);
+    }
+
+    // linha do tempo pessoal — só os eventos desta própria entrada, ordenados; alimenta
+    // também a timeline geral da wiki (ver "ano em foco" na home), mas aqui é o registro
+    // completo (major e não-major juntos), não só os principais sorteados.
+    if (eventsSorted.length) {
+      var ewrap = el("div", { class: "events-wrap" });
+      ewrap.appendChild(el("div", { class: "cathead", id: "linha-do-tempo", text: "Linha do tempo" }));
+      var eList = el("ul", { class: "events-list" });
+      eventsSorted.forEach(function (ev) {
+        eList.appendChild(el("li", { class: ev.major ? "major" : null }, [
+          el("span", { class: "ev-date", text: wbFmtEventDate(ev) }),
+          el("span", { class: "ev-text", text: ev.label || "(evento)" }),
+          ev.note ? el("span", { class: "ev-note", text: ev.note }) : null
+        ]));
+      });
+      ewrap.appendChild(eList);
+      card.appendChild(ewrap);
     }
 
     // galeria — agrupada por rótulo livre (ex: "Primeira Temporada", "Segunda Temporada")
@@ -943,8 +971,11 @@
         topTags.forEach(function (t) { tagCloud.appendChild(el("a", { class: "tag-chip", href: homeHref() + "?q=" + encodeURIComponent(t), text: "#" + t })); });
         wrap.appendChild(tagCloud);
       }
-      randomBtn.style.marginTop = "12px";
-      wrap.appendChild(randomBtn);
+      var actionsRow = el("div", { style: "display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:12px" });
+      randomBtn.style.margin = "0";
+      actionsRow.appendChild(randomBtn);
+      actionsRow.appendChild(el("a", { class: "home-random", style: "margin:0", href: wikiHref("_timeline"), text: "📜 linha do tempo completa" }));
+      wrap.appendChild(actionsRow);
     }
 
     var listWrap = el("div", { class: "home-groups" });
@@ -964,8 +995,12 @@
       listWrap.textContent = "";
       var q = (filterText || "").toLowerCase().trim();
       newsSection.hidden = !!q;
+      // Busca também bate no TÍTULO das notas (não no corpo — não está no índice, ver
+      // wbIndexEntry) — assim uma nota chamada "A Noite do Duelo" aparece buscando "duelo",
+      // ainda que a palavra não esteja em mais nenhum outro campo indexado da entrada.
       var filtered = entries.filter(function (e) {
-        return !q || (e.title + " " + e.type + " " + e.universe + " " + (e.tags || []).join(" ") + " " + (e.search || "")).toLowerCase().indexOf(q) !== -1;
+        var postTitles = (e.posts || []).map(function (p) { return p.title; }).join(" ");
+        return !q || (e.title + " " + e.type + " " + e.universe + " " + (e.tags || []).join(" ") + " " + postTitles + " " + (e.search || "")).toLowerCase().indexOf(q) !== -1;
       });
       if (!filtered.length) { listWrap.appendChild(el("div", { class: "empty", text: "Nada encontrado." })); return; }
       // No Paradise Gate a wiki nunca deixa entender que existem outros universos — como o
@@ -1005,6 +1040,86 @@
     page.appendChild(wrap);
   }
 
+  // Linha do tempo geral — reúne os eventos de TODAS as entradas publicadas (já vêm só
+  // "publico" desde o índice, ver wbIndexEntry) num só lugar, filtrável por tipo de entrada
+  // e por ano. Cada evento linka de volta pra entrada que o originou. "major" (marcado no
+  // editor) é o mesmo campo que o "ano em foco" da home usa pra sortear — aqui ele só regula
+  // o filtro "só principais", o registro completo continua visível por padrão.
+  function renderTimeline(indexData) {
+    var page = document.getElementById("page");
+    page.textContent = "";
+    document.title = "Linha do tempo · " + homeLabel();
+    var header = el("div", { class: "site-header" });
+    header.appendChild(el("div", { class: "brand" }, [el("a", { href: homeHref(), text: homeLabel() })]));
+    mountLoginBar(header);
+    page.appendChild(header);
+
+    var entries = Object.keys(indexData.entries || {}).map(function (id) { return Object.assign({ id: id }, indexData.entries[id]); });
+    var allEvents = [];
+    entries.forEach(function (e) {
+      (e.events || []).forEach(function (ev) {
+        allEvents.push({ label: ev.label, y: ev.y, m: ev.m, d: ev.d, note: ev.note, major: !!ev.major, entryId: e.id, entryTitle: e.title, entryType: e.type });
+      });
+    });
+    allEvents.sort(function (a, b) { return wbEventSortKey(a) - wbEventSortKey(b); });
+
+    var wrap = el("div", { class: "card" });
+    wrap.appendChild(el("div", { class: "home-title", text: "Linha do tempo" }));
+    wrap.appendChild(el("div", { class: "home-sub", text: homeLabel() + " · " + allEvents.length + " evento(s) publicado(s)" }));
+
+    if (!allEvents.length) {
+      wrap.appendChild(el("div", { class: "empty", text: "Nenhum evento publicado ainda." }));
+      page.appendChild(wrap);
+      return;
+    }
+
+    var types = [];
+    entries.forEach(function (e) { if (e.type && types.indexOf(e.type) === -1) types.push(e.type); });
+    types.sort();
+
+    var filterBar = el("div", { class: "timeline-filters" });
+    var typeSel = el("select", { class: "field" }, [el("option", { value: "", text: "todos os tipos" })].concat(types.map(function (t) { return el("option", { value: t, text: t }); })));
+    var yearIn = el("input", { class: "field", type: "number", placeholder: "ano", style: "width:100px", value: new URLSearchParams(location.search).get("ano") || "" });
+    var majorLbl = el("label", { class: "timeline-major-lbl" }, [el("input", { type: "checkbox" }), " só principais"]);
+    var majorChk = majorLbl.querySelector("input");
+    filterBar.appendChild(typeSel); filterBar.appendChild(yearIn); filterBar.appendChild(majorLbl);
+    wrap.appendChild(filterBar);
+
+    var listWrap = el("div", { class: "timeline-list" });
+    wrap.appendChild(listWrap);
+
+    function paint() {
+      listWrap.textContent = "";
+      var typeQ = typeSel.value, yearQ = yearIn.value.trim(), majorQ = majorChk.checked;
+      var shown = allEvents.filter(function (ev) {
+        if (typeQ && ev.entryType !== typeQ) return false;
+        if (yearQ && String(ev.y) !== yearQ) return false;
+        if (majorQ && !ev.major) return false;
+        return true;
+      });
+      if (!shown.length) { listWrap.appendChild(el("div", { class: "empty", text: "Nada encontrado com esses filtros." })); return; }
+      var curYear = null, yearGroup = null;
+      shown.forEach(function (ev) {
+        if (ev.y !== curYear) {
+          curYear = ev.y;
+          yearGroup = el("div", { class: "timeline-year", text: "Ano " + curYear });
+          listWrap.appendChild(yearGroup);
+        }
+        var row = el("a", { class: "timeline-event" + (ev.major ? " major" : ""), href: wikiHref(ev.entryId) }, [
+          el("span", { class: "ev-date", text: wbFmtEventDate(ev) }),
+          el("span", { class: "ev-text", text: ev.label || "(evento)" }),
+          el("span", { class: "ev-origin", text: ev.entryTitle })
+        ]);
+        listWrap.appendChild(row);
+      });
+    }
+    typeSel.addEventListener("change", paint);
+    yearIn.addEventListener("input", paint);
+    majorChk.addEventListener("change", paint);
+    paint();
+    page.appendChild(wrap);
+  }
+
   function showMessage(msg) {
     var page = document.getElementById("page");
     page.innerHTML = "";
@@ -1027,22 +1142,23 @@
     var fs = firebase.firestore();
     var slug = resolveSlug();
     var pgMode = isParadiseGateMode();
-    if (!slug || slug === "_index") {
+    function loadIndex() {
       if (pgMode) {
-        fs.collection("wikiIndex").doc("lotus").get().then(function (snap) {
-          renderHome(snap.exists ? snap.data() : { entries: {} });
-        }).catch(function () { showMessage("Não consegui carregar a wiki agora. Tente de novo mais tarde."); });
-      } else {
-        Promise.all(WB_UNIVERSE_IDS.map(function (uid) {
-          return fs.collection("wikiIndex").doc(uid).get()
-            .then(function (snap) { return (snap.exists && snap.data().entries) || {}; })
-            .catch(function () { return {}; });
-        })).then(function (parts) {
-          var merged = {};
-          parts.forEach(function (p) { Object.assign(merged, p); });
-          renderHome({ entries: merged });
-        });
+        return fs.collection("wikiIndex").doc("lotus").get().then(function (snap) { return { entries: (snap.exists && snap.data().entries) || {} }; });
       }
+      return Promise.all(WB_UNIVERSE_IDS.map(function (uid) {
+        return fs.collection("wikiIndex").doc(uid).get()
+          .then(function (snap) { return (snap.exists && snap.data().entries) || {}; })
+          .catch(function () { return {}; });
+      })).then(function (parts) {
+        var merged = {}; parts.forEach(function (p) { Object.assign(merged, p); });
+        return { entries: merged };
+      });
+    }
+    if (!slug || slug === "_index") {
+      loadIndex().then(renderHome).catch(function () { showMessage("Não consegui carregar a wiki agora. Tente de novo mais tarde."); });
+    } else if (slug === "_timeline") {
+      loadIndex().then(renderTimeline).catch(function () { showMessage("Não consegui carregar a linha do tempo agora. Tente de novo mais tarde."); });
     } else {
       fs.collection("wikiPublic").doc(slug).get().then(function (snap) {
         if (!snap.exists || (pgMode && snap.data().universeId !== "lotus")) { showMessage("Essa página não existe mais (o link pode ter sido despublicado)."); return; }

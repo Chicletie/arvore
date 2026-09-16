@@ -1411,6 +1411,8 @@
         ev.d = (ev.d == null || isNaN(ev.d) || ev.m == null) ? null : (ev.d | 0);
         if (typeof ev.label !== "string") ev.label = "";
         if (typeof ev.note !== "string") ev.note = "";
+        ev.major = !!ev.major;
+        if (WB_VIS.indexOf(ev.vis) === -1) ev.vis = "publico";
       });
     });
     cr.franchises.forEach(function (fr) {
@@ -4116,10 +4118,16 @@
       return { title: s.title || "", body: s.body || "", vis: outVis(s.vis) };
     });
     var posts = (e.posts || []).filter(function (p) { return okVis(p.vis, p.allow); }).map(function (p) {
-      return { title: p.title || "", date: p.date || "", body: p.body || "", vis: outVis(p.vis) };
+      return { id: p.id, title: p.title || "", date: p.date || "", body: p.body || "", vis: outVis(p.vis) };
     }).sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
     var gallery = (e.gallery || []).filter(function (g) { return okVis(g.vis, g.allow) && g.url; }).map(function (g) {
       return { group: g.group || "", url: g.url, caption: g.caption || "", vis: outVis(g.vis), focus: g.focus || null };
+    });
+    // Eventos — só "publico" (o único outro estado é "mestre", tudo ou nada, sem meio-termo
+    // de spoiler/restrito pra evento). Alimentam a "linha do tempo pessoal" da própria página
+    // e a timeline geral da wiki (ver ano em foco), nunca aparecem se o evento for "mestre".
+    var events = (e.events || []).filter(function (ev) { return ev.vis === "publico"; }).map(function (ev) {
+      return { id: ev.id, label: ev.label || "", y: ev.y, m: ev.m, d: ev.d, note: ev.note || "", major: !!ev.major };
     });
     var variants = (e.variants || []).map(function (variant) {
       var vfields = [];
@@ -4149,6 +4157,7 @@
       sections: sections,
       posts: posts,
       gallery: gallery,
+      events: events,
       variants: variants,
       links: wbWikiLinks(e),
       backlinks: wbWikiBacklinks(e),
@@ -4202,8 +4211,9 @@
       return { key: k, type: fm.type, value: e.fields[k] || "", vis: "publico", opts: fm.opts || [] };
     });
     var sections = (e.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
-    var posts = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).map(function (p) { return { title: p.title || "", date: p.date || "", body: p.body || "", vis: "publico" }; });
+    var posts = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).map(function (p) { return { id: p.id, title: p.title || "", date: p.date || "", body: p.body || "", vis: "publico" }; });
     var gallery = (e.gallery || []).filter(function (g) { return g.url; }).map(function (g) { return { group: g.group || "", url: g.url, caption: g.caption || "", vis: "publico", focus: g.focus || null }; });
+    var events = (e.events || []).map(function (ev) { return { id: ev.id, label: ev.label || "", y: ev.y, m: ev.m, d: ev.d, note: ev.note || "", major: !!ev.major }; });
     var links = (e.links || []).map(function (lk) {
       var t = wbEntry(lk.to);
       return t ? { label: lk.label || "", targetId: t.wikiId || null, targetTitle: wbDisplayName(t, lk.dispAs) } : null;
@@ -4231,6 +4241,7 @@
       sections: sections,
       posts: posts,
       gallery: gallery,
+      events: events,
       variants: variants,
       links: links,
       backlinks: [],
@@ -4419,6 +4430,20 @@
     var m = t.replace(/[#*_>`~\[\]()|-]/g, " ").match(/\S+/g);
     return m ? m.length : 0;
   }
+  // Aniversário: reaproveita o mesmo campo tipo "data" de sempre (formato Y-M-D, ano primeiro
+  // — guessFieldType já sugere esse tipo pra um campo chamado "nascimento"), só que o site
+  // processa apenas dia+mês, IGNORANDO o ano — a idade de um personagem não é proporcional ao
+  // ano de verdade, já que a história se passa numa época diferente. Reconhece o campo pelo
+  // nome ("aniversário" ou "nascimento"); se for um campo marcado como não-público, não entra
+  // no índice (mesma regra de sempre: nada além de "publico" pode vazar num agregado público).
+  function wbBirthdayMD(e) {
+    var key = Object.keys(e.fields || {}).filter(function (k) { return /(anivers[áa]rio|nascimento)/i.test(k); })[0];
+    if (!key) return null;
+    if (wbFieldMeta(e, key).vis !== "publico") return null;
+    var p = (e.fields[key] || "").trim().split(/[-/.]/).map(function (x) { return parseInt(x, 10); });
+    if (p.length < 3 || isNaN(p[1]) || isNaN(p[2])) return null;
+    return (p[1] < 10 ? "0" : "") + p[1] + "-" + (p[2] < 10 ? "0" : "") + p[2];
+  }
   function wbIndexEntry(e, snap) {
     var f = flowerById(e.universeId);
     return {
@@ -4438,7 +4463,18 @@
       // Pra tira de estatísticas da home (Paradise Gate): páginas/palavras/conexões/notas.
       wordCount: wbSnapWordCount(snap),
       linkCount: (snap.links || []).length,
-      postsCount: (snap.posts || []).length
+      postsCount: (snap.posts || []).length,
+      birthdayMD: e.type === "Personagem" ? wbBirthdayMD(e) : null,
+      // Notas (título/data só, nunca o corpo) pra alimentar "Notas recentes" e busca por
+      // título na home — o corpo fica de fora de propósito: indexar o texto inteiro de toda
+      // nota de toda entrada infla o documento do wikiIndex sem necessidade (tem limite de
+      // tamanho no Firestore) só pra um caso de busca que o próprio usuário não pediu.
+      // "publico" só, mesmo critério que as tags acima: o título de uma nota spoiler não deve
+      // vazar fora do contexto da própria página.
+      posts: (snap.posts || []).filter(function (p) { return p.vis === "publico"; }).map(function (p) { return { id: p.id, title: p.title, date: p.date }; }),
+      // Eventos (já vêm só "publico" do snapshot) — alimentam a timeline geral da wiki e o
+      // "ano em foco" da home (que só sorteia entre os marcados "major").
+      events: (snap.events || []).map(function (ev) { return { label: ev.label, y: ev.y, m: ev.m, d: ev.d, note: ev.note, major: !!ev.major }; })
     };
   }
   function wbWikiUrl(id) { return location.origin + location.pathname.replace(/index\.html$/, "") + "wiki/" + id; }
@@ -5179,6 +5215,13 @@
           editable({ tag: "div", className: "wb-ev-label", value: ev.label, placeholder: "o que acontece…", commit: function (nv) { ev.label = nv.trim(); touch(false); } }),
           editable({ tag: "div", className: "wb-rel", value: ev.note, placeholder: "＋ nota", multiline: true, display: function (val) { return val || null; }, commit: function (nv) { ev.note = nv.trim(); touch(false); } })
         ]),
+        // "Principal" marca o evento pra entrar na pool de sorteio do "ano em foco" da wiki —
+        // eventos secundários existem (registro completo) mas nunca são sorteados sozinhos.
+        el("button", { type: "button", class: "wb-star" + (ev.major ? " on" : ""), title: ev.major ? "Evento principal (toque p/ desmarcar)" : "Marcar como principal", text: "★", onclick: function () { ev.major = !ev.major; touch(true); } }),
+        // Só público/mestre (não o ciclo de 4 estados usado em campo/seção/post) — spoiler e
+        // restrito precisariam de lista de permitidos por evento, que não existe aqui; melhor
+        // um botão de 2 estados que sempre faz o que promete do que um de 4 com metade quebrada.
+        el("button", { type: "button", title: (ev.vis === "mestre" ? "Mestre: nunca sai do seu app" : "Público: pode entrar na timeline da wiki") + " (toque p/ mudar)", text: ev.vis === "mestre" ? "🔒" : "🔓", onclick: function () { ev.vis = ev.vis === "mestre" ? "publico" : "mestre"; touch(true); } }),
         delBtn(function () { e.events = (e.events || []).filter(function (x) { return x !== ev; }); touch(true); })
       ]));
     });
@@ -5187,7 +5230,7 @@
     if (!ro) evFoot.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "＋ evento", onclick: function () {
       if (!Array.isArray(e.events)) e.events = [];
       var last = e.events[e.events.length - 1];
-      e.events.push({ id: uid(), label: "", y: e.year != null ? e.year : (last ? last.y : 0), m: null, d: null, note: "" });
+      e.events.push({ id: uid(), label: "", y: e.year != null ? e.year : (last ? last.y : 0), m: null, d: null, note: "", major: false, vis: "publico" });
       touch(true);
     } }));
     if (e.events.length) evFoot.appendChild(el("button", { class: "link", type: "button", text: "ver linha do tempo de " + f.name + " →", onclick: function () { wbGo({ view: "universe", uniId: e.universeId, uniTab: "tempo" }); } }));
