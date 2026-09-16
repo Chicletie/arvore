@@ -4239,8 +4239,13 @@
     });
     // Taxonomia (só Criatura, opt-in) — mesma filtragem por vis dos campos normais, já que
     // reaproveita o mesmíssimo wbFieldMeta/fieldMeta por baixo (ver o editor em wbEntryView).
+    // Só publica taxonomy se o TIPO ATUAL ainda for Criatura — se a entrada foi criada como
+    // Criatura, ganhou taxonomia, e depois mudou de tipo (ex: corrigindo uma miscategorização),
+    // o editor já para de mostrar a aba de edição, mas os dados velhos continuam em e.taxonomy
+    // até alguém apagar; sem esse check aqui, a wiki publicaria uma aba "Taxonomia" fantasma
+    // numa entrada que não é mais Criatura, mesmo sem jeito nenhum de editá-la.
     var taxonomy = [];
-    if (e.taxonomy) {
+    if (e.taxonomy && e.type === "Criatura") {
       Object.keys(e.taxonomy.fields || {}).forEach(function (k) {
         var fm = wbFieldMeta(e.taxonomy, k);
         if (!okVis(fm.vis, fm.allow)) return;
@@ -4385,7 +4390,7 @@
       var fm = wbFieldMeta(e, k);
       return { key: k, type: fm.type, value: e.fields[k] || "", vis: "publico", opts: fm.opts || [] };
     });
-    var taxonomy = e.taxonomy ? Object.keys(e.taxonomy.fields || {}).map(function (k) {
+    var taxonomy = (e.taxonomy && e.type === "Criatura") ? Object.keys(e.taxonomy.fields || {}).map(function (k) {
       var fm = wbFieldMeta(e.taxonomy, k);
       return { key: k, type: fm.type, value: e.taxonomy.fields[k] || "", vis: "publico", opts: fm.opts || [] };
     }) : [];
