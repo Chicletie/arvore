@@ -548,7 +548,7 @@
     var card = el("div", { class: "card" });
     var currentTabLabel = "Geral";
 
-    var eyebrowBits = [data.type, data.universe].filter(Boolean);
+    var eyebrowBits = [data.type, isParadiseGateMode() ? null : data.universe].filter(Boolean);
     if (eyebrowBits.length) card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: eyebrowBits.join(" · ") })]));
     card.appendChild(el("h1", { text: data.title || "(sem título)" }));
 
@@ -810,7 +810,7 @@
     var loginBar = mountLoginBar(header);
     page.appendChild(header);
     var card = el("div", { class: "card" });
-    card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: "TEMPORADA · " + (data.universe || "") })]));
+    card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: "TEMPORADA" + (isParadiseGateMode() || !data.universe ? "" : " · " + data.universe) })]));
     card.appendChild(el("h1", { text: data.title || "(sem título)" }));
 
     var sessions = data.sessions || [];
