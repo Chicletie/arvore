@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Redefinir senha · Paradise Gate</title>
+<link rel="icon" href="./icon.svg?v=3" type="image/svg+xml" />
+<link rel="stylesheet" href="./wiki-style.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;0,600;1,400;1,500;1,600&family=Cinzel:wght@600;700&display=swap" />
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+</head>
+<!-- Página de destino do link de "esqueci minha senha" da wiki (botão em wiki-core.js's
+     openLoginModal, sendPasswordResetEmail). Sem isso, o Firebase manda pro seu próprio
+     endereço padrão sem nenhuma marca do Paradise Gate — essa página troca esse destino
+     (precisa apontar a "Action URL" pro Firebase Console, ver instruções passadas ao dono).
+     Sempre no tema Paradise Gate (não detecta o modo pelo caminho como wiki-core.js faz,
+     já que só existe uma versão desta página, sem equivalente pro Ursprung geral). -->
+<body class="pg-theme">
+<div class="page">
+  <div class="site-header" style="justify-content:center">
+    <div class="brand"><a href="./wiki/">🪶 Paradise Gate</a></div>
+  </div>
+  <div class="login-box" style="max-width:360px;margin:40px auto" id="box">
+    <h3>Redefinir senha</h3>
+    <div id="status" style="font-size:13.5px;color:var(--muted);margin-bottom:10px">Confirmando o link…</div>
+    <div id="form" hidden>
+      <input type="password" id="pass1" placeholder="nova senha" autocomplete="new-password" />
+      <input type="password" id="pass2" placeholder="confirme a nova senha" autocomplete="new-password" />
+      <div class="err" id="err"></div>
+      <button class="submit" type="button" id="submitBtn">Salvar nova senha</button>
+    </div>
+  </div>
+</div>
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyC2nVLv97V6D1S6rZ7nwhhyQXgWeFxQLd0",
+    authDomain: "rotina-555dd.firebaseapp.com",
+    projectId: "rotina-555dd",
+    storageBucket: "rotina-555dd.firebasestorage.app",
+    messagingSenderId: "979165283716",
+    appId: "1:979165283716:web:258160eb92ead2353e89d1"
+  };
+  firebase.initializeApp(firebaseConfig);
+
+  var params = new URLSearchParams(location.search);
+  var mode = params.get("mode");
+  var oobCode = params.get("oobCode");
+  var statusEl = document.getElementById("status");
+  var formEl = document.getElementById("form");
+  var errEl = document.getElementById("err");
+  var submitBtn = document.getElementById("submitBtn");
+  var pass1 = document.getElementById("pass1");
+  var pass2 = document.getElementById("pass2");
+
+  if (mode !== "resetPassword" || !oobCode) {
+    statusEl.textContent = "Link inválido. Peça um novo pelo botão \"esqueci minha senha\" na wiki.";
+  } else {
+    firebase.auth().verifyPasswordResetCode(oobCode).then(function (email) {
+      statusEl.textContent = "Nova senha para " + email + ":";
+      formEl.hidden = false;
+      pass1.focus();
+    }).catch(function () {
+      statusEl.textContent = "Esse link não é mais válido (expirou ou já foi usado). Peça um novo pelo botão \"esqueci minha senha\" na wiki.";
+    });
+  }
+
+  function doSubmit() {
+    errEl.textContent = "";
+    if (pass1.value.length < 6) { errEl.textContent = "A senha precisa ter pelo menos 6 caracteres."; return; }
+    if (pass1.value !== pass2.value) { errEl.textContent = "As senhas não coincidem."; return; }
+    submitBtn.disabled = true; submitBtn.textContent = "salvando…";
+    firebase.auth().confirmPasswordReset(oobCode, pass1.value).then(function () {
+      formEl.hidden = true;
+      statusEl.textContent = "Senha alterada! Já pode voltar pra wiki e entrar com a nova senha.";
+    }).catch(function () {
+      submitBtn.disabled = false; submitBtn.textContent = "Salvar nova senha";
+      errEl.textContent = "Não consegui salvar. O link pode ter expirado — peça um novo.";
+    });
+  }
+  submitBtn.addEventListener("click", doSubmit);
+  pass2.addEventListener("keydown", function (ev) { if (ev.key === "Enter") doSubmit(); });
+</script>
+</body>
+</html>
