@@ -2269,15 +2269,27 @@
     }
     published.forEach(function (e) {
       var stale = e.updated > e.wikiPublishedAt;
-      card.appendChild(el("div", { class: "row" }, [
+      var diffPanel = el("div", { style: "margin:0 0 10px" });
+      var diffBtn = null;
+      if (stale && e.wikiPublishedSnap) {
+        diffBtn = el("button", { class: "btn ghost sm", type: "button", text: "ver mudanças", onclick: function () {
+          if (diffPanel.childNodes.length) { diffPanel.textContent = ""; diffBtn.textContent = "ver mudanças"; return; }
+          diffPanel.appendChild(wbEntryDiffSummary(e.wikiPublishedSnap, e));
+          diffBtn.textContent = "ocultar mudanças";
+        } });
+      }
+      var rowKids = [
         el("div", { class: "row-body" }, [
           el("div", { class: "row-title", text: wbDisplayName(e) }),
           el("div", { class: "row-meta", style: stale ? "color:var(--warn)" : "", text: flowerById(e.universeId).name + " · publicado em " + e.wikiPublishedAt + (stale ? " · editado depois, considere republicar" : "") })
         ]),
         el("a", { class: "btn ghost sm", href: wbWikiUrl(e.wikiId), target: "_blank", rel: "noopener", text: "ver" }),
-        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } }),
-        el("button", { class: "btn ghost sm", type: "button", text: stale ? "republicar" : "atualizar", onclick: function () { wbPublishWiki(e, touch); } })
-      ]));
+        el("button", { class: "btn ghost sm", type: "button", text: "abrir", onclick: function () { wbOpen(e); } })
+      ];
+      if (diffBtn) rowKids.push(diffBtn);
+      rowKids.push(el("button", { class: "btn ghost sm", type: "button", text: stale ? "republicar" : "atualizar", onclick: function () { wbPublishWiki(e, touch); } }));
+      card.appendChild(el("div", { class: "row" }, rowKids));
+      card.appendChild(diffPanel);
     });
     if (publishedSeasons.length) {
       card.appendChild(el("div", { class: "cathead", text: "Temporadas (recaps)" }));
@@ -4412,7 +4424,12 @@
     }).then(function () {
       return wbSyncRestrito(id, wbRestritoItems(e));
     }).then(function () {
-      e.wikiId = id; e.wikiPublishedAt = todayKey(); touch(true);
+      e.wikiId = id; e.wikiPublishedAt = todayKey();
+      // Guardado pra alimentar o "ver mudanças" no painel de publicação — o mesmo formato já
+      // usado pelo histórico de versões (wbEntrySnapshot/wbEntryDiffSummary), reaproveitado em
+      // vez de inventar um diff novo só pra publicado-vs-atual.
+      e.wikiPublishedSnap = wbEntrySnapshot(e);
+      touch(true);
     }).catch(function (err) {
       window.alert("Não consegui publicar: " + (err && err.message ? err.message : err) + "\n\nSe for erro de permissão, confira se as regras do Firestore já cobrem wikiPublic/wikiIndex.");
     });
@@ -4513,6 +4530,9 @@
     var sessions = (se.sessions || []).filter(function (sx) { return wbWikiVisible(sx.vis || "publico"); })
       .slice().sort(function (a, b) { return (a.date || "").localeCompare(b.date || ""); })
       .map(function (sx) { return { title: sx.title || "", date: sx.date || "", recap: sx.recap || "", vis: sx.vis || "publico" }; });
+    // Elenco fixado — só nomes (sem link: uma entrada da temporada pode não estar publicada
+    // individualmente, e a infobox da temporada não é o lugar de decidir isso caso a caso).
+    var cast = (se.pinned || []).map(function (id) { var t = wbEntry(id); return t ? wbDisplayName(t) : null; }).filter(Boolean);
     return {
       kind: "temporada",
       title: (cp.name || "Campanha") + " · " + (se.name || "Temporada"),
@@ -4520,6 +4540,10 @@
       seasonName: se.name || "",
       universe: f ? f.name : "",
       universeId: cp.universeId,
+      system: cp.system || "",
+      status: campStatusInfo(se.status || cp.status).label,
+      sessionCount: sessions.length,
+      cast: cast,
       sessions: sessions,
       publishedAt: todayKey()
     };
@@ -5056,6 +5080,7 @@
               el("button", { type: "button", title: "Mover pra cima", text: "▲", onclick: function () { wbMoveGalleryItem(e, g, -1); touch(true); } }),
               el("button", { type: "button", title: "Mover pra baixo", text: "▼", onclick: function () { wbMoveGalleryItem(e, g, 1); touch(true); } }),
               el("button", { type: "button", title: "Legenda", text: "✎", onclick: function () { var c = window.prompt("Legenda:", g.caption || ""); if (c != null) { g.caption = c.trim(); touch(true); } } }),
+              el("button", { type: "button", title: "Mudar grupo (ex: Primeira Temporada), deixe em branco pra 'Geral'", text: "📁", onclick: function () { var gr = window.prompt("Grupo (deixe em branco pra 'Geral'):", g.group || ""); if (gr != null) { g.group = gr.trim(); touch(true); } } }),
               el("button", { type: "button", title: "Ajustar foco do corte", text: "🎯", onclick: function () { wbFocusPicker(g.url, g.focus, function (f) { g.focus = f; touch(true); }); } }),
               el("button", { type: "button", title: "Wiki: " + visInfo(g.vis).label + " (toque p/ mudar)", text: visInfo(g.vis).glyph, onclick: function () { g.vis = nextVis(g.vis); touch(true); } }),
               el("button", { type: "button", title: "Remover", text: "✕", onclick: function () { e.gallery = e.gallery.filter(function (x) { return x.id !== g.id; }); touch(true); } })

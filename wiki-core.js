@@ -614,6 +614,20 @@
     card.appendChild(el("h1", { text: data.title || "(sem título)" }));
 
     var sessions = data.sessions || [];
+    // Sem capa/retrato (temporada não tem conceito de imagem própria) — só a tabela de fatos,
+    // reaproveitando a mesma .infobox/.infobox-facts das páginas de entrada.
+    var factRows = [];
+    if (data.system) factRows.push(["Sistema", data.system]);
+    if (data.status) factRows.push(["Status", data.status]);
+    factRows.push(["Sessões", String(data.sessionCount != null ? data.sessionCount : sessions.length)]);
+    if (data.cast && data.cast.length) factRows.push(["Elenco", data.cast.join(", ")]);
+    if (factRows.length) {
+      var info = el("div", { class: "infobox" });
+      var itable = el("table", { class: "infobox-facts" });
+      factRows.forEach(function (r) { itable.appendChild(el("tr", {}, [el("th", { text: r[0] }), el("td", { text: r[1] })])); });
+      info.appendChild(itable);
+      card.appendChild(info);
+    }
     if (!sessions.length) {
       card.appendChild(el("div", { class: "empty", text: "Nenhum recap público ainda." }));
     } else {
