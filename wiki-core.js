@@ -148,6 +148,9 @@
     if (item.vis === "spoiler") { var c = el("span", { class: "tag" }); c.appendChild(spoilerSpan(prefix + item.text)); return c; }
     return el("span", { class: "tag", text: prefix + item.text });
   }
+  // Ponto de foco escolhido no editor (em vez de recorte fixo) — vira object-position aqui,
+  // a mesma imagem original renderiza certo em qualquer proporção (infobox, miniatura, galeria).
+  function objPos(focus) { return (focus && focus.x != null ? focus.x : 50) + "% " + (focus && focus.y != null ? focus.y : 50) + "%"; }
 
   // Login only matters for "restrito" content — público/spoiler never need it. A signed-in
   // session persists across page loads (Firebase's own local persistence), so a player who logs
@@ -391,17 +394,18 @@
     if (data.cover || shortFields.length || galGroups.length || hasAliases) {
       var info = el("div", { class: "infobox" });
       var portraitOptions = [];
-      if (data.cover) portraitOptions.push({ label: "Capa", url: data.cover, vis: data.coverVis || "publico" });
+      if (data.cover) portraitOptions.push({ label: "Capa", url: data.cover, vis: data.coverVis || "publico", focus: data.coverFocus });
       galGroups.forEach(function (grp) {
         var first = data.gallery.filter(function (g) { return g.group === grp; })[0];
-        if (first) portraitOptions.push({ label: grp || "Geral", url: first.url, vis: first.vis });
+        if (first) portraitOptions.push({ label: grp || "Geral", url: first.url, vis: first.vis, focus: first.focus });
       });
       if (portraitOptions.length) {
         var portraitSlot = el("div", { class: "infobox-portrait" });
         function paintPortrait(opt) {
           portraitSlot.textContent = "";
-          if (opt.vis === "spoiler") portraitSlot.appendChild(spoilerCover(function () { return el("img", { class: "cover", src: opt.url, alt: "" }); }));
-          else portraitSlot.appendChild(el("img", { class: "cover", src: opt.url, alt: "" }));
+          var posStyle = "object-position:" + objPos(opt.focus);
+          if (opt.vis === "spoiler") portraitSlot.appendChild(spoilerCover(function () { return el("img", { class: "cover", style: posStyle, src: opt.url, alt: "" }); }));
+          else portraitSlot.appendChild(el("img", { class: "cover", style: posStyle, src: opt.url, alt: "" }));
         }
         paintPortrait(portraitOptions[0]);
         if (portraitOptions.length > 1) {
@@ -536,8 +540,9 @@
         var grid = el("div", { class: "gal-grid" });
         items.forEach(function (g) {
           var fig = el("figure", { class: "gal-item" });
-          if (g.vis === "spoiler") fig.appendChild(spoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "" }); }));
-          else fig.appendChild(el("img", { src: g.url, alt: g.caption || "" }));
+          var galPos = "object-position:" + objPos(g.focus);
+          if (g.vis === "spoiler") fig.appendChild(spoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "", style: galPos }); }));
+          else fig.appendChild(el("img", { src: g.url, alt: g.caption || "", style: galPos }));
           if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
           grid.appendChild(fig);
         });
@@ -663,7 +668,7 @@
       var newsGrid = el("div", { class: "links-grid" });
       recentAll.slice(0, newsShown).forEach(function (e) {
         var kids = [];
-        if (e.cover) kids.push(el("img", { class: "link-card-cover", src: e.cover, alt: "", loading: "lazy" }));
+        if (e.cover) kids.push(el("img", { class: "link-card-cover", src: e.cover, alt: "", loading: "lazy", style: "object-position:" + objPos(e.coverFocus) }));
         kids.push(el("span", { class: "link-card-label", text: (e.updatedAt || "") + (e.type ? " · " + e.type : "") }));
         kids.push(el("span", { class: "link-card-title", text: e.title || "(sem título)" }));
         newsGrid.appendChild(el("a", { class: "link-card", href: wikiHref(e.id) }, kids));
@@ -711,7 +716,7 @@
       // sentido (e só aparece) na wiki geral.
       function cardFor(e) {
         var card = el("a", { class: "home-card", href: wikiHref(e.id) });
-        if (e.cover) card.appendChild(el("img", { class: "home-card-cover", src: e.cover, alt: "", loading: "lazy" }));
+        if (e.cover) card.appendChild(el("img", { class: "home-card-cover", src: e.cover, alt: "", loading: "lazy", style: "object-position:" + objPos(e.coverFocus) }));
         card.appendChild(el("div", { class: "home-card-title", text: e.title || "(sem título)" }));
         card.appendChild(el("div", { class: "home-card-meta", text: e.type || "" }));
         var snip = q ? snippetFor(e, q) : null;
