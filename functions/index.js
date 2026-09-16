@@ -109,6 +109,8 @@ function buildInviteHtml(link) {
           '<div style="text-align:center;margin:30px 0 26px;">' +
             '<a href="' + link + '" style="display:inline-block;background:#0d1b3f;color:#dfe4ea;text-decoration:none;padding:13px 30px;border-radius:2px;font-size:14px;font-weight:700;letter-spacing:0.05em;">ESCOLHER SENHA E ENTRAR</a>' +
           '</div>' +
+          '<p style="font-size:15px;font-style:italic;color:#2e2416;text-align:right;margin:0 4px 2px;">Ansiosamente,</p>' +
+          '<p style="font-family:\'Cinzel\',Georgia,serif;font-size:15px;font-weight:700;color:#0d1b3f;text-align:right;letter-spacing:0.03em;margin:0 4px 26px;">S&aacute;bio Oliver Montgomery</p>' +
           '<p style="font-size:15px;font-style:italic;color:#6a5940;text-align:center;margin:0;">Sub lege Coeli, scientia crescat</p>' +
         '</div>' +
         '<p style="font-size:12px;color:#7c8aa8;line-height:1.5;margin:18px 6px 0;text-align:center;">Se você não esperava este email, pode ignorá-lo com segurança.</p>' +
