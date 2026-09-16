@@ -1088,7 +1088,12 @@
     { id: "violeta", name: "Violeta", kind: "flor", color: "#8f5cc9" },
     { id: "lotus", name: "Lótus", kind: "flor", color: "#e079ab" }
   ];
-  var WB_TYPES = ["Local", "Personagem", "Facção", "Sistema de Magia", "Divindade", "Evento histórico", "Item", "Criatura", "Língua / Povo", "Conceito"];
+  // "Publicação" é diferente de Obras (franquia/campanha, uma organização de escrita do
+  // AUTOR de verdade) — é um livro/diário/grimório que existe DENTRO do universo, escrito por
+  // um personagem de lá. Existe pra dar um lugar de verdade (com página própria, template
+  // próprio) pra citações de quem nunca virou uma entrada de Personagem — a obra em si vira a
+  // "casa" da citação nesse caso.
+  var WB_TYPES = ["Local", "Personagem", "Facção", "Sistema de Magia", "Divindade", "Evento histórico", "Item", "Publicação", "Criatura", "Língua / Povo", "Conceito"];
   var FRANCHISE_KINDS = ["Romance", "Trilogia", "Série", "Conto", "Novela", "Roteiro", "Quadrinho", "Campanha de RPG", "Outro"];
   var WB_TEMPLATES = {
     "Personagem": ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"],
@@ -1098,6 +1103,7 @@
     "Divindade": ["Domínio", "Símbolos", "Culto e clero", "Manifestações", "Mitos", "Relação com mortais"],
     "Evento histórico": ["Quando", "Onde", "Envolvidos", "Causas", "O que aconteceu", "Consequências"],
     "Item": ["Origem", "Localização atual", "Portadores", "Poderes", "Aparência", "História"],
+    "Publicação": ["Autor", "Ano de publicação", "Natureza", "Localização atual", "Capacidades mágicas", "Conteúdo", "História"],
     "Criatura": ["Habitat", "Perigo", "Aparência", "Comportamento", "Dieta", "Relação com os povos"],
     "Língua / Povo": ["Território", "Língua", "História", "Costumes", "Crenças", "Relações externas"],
     "Conceito": []
@@ -3774,8 +3780,8 @@
   function guessFieldType(name) {
     var n = " " + (name || "").toLowerCase() + " ";
     if (/( idade | anos |n[úu]mero|quantidade|popula[çc][ãa]o|altura|peso|n[íi]vel|contagem|total)/.test(n)) return "numero";
-    if (/(data|nascimento|morte|falecimento|funda[çc][ãa]o|in[íi]cio| fim )/.test(n)) return "data";
-    if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando|localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua)/.test(n)) return "texto";
+    if (/(data|nascimento|morte|falecimento|funda[çc][ãa]o|publica[çc][ãa]o|in[íi]cio| fim )/.test(n)) return "data";
+    if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando|localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua| autor |natureza)/.test(n)) return "texto";
     return "nota";
   }
   // Um campo chamado "segredo"/"nota do mestre"/etc quase sempre É pra ficar de fora da wiki —

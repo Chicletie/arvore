@@ -119,16 +119,29 @@ details.wiki-section.post:last-child { border-bottom: 0; }
 .post-summary { cursor: pointer; font-family: var(--font-wb); font-size: 16px; font-weight: 600; color: var(--ink); }
 .post-summary::marker { color: var(--muted); }
 
-/* linha do tempo pessoal — lista cronológica dos eventos desta própria entrada */
-.events-wrap { clear: both; margin-top: 8px; }
-.events-list { list-style: none; margin: 0; padding: 0; }
-.events-list li { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--border); align-items: baseline; }
-.events-list li:first-child { border-top: 0; }
-.events-list li.major .ev-text { font-weight: 600; }
-.events-list li.major .ev-date { color: var(--gold-ink); }
-.ev-date { font-family: var(--font-wb); font-size: 12.5px; color: var(--faint); white-space: nowrap; flex: none; min-width: 80px; }
-.ev-text { font-family: var(--font-wb); font-size: 16px; }
-.ev-note { font-size: 13px; color: var(--muted); font-style: italic; width: 100%; }
+/* linha do tempo pessoal (aba dentro de Relações) — espinha vertical, cada evento é um nó
+   clicável (expande a descrição em markdown, com [[links]] resolvidos quando possível). */
+.wb-tl { position: relative; padding-left: 22px; margin: 4px 0; }
+.wb-tl::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 1px; background: var(--border); }
+.wb-tl-item { position: relative; margin-bottom: 4px; }
+.wb-tl-head {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+  background: none; border: 0; padding: 8px 6px; cursor: pointer; font: inherit; color: inherit; border-radius: 4px;
+}
+.wb-tl-head:hover { background: var(--accent-wash); }
+.wb-tl-dot { position: absolute; left: -22px; top: 15px; width: 9px; height: 9px; border-radius: 50%; background: var(--border-strong); }
+.wb-tl-item.major .wb-tl-dot { background: var(--gold); width: 11px; height: 11px; left: -23px; }
+.wb-tl-date { font-family: var(--font-wb); font-size: 12.5px; color: var(--faint); white-space: nowrap; flex: none; min-width: 76px; }
+.wb-tl-label { font-family: var(--font-wb); font-size: 16px; }
+.wb-tl-item.major .wb-tl-label { font-weight: 600; }
+.wb-tl-item.major .wb-tl-date { color: var(--gold-ink); }
+.wb-tl-head::after { content: "▸"; margin-left: auto; color: var(--faint); font-size: 11px; transition: transform .15s; }
+.wb-tl-head.open::after { transform: rotate(90deg); }
+.wb-tl-body { padding: 2px 6px 12px 96px; }
+.wb-tl-body .prose { font-size: 14.5px; }
+.wb-tl-body .prose p { margin: 0 0 8px; }
+.wb-tl-empty { font-size: 13px; color: var(--faint); font-style: italic; }
+@media (max-width: 480px) { .wb-tl-body { padding-left: 6px; } }
 
 /* galeria — full width, abaixo do corpo, agrupada por rótulo (ex: temporadas) */
 .gallery-wrap { clear: both; margin-top: 8px; }

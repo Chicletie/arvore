@@ -202,6 +202,42 @@
     return "ano " + ev.y;
   }
   function wbEventSortKey(ev) { return ev.y * 100000 + (ev.m || 0) * 100 + (ev.d || 0); }
+  // Um [[Nome]] dentro de um texto normalmente vira só texto em negrito (.wl-plain) — a wiki
+  // isolada não tem como saber se aquele nome é uma página publicada sem mais contexto. Mas
+  // dentro da descrição de um evento, JÁ temos esse contexto: os links/backlinks reais desta
+  // própria entrada. Se o texto de um [[Nome]] bate com o título de uma ligação real e
+  // publicada, vira um link de verdade (.wl-live) — é assim que a descrição de um evento pode
+  // apontar pra um "Evento histórico" com página própria, por exemplo.
+  function wbUpgradeWikiLinks(container, allLinks) {
+    var byTitle = {};
+    allLinks.forEach(function (lk) { if (lk.targetId) byTitle[(lk.targetTitle || "").toLowerCase()] = lk.targetId; });
+    container.querySelectorAll(".wl-plain").forEach(function (span) {
+      var id = byTitle[(span.textContent || "").toLowerCase()];
+      if (id) span.replaceWith(el("a", { class: "wl-live", href: wikiHref(id), text: span.textContent }));
+    });
+  }
+  // Linha do tempo pessoal como elemento visual próprio (não uma lista de texto simples):
+  // espinha vertical, cada evento é um nó clicável que expande pra revelar a descrição
+  // completa (o "note", que pode conter [[links]] pra outras páginas — ver wbUpgradeWikiLinks
+  // acima) — o rótulo do evento continua sendo só o resumo curto, a descrição é o "como e por
+  // quê" mais longo.
+  function buildTimelineViz(eventsSorted, data) {
+    var allLinks = (data.links || []).concat(data.backlinks || []);
+    var wrap = el("div", { class: "wb-tl" });
+    eventsSorted.forEach(function (ev) {
+      var body = el("div", { class: "wb-tl-body", hidden: "hidden" });
+      if (ev.note) { var prose = renderMarkdown(ev.note); wbUpgradeWikiLinks(prose, allLinks); body.appendChild(prose); }
+      else body.appendChild(el("div", { class: "wb-tl-empty", text: "Sem descrição adicional." }));
+      var head = el("button", { type: "button", class: "wb-tl-head" }, [
+        el("span", { class: "wb-tl-dot" }),
+        el("span", { class: "wb-tl-date", text: wbFmtEventDate(ev) }),
+        el("span", { class: "wb-tl-label", text: ev.label || "(evento)" })
+      ]);
+      head.addEventListener("click", function () { body.hidden = !body.hidden; head.classList.toggle("open", !body.hidden); });
+      wrap.appendChild(el("div", { class: "wb-tl-item" + (ev.major ? " major" : "") }, [head, body]));
+    });
+    return wrap;
+  }
 
   // Login only matters for "restrito" content — público/spoiler never need it. A signed-in
   // session persists across page loads (Firebase's own local persistence), so a player who logs
@@ -670,12 +706,13 @@
     var sharedToc = [];
     if (data.posts && data.posts.length) sharedToc.push({ id: "posts", label: "Posts" });
     var eventsSorted = (data.events || []).slice().sort(function (a, b) { return wbEventSortKey(a) - wbEventSortKey(b); });
-    if (eventsSorted.length) sharedToc.push({ id: "linha-do-tempo", label: "Linha do tempo" });
     if (data.gallery && data.gallery.length) sharedToc.push({ id: "galeria", label: "Galeria" });
-    // Genealogia only ever exists alongside Relações (a family link is also a relation, so
-    // relNeighbors always picks it up too) — never the other way around, which is why this is
-    // gated on relGraph alone: one combined section, tabbed, Relações first/default.
-    if (relGraph) sharedToc.push({ id: "relacoes", label: "Relações" });
+    // Genealogia e Linha do tempo só existem como abas dentro desta seção combinada — o
+    // rótulo do sumário/cabeçalho muda pra "Linha do tempo" quando a entrada tem eventos mas
+    // nenhuma relação (linha do tempo é independente disso — uma entrada pode ter eventos sem
+    // ter nenhuma relação registrada), senão fica "Relações" com as outras abas dentro.
+    var relSectionLabel = relGraph ? "Relações" : (eventsSorted.length ? "Linha do tempo" : null);
+    if (relSectionLabel) sharedToc.push({ id: "relacoes", label: relSectionLabel });
     if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
     if (data.variants && data.variants.length) {
@@ -717,24 +754,6 @@
       card.appendChild(pwrap);
     }
 
-    // linha do tempo pessoal — só os eventos desta própria entrada, ordenados; alimenta
-    // também a timeline geral da wiki (ver "ano em foco" na home), mas aqui é o registro
-    // completo (major e não-major juntos), não só os principais sorteados.
-    if (eventsSorted.length) {
-      var ewrap = el("div", { class: "events-wrap" });
-      ewrap.appendChild(el("div", { class: "cathead", id: "linha-do-tempo", text: "Linha do tempo" }));
-      var eList = el("ul", { class: "events-list" });
-      eventsSorted.forEach(function (ev) {
-        eList.appendChild(el("li", { class: ev.major ? "major" : null }, [
-          el("span", { class: "ev-date", text: wbFmtEventDate(ev) }),
-          el("span", { class: "ev-text", text: ev.label || "(evento)" }),
-          ev.note ? el("span", { class: "ev-note", text: ev.note }) : null
-        ]));
-      });
-      ewrap.appendChild(eList);
-      card.appendChild(ewrap);
-    }
-
     // galeria — agrupada por rótulo livre (ex: "Primeira Temporada", "Segunda Temporada")
     if (data.gallery && data.gallery.length) {
       var gwrap = el("div", { class: "gallery-wrap" });
@@ -756,27 +775,30 @@
       card.appendChild(gwrap);
     }
 
-    // Relações + Genealogia share one section, tabbed (reuses .work-tabs/.work-tab, same look
-    // as the obra/campanha variant switcher above) — Relações is always the default tab, and
-    // Genealogia only exists as a second tab when there's actually a family tree to show.
-    if (relGraph) {
-      card.appendChild(el("div", { class: "cathead", id: "relacoes", text: "Relações" }));
-      if (famTree) {
-        famTree.hidden = true;
-        var relTabRel = el("button", { type: "button", class: "work-tab on", text: "Relações" });
-        var relTabFam = el("button", { type: "button", class: "work-tab", text: "Genealogia" });
-        relTabRel.addEventListener("click", function () {
-          relTabRel.classList.add("on"); relTabFam.classList.remove("on");
-          relGraph.hidden = false; famTree.hidden = true;
+    // Relações + Genealogia + Linha do tempo dividem uma seção, tabbed (reusa .work-tabs, o
+    // mesmo visual do seletor de variante de obra) — Relações vem primeiro quando existe;
+    // Genealogia só existe junto de Relações; Linha do tempo é independente das outras duas
+    // (uma entrada pode ter eventos sem ter nenhuma relação registrada). Sem aba nenhuma
+    // quando só existe UM dos três, pra não mostrar um seletor de uma opção só.
+    if (relSectionLabel) {
+      card.appendChild(el("div", { class: "cathead", id: "relacoes", text: relSectionLabel }));
+      var relPanels = [];
+      if (relGraph) relPanels.push({ label: "Relações", el: relGraph });
+      if (famTree) relPanels.push({ label: "Genealogia", el: famTree });
+      if (eventsSorted.length) relPanels.push({ label: "Linha do tempo", el: buildTimelineViz(eventsSorted, data) });
+      if (relPanels.length > 1) {
+        var relTabs = el("div", { class: "work-tabs" });
+        relPanels.forEach(function (p, i) {
+          var btn = el("button", { type: "button", class: "work-tab" + (i === 0 ? " on" : ""), text: p.label });
+          btn.addEventListener("click", function () {
+            relTabs.querySelectorAll(".work-tab").forEach(function (b, j) { b.classList.toggle("on", j === i); });
+            relPanels.forEach(function (pp, j) { pp.el.hidden = j !== i; });
+          });
+          relTabs.appendChild(btn);
         });
-        relTabFam.addEventListener("click", function () {
-          relTabFam.classList.add("on"); relTabRel.classList.remove("on");
-          relGraph.hidden = true; famTree.hidden = false;
-        });
-        card.appendChild(el("div", { class: "work-tabs" }, [relTabRel, relTabFam]));
+        card.appendChild(relTabs);
       }
-      card.appendChild(relGraph);
-      if (famTree) card.appendChild(famTree);
+      relPanels.forEach(function (p, i) { p.el.hidden = i !== 0; card.appendChild(p.el); });
     }
 
     // ligações — só aparece pra quem também está publicado; o resto fica de fora de propósito
