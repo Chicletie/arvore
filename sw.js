@@ -1,6 +1,6 @@
 /* tree — service worker (offline + atualização) */
-var CACHE = "arvore-cache-v57";
-var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg"];
+var CACHE = "arvore-cache-v58";
+var SHELL = ["./tree/", "./tree/index.html", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
@@ -36,7 +36,7 @@ self.addEventListener("fetch", function (e) {
         return r;
       }).catch(function () {
         return caches.match(req).then(function (m) {
-          return m || caches.match("./index.html") || caches.match("./");
+          return m || caches.match("./tree/index.html") || caches.match("./tree/");
         });
       })
     );

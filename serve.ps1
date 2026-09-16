@@ -10,6 +10,7 @@ while ($listener.IsListening) {
   $reqPath = $ctx.Request.Url.AbsolutePath -replace '^/arvore/', ''
   if ($reqPath -eq "") { $reqPath = "index.html" }
   $full = Join-Path $root $reqPath
+  if ((Test-Path $full) -and (Get-Item $full).PSIsContainer) { $full = Join-Path $full "index.html" }
   if (-not (Test-Path $full) -or (Get-Item $full).PSIsContainer) {
     $full = Join-Path $root "404.html"
     $ctx.Response.StatusCode = 404
