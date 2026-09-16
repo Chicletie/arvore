@@ -476,10 +476,24 @@
       firebase.firestore().collection("wikiRestrito").doc(wikiId).collection("itens").get().then(function (snap) {
         var items = snap.docs.map(function (d) { return d.data(); });
         if (!items.length) return;
-        slot.appendChild(el("div", { class: "cathead", text: "🔐 Desbloqueado pra você" }));
+        // "campo-confidencial" não entra na lista "Desbloqueado pra você" — ele TROCA o
+        // conteúdo do campo já renderizado no lugar de origem (ver data-field-swap em
+        // buildArticle/infobox), não soma uma seção nova. Só mostra o cabeçalho se sobrar algo
+        // de fato listado aqui embaixo.
+        var hasExtraSection = items.some(function (it) { return it.kind !== "campo-confidencial"; });
+        if (hasExtraSection) slot.appendChild(el("div", { class: "cathead", text: "🔐 Desbloqueado pra você" }));
         items.forEach(function (it) {
           var heading = (it.key || it.title || "Seção") + (it.variant ? " (" + it.variant + ")" : "");
-          if (it.kind === "campo") {
+          if (it.kind === "campo-confidencial") {
+            var swapTarget = null;
+            host.querySelectorAll("[data-field-swap]").forEach(function (n) { if (n.getAttribute("data-field-swap") === it.key) swapTarget = n; });
+            if (swapTarget) {
+              swapTarget.textContent = "";
+              swapTarget.classList.add("wb-conf-swapped");
+              if (swapTarget.tagName === "TD") { var confSpan = el("span"); mdInline(confSpan, it.value); swapTarget.appendChild(confSpan); }
+              else swapTarget.appendChild(renderMarkdown(it.value));
+            }
+          } else if (it.kind === "campo") {
             slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: heading }));
             slot.appendChild(renderMarkdown(it.value));
           } else if (it.kind === "secao") {
@@ -741,7 +755,7 @@
           itable.appendChild(el("tr", {}, [el("th", { text: "Também conhecido(a) como" }), aliasTd]));
         }
         shortFields.forEach(function (f) {
-          var td = el("td");
+          var td = el("td", { "data-field-swap": f.key });
           if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
           else mdInline(td, f.value);
           itable.appendChild(el("tr", {}, [el("th", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }), td]));
@@ -786,8 +800,13 @@
 
       bLongFields.forEach(function (f) {
         article.appendChild(el("div", { class: "cathead", id: f._anchor, text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
-        if (f.vis === "spoiler") article.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
-        else article.appendChild(renderMarkdown(f.value));
+        // data-field-swap só na aba Geral (campos de variante de obra não têm versão
+        // confidencial — o mesmo nome de campo pode se repetir numa variante sem risco de o
+        // troca-conteúdo de mountRestrito acertar o alvo errado).
+        var fbody = anchorPrefix === "geral-" ? el("div", { "data-field-swap": f.key }) : el("div");
+        if (f.vis === "spoiler") fbody.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
+        else fbody.appendChild(renderMarkdown(f.value));
+        article.appendChild(fbody);
       });
       // <details> em vez de div — dá pro leitor recolher uma seção que não interessa (o autor já
       // podia fazer isso no próprio editor do tree; aqui era sempre tudo aberto, sem opção).
