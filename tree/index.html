@@ -2004,8 +2004,17 @@
     if (opts.autoedit) setTimeout(enter, 40);
     return host;
   }
+  // Tipo da entrada-esboço criada por "+ criar e ligar" (autocomplete [[Nome]]): a intenção
+  // sempre foi cair em "Conceito", o catch-all genérico da wiki (confirmado por wbCombo mostrar
+  // "Conceito" no seletor de tipo dessas entradas depois) — mas `C().types[0] || "Conceito"`
+  // nunca de fato caía ali, porque `types[0]` é sempre uma string truthy (índice 0 de WB_TYPES é
+  // "Local", não "Conceito", que fica por último). Bug real, achado numa varredura de tipos:
+  // toda entrada-esboço criada assim, desde sempre, virava "Local" silenciosamente, sem o
+  // usuário nunca ver ou escolher um tipo. Corrigido pra preferir "Conceito" quando existir na
+  // lista de tipos do mundo, só caindo pra types[0] se ele tiver sido removido de propósito.
   function wbStubEntry(uniId, title) {
-    var e = { id: uid(), universeId: uniId || "raiz", type: C().types[0] || "Conceito", title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [] };
+    var stubType = C().types.indexOf("Conceito") !== -1 ? "Conceito" : (C().types[0] || "Conceito");
+    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [] };
     C().entries.push(e); save();
     return e;
   }
@@ -3819,7 +3828,7 @@
     var n = " " + (name || "").toLowerCase() + " ";
     if (/( idade | anos |n[úu]mero|quantidade|popula[çc][ãa]o|altura|peso|n[íi]vel|contagem|total)/.test(n)) return "numero";
     if (/(data|nascimento|morte|falecimento|funda[çc][ãa]o|publica[çc][ãa]o|in[íi]cio| fim )/.test(n)) return "data";
-    if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando|localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua| autor |natureza)/.test(n)) return "texto";
+    if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando| onde |localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua| autor |natureza)/.test(n)) return "texto";
     return "nota";
   }
   // Um campo chamado "segredo"/"nota do mestre"/etc quase sempre É pra ficar de fora da wiki —
