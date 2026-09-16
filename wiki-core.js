@@ -364,10 +364,12 @@
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = data.title || "wiki";
-    var loginBar = mountLoginBar(page);
+    var header = el("div", { class: "site-header" });
     var topbar = el("div", { class: "topbar" }, [el("a", { href: homeHref(), text: homeLabel() })]);
-    if (data.universe && !isParadiseGateMode()) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
-    page.appendChild(topbar);
+    if (data.universe && !isParadiseGateMode()) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { class: "topbar-uni", text: data.universe })); }
+    header.appendChild(topbar);
+    var loginBar = mountLoginBar(header);
+    page.appendChild(header);
     var card = el("div", { class: "card" });
     var currentTabLabel = "Geral";
 
@@ -594,10 +596,12 @@
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = data.title || "wiki";
-    var loginBar = mountLoginBar(page);
+    var header = el("div", { class: "site-header" });
     var topbar = el("div", { class: "topbar" }, [el("a", { href: homeHref(), text: homeLabel() })]);
-    if (data.universe && !isParadiseGateMode()) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
-    page.appendChild(topbar);
+    if (data.universe && !isParadiseGateMode()) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { class: "topbar-uni", text: data.universe })); }
+    header.appendChild(topbar);
+    var loginBar = mountLoginBar(header);
+    page.appendChild(header);
     var card = el("div", { class: "card" });
     card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: "TEMPORADA · " + (data.universe || "") })]));
     card.appendChild(el("h1", { text: data.title || "(sem título)" }));
@@ -622,7 +626,9 @@
     var page = document.getElementById("page");
     page.textContent = "";
     document.title = homeLabel() + " · Wiki";
-    mountLoginBar(page);
+    var header = el("div", { class: "site-header" });
+    mountLoginBar(header);
+    page.appendChild(header);
     var wrap = el("div", { class: "card" });
     wrap.appendChild(el("div", { class: "home-title", text: homeLabel() }));
     wrap.appendChild(el("div", { class: "home-sub", text: "Wiki pública. Navegue pelas páginas publicadas." }));

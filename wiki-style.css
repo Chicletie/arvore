@@ -23,10 +23,13 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f
 h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin: 6px 0 4px; }
 .aliases { font-size: 13px; color: var(--muted); font-style: italic; margin-bottom: 14px; }
 
-.topbar { max-width: 800px; margin: 0 auto 14px; display: flex; gap: 10px; align-items: center; font-size: 13px; }
-.topbar a { color: var(--gold-ink); text-decoration: none; font-weight: 600; }
+.site-header { max-width: 800px; margin: 0 auto 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; box-shadow: var(--shadow); }
+.site-header > .login-bar:only-child { margin-left: auto; }
+.topbar { display: flex; gap: 10px; align-items: center; }
+.topbar a { color: var(--gold-ink); text-decoration: none; font-weight: 600; font-family: var(--font-display); font-size: 17px; letter-spacing: 0.01em; }
 .topbar a:hover { text-decoration: underline; }
-.topbar .sep { color: var(--faint); }
+.topbar .sep { color: var(--faint); font-size: 13px; }
+.topbar .topbar-uni { font-size: 13px; color: var(--muted); }
 
 /* infobox — floats right of the article on wide screens, stacks full-width on narrow ones */
 .infobox { float: none; width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin: 0 0 18px; overflow: hidden; }
@@ -122,8 +125,9 @@ a.tag:hover { border-color: var(--gold); }
 .restrito-block { border: 1px dashed var(--border-strong); border-radius: var(--radius); margin: 10px 0; padding: 10px 12px; color: var(--faint); font-style: italic; font-size: 14px; }
 
 /* login (só pra desbloquear conteúdo "visível apenas para") */
-.login-bar { max-width: 800px; margin: 0 auto 10px; text-align: right; font-size: 12.5px; }
-.login-bar a, .login-bar button.linklike { color: var(--gold-ink); background: none; border: 0; padding: 0; font: inherit; cursor: pointer; text-decoration: underline; }
+.login-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+.login-bar a, .login-bar button.linklike { color: var(--gold-ink); background: var(--accent-wash); border: 1px solid var(--border-strong); padding: 5px 11px; border-radius: 999px; font: inherit; font-size: 12px; cursor: pointer; text-decoration: none; }
+.login-bar a:hover, .login-bar button.linklike:hover { background: var(--gold); color: var(--paper); border-color: var(--gold); }
 .login-modal { position: fixed; inset: 0; background: rgba(20,16,10,0.45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
 .login-box { background: var(--paper); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 20px; width: 100%; max-width: 320px; box-shadow: var(--shadow); }
 .login-box h3 { margin: 0 0 12px; font-family: var(--font-display); font-weight: 500; }
@@ -155,7 +159,7 @@ html { scroll-behavior: smooth; }
 @media print {
   body { background: #fff; padding: 0; }
   .card { box-shadow: none; border: 1px solid #ccc; }
-  .topbar, .toc, .home-search, .home-random, .foot, .infobox-tabs, .spoiler-reveal { display: none; }
+  .site-header, .toc, .home-search, .home-random, .foot, .infobox-tabs, .spoiler-reveal { display: none; }
   .infobox { float: none; width: 100%; page-break-inside: avoid; }
   a { color: inherit; text-decoration: none; }
   .spoiler-block:not(.revealed) { display: none; }
