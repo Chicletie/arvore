@@ -297,6 +297,15 @@
     return wrap;
   }
 
+  // "Ver como convidado" — um jogador com acesso restrito/confidencial pode querer navegar
+  // vendo só o que qualquer visitante vê (curiosidade, ou pra não estragar a própria imersão
+  // vendo segredos do personagem sem querer). Guardado em sessionStorage (não localStorage):
+  // some sozinho quando a aba fecha, não precisa de um "voltar ao normal" que o jogador esqueça
+  // de desfazer numa sessão futura. Isolado em try/catch porque sessionStorage pode lançar em
+  // contextos com armazenamento bloqueado (ex: o iframe de "ver como wiki" do dono, que nem
+  // chega a mostrar esse botão já que nunca tem firebase.auth ativo ali).
+  function wbGuestMode() { try { return sessionStorage.getItem("wb_guest_mode") === "1"; } catch (err) { return false; } }
+  function wbSetGuestMode(on) { try { if (on) sessionStorage.setItem("wb_guest_mode", "1"); else sessionStorage.removeItem("wb_guest_mode"); } catch (err) { } }
   // Login only matters for "restrito" content — público/spoiler never need it. A signed-in
   // session persists across page loads (Firebase's own local persistence), so a player who logs
   // in once stays in on later visits until they sign out.
@@ -312,9 +321,17 @@
       authSlot.textContent = "";
       var u = firebase.auth().currentUser;
       if (u) {
-        authSlot.appendChild(el("span", { text: "logado como " + u.email + " · " }));
+        authSlot.appendChild(el("span", { text: "logado como " + u.email + (wbGuestMode() ? " (vendo como convidado)" : "") + " · " }));
+        // Recarrega a página de propósito ao trocar: o conteúdo restrito/confidencial já pode
+        // ter sido injetado/trocado no DOM por mountRestrito, e desfazer isso in-place exigiria
+        // guardar o valor público original de cada campo só pra esse caso raro — um reload
+        // simples já resolve certo, igual um login/logout de verdade também recarregaria tudo.
+        var guestBtn = el("button", { class: "linklike", type: "button", text: wbGuestMode() ? "👁 voltar a ver com meu acesso" : "👁 ver como convidado" });
+        guestBtn.addEventListener("click", function () { wbSetGuestMode(!wbGuestMode()); location.reload(); });
+        authSlot.appendChild(guestBtn);
+        authSlot.appendChild(document.createTextNode(" · "));
         var out = el("button", { class: "linklike", type: "button", text: "sair" });
-        out.addEventListener("click", function () { firebase.auth().signOut(); });
+        out.addEventListener("click", function () { wbSetGuestMode(false); firebase.auth().signOut(); });
         authSlot.appendChild(out);
       } else {
         var inBtn = el("button", { class: "linklike", type: "button", text: "entrar (pra ver conteúdo restrito)" });
@@ -376,8 +393,9 @@
       });
     }
     function paint() {
-      btn.hidden = !firebase.auth().currentUser;
-      if (mineBtn) mineBtn.hidden = !firebase.auth().currentUser;
+      var show = firebase.auth().currentUser && !wbGuestMode();
+      btn.hidden = !show;
+      if (mineBtn) mineBtn.hidden = !show;
     }
     paint();
     firebase.auth().onAuthStateChanged(paint);
@@ -472,7 +490,7 @@
     host.appendChild(slot);
     function refresh() {
       slot.textContent = "";
-      if (!firebase.auth().currentUser) return;
+      if (!firebase.auth().currentUser || wbGuestMode()) return;
       firebase.firestore().collection("wikiRestrito").doc(wikiId).collection("itens").get().then(function (snap) {
         var items = snap.docs.map(function (d) { return d.data(); });
         if (!items.length) return;
