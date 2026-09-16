@@ -3914,6 +3914,9 @@
   }
   function wbRenderSections(card, e, opts) {
     var touch = opts.touch;
+    if (!opts.ro) {
+      card.appendChild(el("div", { class: "hint", style: "margin-bottom:8px", text: "Seções são blocos de texto que você reordena à mão, pra algo específico desta entrada. Pra um fato padrão que se repete entre entradas do mesmo tipo (ex: História, Clima), prefira um campo tipo \"nota\" lá embaixo em Campos, ele ganha sugestão automática nas próximas entradas." }));
+    }
     (e.sections || []).forEach(function (sec, idx) {
       if (opts.hideSecret && sec.vis === "mestre") return;
       var host = el("div", { class: "wb-sec" + (wbVisBgClass(sec.vis, "wb-sec") ? " " + wbVisBgClass(sec.vis, "wb-sec") : ""), "data-toc": (sec.title || "Seção") });
@@ -5054,6 +5057,7 @@
     // eventos datados
     if (!Array.isArray(e.events)) e.events = [];
     if (e.events.length || !ro) card.appendChild(cat("Eventos", "Tempo"));
+    if (!ro) card.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Eventos entram na linha do tempo do universo inteiro. Pra uma anotação datada solta que fala só desta entrada, sem mexer na linha do tempo, use Posts, logo mais abaixo." }));
     var months = uniMonths(e.universeId);
     var evsSorted = e.events.slice().sort(function (a, b) { return evSortKey(a) - evSortKey(b); });
     if (ro) {
