@@ -927,6 +927,11 @@
   // account with access to everything-but-Cravo never even learns Cravo has entries.
   var WB_UNIVERSE_IDS = ["raiz", "rosa", "crisantemo", "girassol", "cravo", "miosotis", "violeta", "lotus"];
   function wikiCoreBoot() {
+    // Identidade visual "Academia Whitmore" (azul-royal + prata, mesma paleta do email de
+    // convite) só no Paradise Gate — o Ursprung continua no herbário, já que ali entram as
+    // outras 6 flores e o azul é especificamente da instituição fictícia do Lótus. Marcado
+    // como classe (não media query) porque é fixo, independente do tema claro/escuro do sistema.
+    document.body.classList.toggle("pg-theme", isParadiseGateMode());
     if (typeof firebase === "undefined") { showMessage("Não consegui carregar a conexão com a nuvem."); return; }
     try { firebase.initializeApp(FIREBASE_CONFIG); } catch (e) {}
     var fs = firebase.firestore();

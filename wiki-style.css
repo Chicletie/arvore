@@ -15,6 +15,21 @@
     --accent-wash: #2a2114; --warn: #d6a24a; --shadow: 0 2px 10px rgba(0,0,0,0.45), 0 26px 60px -24px rgba(0,0,0,0.7);
   }
 }
+/* Paradise Gate ("pg-theme", set by wiki-core.js only when the URL is under /wiki/) — expands
+   the invite email's identity (azul-royal + prata) into the wiki itself. Deliberately a single
+   fixed palette, not a light/dark pair like the herbarium above: the email it's echoing is
+   itself one fixed design, and every component below already reads its colors purely from
+   these variables, so overriding the whole set here is enough — no selector-by-selector changes
+   needed, same mechanism as the dark-mode swap above, just triggered by a class instead of
+   prefers-color-scheme so it doesn't depend on (or fight with) the visitor's OS setting. */
+body.pg-theme {
+  --bg: #0a1730; --paper: #0f1c3f; --surface: #13234f; --surface-2: #17285c; --border: #2c3c63; --border-strong: #4a5c86;
+  --ink: #dfe4ea; --muted: #a7b1bf; --faint: #7f8a9a; --gold: #c7d0de; --gold-ink: #eef1f4;
+  --accent-wash: #1b2c57; --warn: #d6a24a; --shadow: 0 6px 20px rgba(2,6,20,0.5), 0 30px 70px -26px rgba(2,6,20,0.7);
+  --font-display: "Cinzel", Georgia, serif;
+}
+body.pg-theme h1, body.pg-theme .home-title, body.pg-theme .topbar a { letter-spacing: 0.02em; }
+
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); line-height: 1.6; padding: 28px 16px 60px; }
 .page { max-width: 800px; margin: 0 auto; }
