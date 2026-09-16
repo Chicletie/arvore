@@ -16,16 +16,20 @@
   }
 }
 /* Paradise Gate ("pg-theme", set by wiki-core.js only when the URL is under /wiki/) — expands
-   the invite email's identity (azul-royal + prata) into the wiki itself. Deliberately a single
-   fixed palette, not a light/dark pair like the herbarium above: the email it's echoing is
-   itself one fixed design, and every component below already reads its colors purely from
-   these variables, so overriding the whole set here is enough — no selector-by-selector changes
-   needed, same mechanism as the dark-mode swap above, just triggered by a class instead of
-   prefers-color-scheme so it doesn't depend on (or fight with) the visitor's OS setting. */
+   the invite email's identity into the wiki itself: a royal-blue "envelope" behind cream
+   "letter" panels, same contrast that made the email work, rather than a flat navy wash. So
+   --paper/--surface/--border/--ink/--muted/--faint below are the herbarium's own LIGHT values,
+   restated verbatim (not left to inherit) so a visitor's OS dark-mode preference can't swap them
+   out from under this — PG is one fixed design either way, same as the email itself. Only --bg
+   goes navy, and --gold/--gold-ink/--accent-wash shift from warm gold to cool silver-blue for
+   links/tags/accents on the cream card. Every component already reads its colors purely from
+   these variables, so this one block is enough — no selector-by-selector changes needed. */
 body.pg-theme {
-  --bg: #0a1730; --paper: #0f1c3f; --surface: #13234f; --surface-2: #17285c; --border: #2c3c63; --border-strong: #4a5c86;
-  --ink: #dfe4ea; --muted: #a7b1bf; --faint: #7f8a9a; --gold: #c7d0de; --gold-ink: #eef1f4;
-  --accent-wash: #1b2c57; --warn: #d6a24a; --shadow: 0 6px 20px rgba(2,6,20,0.5), 0 30px 70px -26px rgba(2,6,20,0.7);
+  --bg: #0a1730;
+  --paper: #f5ecd6; --surface: #f6eeda; --surface-2: #ece0c3; --border: #d2bf98; --border-strong: #a98f61;
+  --ink: #2e2416; --muted: #6a5940; --faint: #9a8763;
+  --gold: #6b7a94; --gold-ink: #3d4c68; --accent-wash: #eef1f4; --warn: #b07d24;
+  --shadow: 0 2px 10px rgba(2,6,20,0.35), 0 24px 55px -22px rgba(2,6,20,0.65);
   --font-display: "Cinzel", Georgia, serif;
 }
 body.pg-theme h1, body.pg-theme .home-title, body.pg-theme .topbar a { letter-spacing: 0.02em; }
