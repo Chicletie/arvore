@@ -618,7 +618,8 @@
     // "Segunda Temporada"), each showing that group's first image — same idea as a fandom
     // infobox's season-switcher, tabs sit right above the picture.
     var hasAliases = data.aliases && data.aliases.length;
-    if (data.cover || shortFields.length || galGroups.length || hasAliases) {
+    var hasChildren = data.children && data.children.length;
+    if (data.cover || shortFields.length || galGroups.length || hasAliases || hasChildren) {
       var info = el("div", { class: "infobox" });
       var portraitOptions = [];
       if (data.cover) portraitOptions.push({ label: "Capa", url: data.cover, vis: data.coverVis || "publico", focus: data.coverFocus });
@@ -650,7 +651,7 @@
         }
         info.appendChild(portraitSlot);
       }
-      if (hasAliases || shortFields.length) {
+      if (hasAliases || shortFields.length || hasChildren) {
         var itable = el("table", { class: "infobox-facts" });
         if (hasAliases) {
           var aliasTd = el("td");
@@ -668,6 +669,18 @@
           else mdInline(td, f.value);
           itable.appendChild(el("tr", {}, [el("th", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }), td]));
         });
+        // Contém — o reverso do breadcrumb do topo (ex: uma província lista suas cidades),
+        // mesma fonte (parentId) e mesma regra de só entrar quem também está publicado. Vira
+        // fato da infobox, não seção própria — é um dado sobre a entrada, como população ou
+        // governo, não um bloco de conteúdo.
+        if (hasChildren) {
+          var childTd = el("td");
+          data.children.forEach(function (c, i) {
+            if (i) childTd.appendChild(document.createTextNode(", "));
+            childTd.appendChild(el("a", { href: wikiHref(c.targetId), text: c.targetTitle }));
+          });
+          itable.appendChild(el("tr", {}, [el("th", { text: "Contém" }), childTd]));
+        }
         info.appendChild(itable);
       }
       card.appendChild(info);
@@ -724,8 +737,6 @@
     // ter nenhuma relação registrada), senão fica "Relações" com as outras abas dentro.
     var relSectionLabel = relGraph ? "Relações" : (eventsSorted.length ? "Linha do tempo" : null);
     if (relSectionLabel) sharedToc.push({ id: "relacoes", label: relSectionLabel });
-    var hasChildren = data.children && data.children.length;
-    if (hasChildren) sharedToc.push({ id: "contem", label: "Contém" });
     if (hasLinks) sharedToc.push({ id: "ligacoes", label: "Ligações" });
 
     // Galeria e Citações entram como abas (mesmo seletor .work-tabs de Geral/variante de
@@ -841,18 +852,6 @@
       var kids = [el("span", { class: "link-card-label", text: lk.label || "ligação" }), el("span", { class: "link-card-title", text: lk.targetTitle })];
       return lk.targetId ? el("a", { class: "link-card", href: wikiHref(lk.targetId) }, kids) : el("div", { class: "link-card", style: "cursor:default", "aria-disabled": "true" }, kids);
     }
-    // Contém — o reverso do breadcrumb do topo: o que está "dentro de" esta entrada (ex: uma
-    // província contém suas cidades), mesma fonte (parentId) e mesma regra de só mostrar quem
-    // também está publicado.
-    if (hasChildren) {
-      var chwrap = el("div", { class: "links-wrap" });
-      chwrap.appendChild(el("div", { class: "cathead", id: "contem", text: "Contém" }));
-      var chrow = el("div", { class: "links-grid" });
-      data.children.forEach(function (c) { chrow.appendChild(linkCard({ label: c.type, targetId: c.targetId, targetTitle: c.targetTitle })); });
-      chwrap.appendChild(chrow);
-      card.appendChild(chwrap);
-    }
-
     if (hasLinks) {
       var lwrap = el("div", { class: "links-wrap" });
       lwrap.appendChild(el("div", { class: "cathead", id: "ligacoes", text: "Ligações" }));
