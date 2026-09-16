@@ -28,33 +28,35 @@
   }
   function slugifyAnchor(s, i) { return "sec-" + i + "-" + String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 30); }
 
-  // /arvore/wiki/leonel-bianchi and /arvore/wiki.html and /arvore/404.html all need to agree
-  // on where "the site root" is, so every internal link is absolute and correct regardless of
-  // which physical file the server actually returned for the current URL. "paradisegate" is a
-  // second, parallel pretty-URL prefix (see isParadiseGateMode below) that never mentions the
-  // rest of the multiverse — same 404.html catch-all trick, just a different top segment. It's
-  // a URL/branding name only — the underlying universe id in the data is still "lotus" (see
-  // WB_UNIVERSE_IDS / the universeId checks below), untouched by this rename.
+  // /wiki/leonel-bianchi and /wiki.html and /404.html all need to agree on where "the site
+  // root" is, so every internal link is absolute and correct regardless of which physical file
+  // the server actually returned for the current URL. "ursprung" is a second, parallel
+  // pretty-URL prefix (see isParadiseGateMode below) for the GERAL wiki (all 7 universes) —
+  // same 404.html catch-all trick, just a different top segment. Since paradisegate.com.br's
+  // own root already IS the Paradise Gate/Lótus wiki (2026-09-16), /wiki/ was freed up to mean
+  // exactly that, and the old "everything" wiki moved to /ursprung/ instead. The underlying
+  // universe id in the data is still "lotus" either way, untouched by any of this renaming.
   function siteRoot() {
     var path = location.pathname;
-    path = path.replace(/\/(wiki|paradisegate)\/[^/]*$/, "/").replace(/\/(wiki|paradisegate)\/?$/, "/").replace(/\/(wiki|paradisegate|404)\.html$/, "/");
+    path = path.replace(/\/(wiki|ursprung)\/[^/]*$/, "/").replace(/\/(wiki|ursprung)\/?$/, "/").replace(/\/(wiki|ursprung|404)\.html$/, "/");
     if (path.charAt(path.length - 1) !== "/") path += "/";
     return path;
   }
   var ROOT = siteRoot();
-  // A visitor who arrived via /paradisegate(.html)/... gets a wiki that never lets on other
+  // A visitor on /wiki(.html)/... gets the Paradise Gate wiki that never lets on other
   // universes exist: its own home (only Lótus entries), its own topbar, and every link
-  // generated while in this mode stays under /paradisegate/ too. Reaches the exact same
+  // generated while in this mode stays under /wiki/ too. Reaches the exact same
   // wikiPublic/<slug> documents as the geral wiki underneath — Lótus entries are always openly
   // readable either way (see the Firestore rule) — this is purely about which INDEX gets
-  // fetched and how links are built.
-  function isParadiseGateMode() { return /\/paradisegate(\.html)?(\/|$)/.test(location.pathname); }
-  function wikiHref(id) { return ROOT + (isParadiseGateMode() ? "paradisegate/" : "wiki/") + encodeURIComponent(id); }
+  // fetched and how links are built. (Function name kept as isParadiseGateMode even though the
+  // URL segment it checks changed from "paradisegate" to "wiki" — same concept, new address.)
+  function isParadiseGateMode() { return /\/wiki(\.html)?(\/|$)/.test(location.pathname); }
+  function wikiHref(id) { return ROOT + (isParadiseGateMode() ? "wiki/" : "ursprung/") + encodeURIComponent(id); }
   function homeLabel() { return isParadiseGateMode() ? "🌸 Paradise Gate" : "🌿 Herbário do Multiverso"; }
-  function homeHref() { return ROOT + (isParadiseGateMode() ? "paradisegate.html" : "wiki.html"); }
+  function homeHref() { return ROOT + (isParadiseGateMode() ? "wiki.html" : "ursprung.html"); }
 
   function resolveSlug() {
-    var m = location.pathname.match(/\/(?:wiki|paradisegate)\/([^/?#]+)\/?$/);
+    var m = location.pathname.match(/\/(?:wiki|ursprung)\/([^/?#]+)\/?$/);
     if (m) return decodeURIComponent(m[1]);
     var q = new URLSearchParams(location.search).get("id");
     return q || null;
@@ -570,7 +572,7 @@
       var tagWrap = el("div", { class: "tags" });
       data.tags.forEach(function (t) {
         if (t.vis === "spoiler") { tagWrap.appendChild(chip("#", t)); return; }
-        tagWrap.appendChild(el("a", { class: "tag", href: ROOT + "wiki.html?q=" + encodeURIComponent(t.text), text: "#" + t.text }));
+        tagWrap.appendChild(el("a", { class: "tag", href: homeHref() + "?q=" + encodeURIComponent(t.text), text: "#" + t.text }));
       });
       card.appendChild(tagWrap);
     }
