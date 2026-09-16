@@ -30,28 +30,31 @@
 
   // /arvore/wiki/leonel-bianchi and /arvore/wiki.html and /arvore/404.html all need to agree
   // on where "the site root" is, so every internal link is absolute and correct regardless of
-  // which physical file the server actually returned for the current URL. "lotus" is a second,
-  // parallel pretty-URL prefix (see isLotusMode below) that never mentions the rest of the
-  // multiverse — same 404.html catch-all trick, just a different top segment.
+  // which physical file the server actually returned for the current URL. "paradisegate" is a
+  // second, parallel pretty-URL prefix (see isParadiseGateMode below) that never mentions the
+  // rest of the multiverse — same 404.html catch-all trick, just a different top segment. It's
+  // a URL/branding name only — the underlying universe id in the data is still "lotus" (see
+  // WB_UNIVERSE_IDS / the universeId checks below), untouched by this rename.
   function siteRoot() {
     var path = location.pathname;
-    path = path.replace(/\/(wiki|lotus)\/[^/]*$/, "/").replace(/\/(wiki|lotus)\/?$/, "/").replace(/\/(wiki|lotus|404)\.html$/, "/");
+    path = path.replace(/\/(wiki|paradisegate)\/[^/]*$/, "/").replace(/\/(wiki|paradisegate)\/?$/, "/").replace(/\/(wiki|paradisegate|404)\.html$/, "/");
     if (path.charAt(path.length - 1) !== "/") path += "/";
     return path;
   }
   var ROOT = siteRoot();
-  // A visitor who arrived via /lotus(.html)/... gets a wiki that never lets on other universes
-  // exist: its own home (only Lótus entries), its own topbar, and every link generated while in
-  // this mode stays under /lotus/ too. Reached the exact same wikiPublic/<slug> documents as the
-  // geral wiki underneath — Lótus entries are always openly readable either way (see the
-  // Firestore rule) — this is purely about which INDEX gets fetched and how links are built.
-  function isLotusMode() { return /\/lotus(\.html)?(\/|$)/.test(location.pathname); }
-  function wikiHref(id) { return ROOT + (isLotusMode() ? "lotus/" : "wiki/") + encodeURIComponent(id); }
-  function homeLabel() { return isLotusMode() ? "🌸 Lótus" : "🌿 Herbário do Multiverso"; }
-  function homeHref() { return ROOT + (isLotusMode() ? "lotus.html" : "wiki.html"); }
+  // A visitor who arrived via /paradisegate(.html)/... gets a wiki that never lets on other
+  // universes exist: its own home (only Lótus entries), its own topbar, and every link
+  // generated while in this mode stays under /paradisegate/ too. Reaches the exact same
+  // wikiPublic/<slug> documents as the geral wiki underneath — Lótus entries are always openly
+  // readable either way (see the Firestore rule) — this is purely about which INDEX gets
+  // fetched and how links are built.
+  function isParadiseGateMode() { return /\/paradisegate(\.html)?(\/|$)/.test(location.pathname); }
+  function wikiHref(id) { return ROOT + (isParadiseGateMode() ? "paradisegate/" : "wiki/") + encodeURIComponent(id); }
+  function homeLabel() { return isParadiseGateMode() ? "🌸 Paradise Gate" : "🌿 Herbário do Multiverso"; }
+  function homeHref() { return ROOT + (isParadiseGateMode() ? "paradisegate.html" : "wiki.html"); }
 
   function resolveSlug() {
-    var m = location.pathname.match(/\/(?:wiki|lotus)\/([^/?#]+)\/?$/);
+    var m = location.pathname.match(/\/(?:wiki|paradisegate)\/([^/?#]+)\/?$/);
     if (m) return decodeURIComponent(m[1]);
     var q = new URLSearchParams(location.search).get("id");
     return q || null;
@@ -360,7 +363,7 @@
     document.title = data.title || "wiki";
     var loginBar = mountLoginBar(page);
     var topbar = el("div", { class: "topbar" }, [el("a", { href: homeHref(), text: homeLabel() })]);
-    if (data.universe && !isLotusMode()) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
+    if (data.universe && !isParadiseGateMode()) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
     page.appendChild(topbar);
     var card = el("div", { class: "card" });
     var currentTabLabel = "Geral";
@@ -556,7 +559,7 @@
     document.title = data.title || "wiki";
     var loginBar = mountLoginBar(page);
     var topbar = el("div", { class: "topbar" }, [el("a", { href: homeHref(), text: homeLabel() })]);
-    if (data.universe && !isLotusMode()) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
+    if (data.universe && !isParadiseGateMode()) { topbar.appendChild(el("span", { class: "sep", text: "·" })); topbar.appendChild(el("span", { text: data.universe })); }
     page.appendChild(topbar);
     var card = el("div", { class: "card" });
     card.appendChild(el("div", { class: "eyebrow" }, [el("span", { text: "TEMPORADA · " + (data.universe || "") })]));
@@ -695,9 +698,9 @@
     try { firebase.initializeApp(FIREBASE_CONFIG); } catch (e) {}
     var fs = firebase.firestore();
     var slug = resolveSlug();
-    var lotus = isLotusMode();
+    var pgMode = isParadiseGateMode();
     if (!slug || slug === "_index") {
-      if (lotus) {
+      if (pgMode) {
         fs.collection("wikiIndex").doc("lotus").get().then(function (snap) {
           renderHome(snap.exists ? snap.data() : { entries: {} });
         }).catch(function () { showMessage("Não consegui carregar a wiki agora. Tente de novo mais tarde."); });
@@ -714,7 +717,7 @@
       }
     } else {
       fs.collection("wikiPublic").doc(slug).get().then(function (snap) {
-        if (!snap.exists || (lotus && snap.data().universeId !== "lotus")) { showMessage("Essa página não existe mais (o link pode ter sido despublicado)."); return; }
+        if (!snap.exists || (pgMode && snap.data().universeId !== "lotus")) { showMessage("Essa página não existe mais (o link pode ter sido despublicado)."); return; }
         var data = snap.data();
         if (data.kind === "temporada") renderSeason(data, slug);
         else renderEntry(data, slug);
