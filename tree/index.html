@@ -6792,15 +6792,16 @@
   // and unlock content marked "restrito" for them) via the createPlayerAccount Cloud Function
   // (functions/index.js), which uses the Admin SDK to bypass the "Enable create (sign-up)"
   // restriction — left permanently OFF on purpose (see project-infra) — without ever needing to
-  // toggle it on/off by hand. The Function itself treats "already has an account" as a normal
-  // success case, so the client always just proceeds to send the reset email either way. The
-  // player never learns any password (nobody needs to relay one) — they get Firebase's own
-  // "escolha sua senha" email instead and pick their own.
+  // toggle it on/off by hand. The Function itself also sends the invite email now (a branded
+  // HTML one via Brevo, not Firebase's generic "redefinir senha" template — that one's still
+  // used, just only for a returning player who actually forgets their password later), so there's
+  // nothing left for the client to do after a successful call. The player never learns any
+  // password (nobody needs to relay one) — they pick their own from the link in that email.
   function wbInvitePlayer(email, onDone) {
-    if (!fbFunctions || !fbAuth) { onDone(new Error("Sem conexão com a nuvem agora.")); return; }
+    if (!fbFunctions) { onDone(new Error("Sem conexão com a nuvem agora.")); return; }
     fbFunctions.httpsCallable("createPlayerAccount")({ email: email }).then(function () {
-      return fbAuth.sendPasswordResetEmail(email);
-    }).then(function () { onDone(null); }).catch(function (err) {
+      onDone(null);
+    }).catch(function (err) {
       onDone(err);
     });
   }
