@@ -1093,13 +1093,12 @@
   // um personagem de lá. Existe pra dar um lugar de verdade (com página própria, template
   // próprio) pra citações de quem nunca virou uma entrada de Personagem — a obra em si vira a
   // "casa" da citação nesse caso.
-  var WB_TYPES = ["Local", "Personagem", "Facção", "Título / Cargo", "Sistema de Magia", "Divindade", "Evento histórico", "Item", "Publicação", "Criatura", "Língua / Povo", "Conceito"];
+  var WB_TYPES = ["Local", "Personagem", "Facção", "Sistema de Magia", "Divindade", "Evento histórico", "Item", "Publicação", "Criatura", "Língua / Povo", "Conceito"];
   var FRANCHISE_KINDS = ["Romance", "Trilogia", "Série", "Conto", "Novela", "Roteiro", "Quadrinho", "Campanha de RPG", "Outro"];
   var WB_TEMPLATES = {
     "Personagem": ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"],
     "Local": ["População", "Governo", "Clima", "Geografia", "Economia", "História", "Pontos de interesse", "Atmosfera"],
     "Facção": ["Liderança", "Território", "Propósito", "Membros", "Recursos", "Aliados", "Rivais", "Segredos"],
-    "Título / Cargo": ["Detentor atual", "Instituído por", "Símbolos", "Deveres e poderes", "Linha de sucessão", "História"],
     "Sistema de Magia": ["Fonte", "Quem pode usar", "Como funciona", "Custo / preço", "Limites", "Aparência / sensação", "Tabus"],
     "Divindade": ["Domínio", "Símbolos", "Culto e clero", "Manifestações", "Mitos", "Relação com mortais"],
     "Evento histórico": ["Quando", "Onde", "Envolvidos", "Causas", "O que aconteceu", "Consequências"],
@@ -1186,7 +1185,6 @@
     { label: "sócio(a) de", inverse: "sócio(a) de", style: "bond" },
     { label: "é dono(a) de", inverse: "é propriedade de", style: "bond" },
     { label: "tutor(a) de", inverse: "animal de estimação de", style: "bond" },
-    { label: "detém o título de", inverse: "é detido(a) por", style: "bond" },
     { label: "faz parte de", inverse: "tem como membro", style: "faction" },
     { label: "lidera", inverse: "é liderado(a) por", style: "faction" },
     { label: "pertence a", inverse: "contém", style: "neutral" },
@@ -1202,6 +1200,9 @@
     { label: "profetiza", inverse: "é profetizado(a) por", style: "narrative" },
     { label: "pratica", inverse: "é praticado(a) por", style: "practice" },
     { label: "acredita em", inverse: "é uma crença de", style: "practice" },
+    { label: "afeta", inverse: "é afetado(a) por", style: "practice" },
+    { label: "fala", inverse: "é falado(a) por", style: "practice" },
+    { label: "caça", inverse: "é caçado(a) por", style: "nature" },
     { label: "manifesta-se como", inverse: "manifestação de", style: "multiversal" }
   ];
   var EDGE_STYLE = {
@@ -1215,6 +1216,7 @@
     location: { color: "#4a8f7d", dash: "" },
     narrative: { color: "#7d6a9d", dash: "4 3" },
     practice: { color: "#2f8f9d", dash: "2 2" },
+    nature: { color: "#6b8a4f", dash: "" },
     multiversal: { color: "#8f5cc9", dash: "6 4" },
     neutral: { color: "var(--border-strong)", dash: "" }
   };
@@ -1283,8 +1285,8 @@
     if (!cr.types.length) cr.types = WB_TYPES.slice();
     // Um tipo NOVO adicionado ao catálogo embutido (WB_TYPES) depois que o mundo já existia
     // nunca chegava aos mundos antigos — cr.types fica congelado desde a criação do mundo,
-    // igual cr.templates (ver mescla logo abaixo). Sem isso, "Título / Cargo" (e antes,
-    // "Publicação") nunca apareceria no seletor de tipo de mundos já existentes.
+    // igual cr.templates (ver mescla logo abaixo). Sem isso, "Publicação" nunca apareceria no
+    // seletor de tipo de mundos já existentes.
     WB_TYPES.forEach(function (t) { if (cr.types.indexOf(t) === -1) cr.types.push(t); });
     if (!cr.templates || typeof cr.templates !== "object") cr.templates = clone(WB_TEMPLATES);
     // Novos campos padrão adicionados a um tipo (ex: a leva de campos curtos pra infobox da
@@ -3806,7 +3808,7 @@
     var n = " " + (name || "").toLowerCase() + " ";
     if (/( idade | anos |n[úu]mero|quantidade|popula[çc][ãa]o|altura|peso|n[íi]vel|contagem|total)/.test(n)) return "numero";
     if (/(data|nascimento|morte|falecimento|funda[çc][ãa]o|publica[çc][ãa]o|in[íi]cio| fim )/.test(n)) return "data";
-    if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando|localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua| autor |natureza|detentor|institu[íi]do)/.test(n)) return "texto";
+    if (/(ocupa[çc][ãa]o|afilia[çc][ãa]o|esp[eé]cie|status|governo|clima|lideran[çc]a|territ[oó]rio|fonte|quem pode usar|dom[íi]nio|s[íi]mbolos?|quando|localiza[çc][ãa]o atual|portadores|habitat|perigo|l[íi]ngua| autor |natureza)/.test(n)) return "texto";
     return "nota";
   }
   // Um campo chamado "segredo"/"nota do mestre"/etc quase sempre É pra ficar de fora da wiki —
