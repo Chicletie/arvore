@@ -1841,9 +1841,23 @@
     function cleanupOrphans() {
       document.querySelectorAll("body > .wb-ctl-menu-body").forEach(function (b) { if (b !== body) b.remove(); });
     }
+    // Rolar a página não move o popover junto (ele é position:fixed, ancorado no viewport, não
+    // no gatilho) — ficava "flutuando" longe de onde foi aberto, parecendo travado. Mais simples
+    // e mais previsível que reposicionar ao vivo durante o scroll: fecha o popover assim que a
+    // página rola por baixo dele. Ignora rolagem que acontece DENTRO do próprio popover (a lista
+    // de opções às vezes precisa de scroll interno, e o resultado da busca de "linkar entrada"
+    // também rola) — só fecha quando quem rolou foi a página por trás.
+    function onOutsideScroll(ev) {
+      if (body.contains(ev.target)) return;
+      d.open = false;
+    }
     d.addEventListener("toggle", function () {
       cleanupOrphans();
-      if (!d.open) { if (body.parentNode) body.parentNode.removeChild(body); return; }
+      if (!d.open) {
+        window.removeEventListener("scroll", onOutsideScroll, true);
+        if (body.parentNode) body.parentNode.removeChild(body);
+        return;
+      }
       document.body.appendChild(body);
       // position:fixed calculado no abrir (não CSS puro ancorado à direita do gatilho) — perto da
       // borda da tela (comum em mobile, onde o "⋯" de um campo curto fica bem à direita), um
@@ -1855,6 +1869,7 @@
       body.style.left = left + "px";
       body.style.top = (r.bottom + 4) + "px";
       body.style.width = bw + "px";
+      window.addEventListener("scroll", onOutsideScroll, true);
     });
     return d;
   }
