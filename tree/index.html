@@ -5408,9 +5408,13 @@
     var snap = wbBuildWikiSnapshot(e);
     fbFs.collection("wikiPublic").doc(id).set(snap).then(function () {
       var idxUpdate = {}; idxUpdate["entries." + id] = wbIndexEntry(e, snap);
-      return fbFs.collection("wikiIndex").doc(e.universeId).set({ entries: {} }, { merge: true }).then(function () {
-        return fbFs.collection("wikiIndex").doc(e.universeId).update(idxUpdate);
-      });
+      // set(dotPath, {merge:true}) num único chamado: cria o doc se não existir E funde só
+      // essa chave, sem tocar nas outras entradas já publicadas — o antigo pré-passo
+      // set({entries:{}}, {merge:true}) parecia inofensivo mas na verdade SUBSTITUÍA o campo
+      // "entries" inteiro por {} a cada publicação (merge:true só funde o campo de nível mais
+      // alto que você menciona; um objeto vazio como valor apaga tudo que tinha dentro), o que
+      // apagava da wiki toda entrada publicada antes daquela.
+      return fbFs.collection("wikiIndex").doc(e.universeId).set(idxUpdate, { merge: true });
     }).then(function () {
       return wbSyncRestrito(id, wbRestritoItems(e));
     }).then(function () {
@@ -5579,9 +5583,7 @@
     var snap = wbBuildSeasonSnapshot(cp, se);
     fbFs.collection("wikiPublic").doc(id).set(snap).then(function () {
       var idxUpdate = {}; idxUpdate["entries." + id] = { title: (cp.name || "Campanha") + " · " + (se.name || "Temporada"), type: "Temporada", universe: flowerById(cp.universeId) ? flowerById(cp.universeId).name : "", universeId: cp.universeId, franchiseIds: [], tags: [], search: wbSeasonSearchText(snap), updatedAt: todayKey() };
-      return fbFs.collection("wikiIndex").doc(cp.universeId).set({ entries: {} }, { merge: true }).then(function () {
-        return fbFs.collection("wikiIndex").doc(cp.universeId).update(idxUpdate);
-      });
+      return fbFs.collection("wikiIndex").doc(cp.universeId).set(idxUpdate, { merge: true });
     }).then(function () {
       return wbSyncRestrito(id, wbSeasonRestritoItems(se));
     }).then(function () {
