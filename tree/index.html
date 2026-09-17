@@ -848,6 +848,26 @@
   .wb-fieldctl:hover { opacity: 1; }
   .wb-fieldctl button { background: none; border: 0; color: var(--faint); font-size: 11px; cursor: pointer; padding: 0 2px; }
   .wb-fieldctl button:hover { color: var(--ink); }
+  /* Menu "⋯": um gatilho pequeno e discreto (some no repouso, some, campo/seção/post não fica
+     poluído de ícones sempre visíveis; o conteúdo abre num popover só quando tocado. */
+  .wb-ctl-menu { position: relative; display: inline-block; margin-left: 6px; }
+  .wb-ctl-menu > summary { list-style: none; cursor: pointer; width: 22px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 5px; color: var(--faint); font-size: 13px; }
+  .wb-ctl-menu > summary::-webkit-details-marker { display: none; }
+  .wb-ctl-menu > summary:hover { background: var(--accent-wash); color: var(--ink); }
+  .wb-ctl-menu.wb-fieldctl { opacity: 0.5; }
+  .wb-ctl-menu.wb-fieldctl:hover, .wb-ctl-menu.wb-fieldctl[open] { opacity: 1; }
+  .wb-ctl-menu[open] > summary { background: var(--accent-wash); color: var(--ink); }
+  .wb-ctl-menu-body { position: fixed; z-index: 6; background: var(--paper); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column; gap: 2px; max-height: 70vh; overflow-y: auto; }
+  .wb-ctl-item { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 7px 9px; border-radius: 4px; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--ink); }
+  .wb-ctl-item:hover { background: var(--accent-wash); }
+  .wb-ctl-item.wb-ctl-danger { color: var(--warn); }
+  .wb-ctl-row { display: flex; align-items: center; gap: 8px; padding: 4px 9px; font-size: 12.5px; }
+  .wb-ctl-label { color: var(--muted); flex-shrink: 0; }
+  .wb-ctl-row select { flex: 1; padding: 4px 6px; font-size: 12.5px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--ink); font-family: inherit; }
+  .wb-ctl-move { display: flex; gap: 6px; padding: 2px 9px 5px; }
+  .wb-ctl-move button { width: 26px; height: 22px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 5px; font-size: 10px; cursor: pointer; }
+  .wb-ctl-move button:hover { border-color: var(--gold); color: var(--ink); }
+  .wb-ctl-divider { height: 1px; background: var(--border); margin: 3px 2px; }
   .wb-fld-progress { display: flex; align-items: center; gap: 10px; }
   .wb-fld-progress .bar-track { flex: 1; margin-top: 0; }
   .wb-secret-mark { color: var(--warn); font-size: 0.82em; letter-spacing: 0.04em; }
@@ -1772,8 +1792,25 @@
   // rótulo+controle inline como um <select>).
   function wbCtlMenu(items) {
     var d = el("details", { class: "wb-ctl-menu" });
-    d.appendChild(el("summary", { "aria-label": "Mais opções", text: "⋯" }));
-    d.appendChild(el("div", { class: "wb-ctl-menu-body" }, items));
+    var summary = el("summary", { "aria-label": "Mais opções", text: "⋯" });
+    var body = el("div", { class: "wb-ctl-menu-body" }, items);
+    d.appendChild(summary);
+    d.appendChild(body);
+    // position:fixed calculado no abrir (não CSS puro ancorado à direita do gatilho) — perto da
+    // borda da tela (comum em mobile, onde o "⋯" de um campo curto fica bem à direita), um
+    // popover só-CSS vazaria pra fora da viewport à esquerda. Recalculado a cada abertura, então
+    // sobrevive a reflow entre uma abertura e outra.
+    d.addEventListener("toggle", function () {
+      if (!d.open) return;
+      var r = summary.getBoundingClientRect();
+      var bw = Math.min(220, window.innerWidth - 16);
+      var left = Math.max(8, Math.min(r.right - bw, window.innerWidth - bw - 8));
+      body.style.position = "fixed";
+      body.style.left = left + "px";
+      body.style.top = (r.bottom + 4) + "px";
+      body.style.right = "auto";
+      body.style.width = bw + "px";
+    });
     return d;
   }
   function wbCtlItem(label, onclick, danger) {
@@ -4115,13 +4152,48 @@
     ta.addEventListener("blur", function () { clearTimeout(deb); if (getVal() !== ta.value) setVal(ta.value); });
     return ta;
   }
+  // Menu "⋯" do campo: reordenar, tipo, visibilidade, adicionar nota de mestre/versão
+  // confidencial, remover — ações ocasionais que antes ficavam sempre visíveis como ícones
+  // soltos (▲▼⚙🔓✕) mais duas fileiras de botão-fantasma de largura inteira. As EDIÇÕES em si
+  // (o texto da nota de mestre, o texto+lista de cada versão confidencial) continuam visíveis
+  // direto no corpo do campo via wbConfidentialEditor — só o "adicionar" mora no menu, o
+  // conteúdo já criado merece o próprio espaço, não fica escondido atrás de um clique a mais.
+  function wbFieldCtl(e, k, fm, touch) {
+    var items = [];
+    items.push(el("div", { class: "wb-ctl-move" }, [
+      el("button", { type: "button", text: "▲ acima", onclick: function () { wbMoveField(e, k, -1); touch(true); } }),
+      el("button", { type: "button", text: "▼ abaixo", onclick: function () { wbMoveField(e, k, 1); touch(true); } })
+    ]));
+    items.push(wbCtlRow("Tipo", wbTypeSelect(fm.type, function (nv) {
+      var m = wbFieldMetaWrite(e, k);
+      m.type = nv;
+      if (nv === "escolha") { var o = window.prompt("Opções separadas por vírgula:", m.opts.join(", ")); m.opts = (o || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean); }
+      touch(true);
+    })));
+    if (fm.type !== "cabecalho") {
+      items.push(wbCtlRow("Wiki", wbVisSelect(fm.vis, function (nv) { var m = wbFieldMetaWrite(e, k); m.vis = nv; touch(true); })));
+      if (fm.vis === "publico" || fm.vis === "spoiler") {
+        items.push(el("div", { class: "wb-ctl-divider" }));
+        if (fm.master === undefined) items.push(wbCtlItem("🎭 Adicionar nota do mestre", function () { var m = wbFieldMetaWrite(e, k); m.master = ""; touch(true); }));
+        items.push(wbCtlItem("🔐 Adicionar versão confidencial", function () {
+          var m = wbFieldMetaWrite(e, k);
+          if (!Array.isArray(m.confidentialVariants)) m.confidentialVariants = [];
+          m.confidentialVariants.push({ id: uid(), text: "", allow: [] });
+          touch(true);
+        }));
+      }
+    }
+    items.push(el("div", { class: "wb-ctl-divider" }));
+    items.push(wbCtlItem("✕ Remover campo", function () { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }, true));
+    var menu = wbCtlMenu(items);
+    menu.classList.add("wb-fieldctl");
+    return menu;
+  }
   function wbConfidentialEditor(e, k, touch, longField) {
     var fm = wbFieldMeta(e, k);
     var wrap = el("div", { class: "wb-confidential-group" });
 
-    if (fm.master === undefined) {
-      wrap.appendChild(el("button", { class: "field-ghost", type: "button", style: "font-size:11px;margin-top:6px", text: "🎭+ nota do mestre (nunca é publicada)", onclick: function () { var m = wbFieldMetaWrite(e, k); m.master = ""; touch(true); } }));
-    } else {
+    if (fm.master !== undefined) {
       var mWrap = el("div", { class: "wb-sec wb-sec-restrito", style: "margin-top:8px" });
       var mHead = el("div", { class: "wb-sec-head" });
       mHead.appendChild(el("span", { class: "wb-lfield-lab", text: "🎭 nota do mestre (só você vê, nunca publicada)" }));
@@ -4146,14 +4218,6 @@
         function (v) { variant.text = v; save(); flashSaved(); }));
       wrap.appendChild(vWrap);
     });
-    wrap.appendChild(el("button", { class: "field-ghost", type: "button", style: "font-size:11px;margin-top:6px", text: "🔐+ versão confidencial pra quem tem acesso", onclick: function () {
-      // Primeiro toque (campo ainda "adivinhado") precisa de wbFieldMetaWrite pra não perder a
-      // escrita num objeto descartável — mesmo cuidado de sempre, mesmo já tendo variantes.
-      var m = wbFieldMetaWrite(e, k);
-      if (!Array.isArray(m.confidentialVariants)) m.confidentialVariants = [];
-      m.confidentialVariants.push({ id: uid(), text: "", allow: [] });
-      touch(true);
-    } }));
     return wrap;
   }
   function wbRenderLongField(e, k, opts) {
@@ -4167,16 +4231,7 @@
       else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
     } }));
     if (fm.vis !== "publico") head.appendChild(el("span", { class: wbVisMarkClass(fm.vis), text: visInfo(fm.vis).glyph }));
-    if (!opts.ro) head.appendChild(el("span", { class: "wb-fieldctl" }, [
-      el("button", { type: "button", title: "Tipo: " + fm.type, text: "⚙", onclick: function () {
-        var m = wbFieldMetaWrite(e, k), ids = FIELD_TYPES.map(function (x) { return x.id; });
-        m.type = ids[(ids.indexOf(m.type) + 1) % ids.length];
-        if (m.type === "escolha") { var o = window.prompt("Opções separadas por vírgula:", m.opts.join(", ")); m.opts = (o || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean); }
-        touch(true);
-      } }),
-      el("button", { type: "button", title: "Wiki: " + visInfo(fm.vis).label + " (toque p/ mudar)", text: visInfo(fm.vis).glyph, onclick: function () { var m = wbFieldMetaWrite(e, k); m.vis = nextVis(m.vis); touch(true); } }),
-      el("button", { type: "button", title: "Remover campo", text: "✕", onclick: function () { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); } })
-    ]));
+    if (!opts.ro) head.appendChild(wbFieldCtl(e, k, fm, touch));
     wrap.appendChild(head);
     if (!opts.ro && fm.vis === "restrito") wrap.appendChild(wbAllowEditor(fm.allow, touch));
     if (!opts.ro && (fm.vis === "publico" || fm.vis === "spoiler")) wrap.appendChild(wbConfidentialEditor(e, k, touch, true));
@@ -4210,21 +4265,7 @@
       else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
     } }));
     if (fm.type !== "cabecalho" && fm.vis !== "publico") dt.appendChild(el("span", { class: wbVisMarkClass(fm.vis), text: " " + visInfo(fm.vis).glyph }));
-    if (!opts.ro) {
-      dt.appendChild(el("span", { class: "wb-fieldctl" }, [
-        el("button", { type: "button", title: "Mover pra cima", text: "▲", onclick: function () { wbMoveField(e, k, -1); touch(true); } }),
-        el("button", { type: "button", title: "Mover pra baixo", text: "▼", onclick: function () { wbMoveField(e, k, 1); touch(true); } }),
-        el("button", { type: "button", title: "Tipo: " + fm.type + " (toque p/ mudar)", text: "⚙", onclick: function () {
-          var m = wbFieldMetaWrite(e, k);
-          var ids = FIELD_TYPES.map(function (x) { return x.id; });
-          m.type = ids[(ids.indexOf(m.type) + 1) % ids.length];
-          if (m.type === "escolha") { var o = window.prompt("Opções separadas por vírgula:", m.opts.join(", ")); m.opts = (o || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean); }
-          touch(true);
-        } }),
-        fm.type === "cabecalho" ? null : el("button", { type: "button", title: "Wiki: " + visInfo(fm.vis).label + " (toque p/ mudar)", text: visInfo(fm.vis).glyph, onclick: function () { var m = wbFieldMetaWrite(e, k); m.vis = nextVis(m.vis); touch(true); } }),
-        el("button", { type: "button", title: "Remover campo", text: "✕", onclick: function () { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); } })
-      ]));
-    }
+    if (!opts.ro) dt.appendChild(wbFieldCtl(e, k, fm, touch));
     dl.appendChild(dt);
     if (fm.type === "cabecalho") {
       dt.classList.add("wb-field-header");
@@ -4358,14 +4399,19 @@
       if (sec.vis !== "publico") head.appendChild(el("span", { class: wbVisMarkClass(sec.vis), text: visInfo(sec.vis).glyph }));
       if (!opts.ro) {
         head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Recolher", text: sec.collapsed ? "▸" : "▾", onclick: function () { sec.collapsed = !sec.collapsed; touch(true); } }));
-        head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Wiki: " + visInfo(sec.vis).label + " (toque p/ mudar)", text: visInfo(sec.vis).glyph, onclick: function () { sec.vis = nextVis(sec.vis); touch(true); } }));
-        head.appendChild(el("button", { class: "wb-ord", type: "button", text: "▲", disabled: idx === 0 ? "disabled" : null, onclick: function () { var t = e.sections[idx - 1]; e.sections[idx - 1] = sec; e.sections[idx] = t; touch(true); } }));
-        head.appendChild(el("button", { class: "wb-ord", type: "button", text: "▼", disabled: idx === e.sections.length - 1 ? "disabled" : null, onclick: function () { var t = e.sections[idx + 1]; e.sections[idx + 1] = sec; e.sections[idx] = t; touch(true); } }));
-        head.appendChild(delBtn(function () {
-          var removedSec = sec;
-          e.sections.splice(idx, 1); touch(true);
-          wbUndoToast("Seção removida.", function () { e.sections.splice(idx, 0, removedSec); });
-        }));
+        head.appendChild(wbCtlMenu([
+          el("div", { class: "wb-ctl-move" }, [
+            el("button", { type: "button", text: "▲ acima", disabled: idx === 0 ? "disabled" : null, onclick: function () { var t = e.sections[idx - 1]; e.sections[idx - 1] = sec; e.sections[idx] = t; touch(true); } }),
+            el("button", { type: "button", text: "▼ abaixo", disabled: idx === e.sections.length - 1 ? "disabled" : null, onclick: function () { var t = e.sections[idx + 1]; e.sections[idx + 1] = sec; e.sections[idx] = t; touch(true); } })
+          ]),
+          wbCtlRow("Wiki", wbVisSelect(sec.vis, function (nv) { sec.vis = nv; touch(true); })),
+          el("div", { class: "wb-ctl-divider" }),
+          wbCtlItem("✕ Remover seção", function () {
+            var removedSec = sec;
+            e.sections.splice(idx, 1); touch(true);
+            wbUndoToast("Seção removida.", function () { e.sections.splice(idx, 0, removedSec); });
+          }, true)
+        ]));
       }
       host.appendChild(head);
       if (!opts.ro && sec.vis === "restrito") host.appendChild(wbAllowEditor(sec.allow, touch));
@@ -4424,12 +4470,15 @@
       if (post.vis !== "publico") head.appendChild(el("span", { class: wbVisMarkClass(post.vis), text: visInfo(post.vis).glyph }));
       if (!opts.ro) {
         head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Recolher", text: post.collapsed ? "▸" : "▾", onclick: function () { post.collapsed = !post.collapsed; touch(true); } }));
-        head.appendChild(el("button", { class: "wb-sec-toggle", type: "button", title: "Wiki: " + visInfo(post.vis).label + " (toque p/ mudar)", text: visInfo(post.vis).glyph, onclick: function () { post.vis = nextVis(post.vis); touch(true); } }));
-        head.appendChild(delBtn(function () {
-          var removedPost = post;
-          e.posts = e.posts.filter(function (x) { return x.id !== post.id; }); touch(true);
-          wbUndoToast("Post removido.", function () { e.posts.push(removedPost); });
-        }));
+        head.appendChild(wbCtlMenu([
+          wbCtlRow("Wiki", wbVisSelect(post.vis, function (nv) { post.vis = nv; touch(true); })),
+          el("div", { class: "wb-ctl-divider" }),
+          wbCtlItem("✕ Remover post", function () {
+            var removedPost = post;
+            e.posts = e.posts.filter(function (x) { return x.id !== post.id; }); touch(true);
+            wbUndoToast("Post removido.", function () { e.posts.push(removedPost); });
+          }, true)
+        ]));
       }
       host.appendChild(head);
       if (!opts.ro && post.vis === "restrito") host.appendChild(wbAllowEditor(post.allow, touch));
