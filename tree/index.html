@@ -622,6 +622,14 @@
     .wb-read dl.wb-fields dt { border-bottom: 0; padding: 12px 0 0; }
     .wb-read dl.wb-fields dd { padding: 3px 0 9px; border-bottom: 1px dotted var(--rule); }
   }
+  /* cabeçalho de infobox — separador full-width entre grupos de campos, tipo os "headers" da
+     infobox da Fandom */
+  .wb-read dl.wb-fields dt.wb-field-header {
+    grid-column: 1 / -1; font-size: 11px; letter-spacing: 0.08em; color: var(--gold-ink);
+    background: var(--accent-wash); padding: 6px 10px; margin: 6px 0 0; border-radius: var(--radius-sm);
+    border-bottom: 0;
+  }
+  .wb-read dl.wb-fields dd.wb-field-header { display: none; }
 
   /* long descriptive fields — roomy, always-editable */
   .wb-lfield { margin-top: 16px; }
@@ -1145,7 +1153,8 @@
     { id: "bool", label: "sim / não" },
     { id: "escolha", label: "escolha" },
     { id: "progresso", label: "progresso" },
-    { id: "ligacao", label: "ligação a entrada" }
+    { id: "ligacao", label: "ligação a entrada" },
+    { id: "cabecalho", label: "cabeçalho (separador)" }
   ];
   // Publish visibility for fields/seções/tags/aliases/galeria/capa: público sai na wiki
   // normalmente; spoiler sai mas colapsado atrás de "revelar" (não é sigilo real, é só pra
@@ -3850,6 +3859,36 @@
     e.fieldMeta[k] = m;
     return m;
   }
+  // Reordena um campo curto (inclui "cabecalho") pra cima/baixo — SÓ dentro do próprio grupo
+  // curto/longo, ignorando campos do outro grupo que porventura estejam intercalados na ordem
+  // bruta, já que curto (infobox) e "nota" (corpo) renderizam em lugares completamente
+  // diferentes da página e mover um relativo ao outro não faria sentido visualmente. e.fields/
+  // e.fieldMeta são objetos comuns, não arrays — "mover" aqui é reconstruir os dois com as
+  // chaves na nova ordem (objetos JS preservam ordem de inserção de chaves-string).
+  function wbMoveField(e, key, dir) {
+    var allKeys = Object.keys(e.fields);
+    var isLong = wbFieldMeta(e, key).type === "nota";
+    var groupKeys = allKeys.filter(function (k) { return (wbFieldMeta(e, k).type === "nota") === isLong; });
+    var gi = groupKeys.indexOf(key), gj = gi + dir;
+    if (gi === -1 || gj < 0 || gj >= groupKeys.length) return;
+    var otherKey = groupKeys[gj];
+    var ai = allKeys.indexOf(key), aj = allKeys.indexOf(otherKey);
+    var tmp = allKeys[ai]; allKeys[ai] = allKeys[aj]; allKeys[aj] = tmp;
+    var newFields = {}, newMeta = {};
+    allKeys.forEach(function (k) { newFields[k] = e.fields[k]; newMeta[k] = e.fieldMeta[k]; });
+    e.fields = newFields; e.fieldMeta = newMeta;
+  }
+  // Atalho pra criar direto um campo tipo "cabecalho" — sem isso, o usuário precisaria criar um
+  // campo comum e apertar ⚙ 9 vezes até o ciclo de tipos chegar em cabeçalho.
+  function wbAddHeaderField(target, touch) {
+    var k = window.prompt("Texto do cabeçalho:");
+    if (!k) return;
+    k = k.trim();
+    if (!k || (k in target.fields)) return;
+    target.fields[k] = "";
+    target.fieldMeta[k] = { type: "cabecalho", opts: [], vis: "publico", allow: [] };
+    touch(true);
+  }
   function autoGrow(ta) { ta.style.height = "auto"; ta.style.height = (ta.scrollHeight + 2) + "px"; }
   function bindGrow(ta) {
     ta.addEventListener("input", function () { autoGrow(ta); });
@@ -3962,9 +4001,11 @@
       if (nv && nv !== k && !(nv in e.fields)) { e.fields[nv] = e.fields[k]; delete e.fields[k]; if (e.fieldMeta[k]) { e.fieldMeta[nv] = e.fieldMeta[k]; delete e.fieldMeta[k]; } touch(true); }
       else if (!nv) { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); }
     } }));
-    if (fm.vis !== "publico") dt.appendChild(el("span", { class: wbVisMarkClass(fm.vis), text: " " + visInfo(fm.vis).glyph }));
+    if (fm.type !== "cabecalho" && fm.vis !== "publico") dt.appendChild(el("span", { class: wbVisMarkClass(fm.vis), text: " " + visInfo(fm.vis).glyph }));
     if (!opts.ro) {
       dt.appendChild(el("span", { class: "wb-fieldctl" }, [
+        el("button", { type: "button", title: "Mover pra cima", text: "▲", onclick: function () { wbMoveField(e, k, -1); touch(true); } }),
+        el("button", { type: "button", title: "Mover pra baixo", text: "▼", onclick: function () { wbMoveField(e, k, 1); touch(true); } }),
         el("button", { type: "button", title: "Tipo: " + fm.type + " (toque p/ mudar)", text: "⚙", onclick: function () {
           var m = wbFieldMetaWrite(e, k);
           var ids = FIELD_TYPES.map(function (x) { return x.id; });
@@ -3972,11 +4013,16 @@
           if (m.type === "escolha") { var o = window.prompt("Opções separadas por vírgula:", m.opts.join(", ")); m.opts = (o || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean); }
           touch(true);
         } }),
-        el("button", { type: "button", title: "Wiki: " + visInfo(fm.vis).label + " (toque p/ mudar)", text: visInfo(fm.vis).glyph, onclick: function () { var m = wbFieldMetaWrite(e, k); m.vis = nextVis(m.vis); touch(true); } }),
+        fm.type === "cabecalho" ? null : el("button", { type: "button", title: "Wiki: " + visInfo(fm.vis).label + " (toque p/ mudar)", text: visInfo(fm.vis).glyph, onclick: function () { var m = wbFieldMetaWrite(e, k); m.vis = nextVis(m.vis); touch(true); } }),
         el("button", { type: "button", title: "Remover campo", text: "✕", onclick: function () { delete e.fields[k]; delete e.fieldMeta[k]; touch(true); } })
       ]));
     }
     dl.appendChild(dt);
+    if (fm.type === "cabecalho") {
+      dt.classList.add("wb-field-header");
+      dl.appendChild(el("dd", { class: "wb-field-header" }));
+      return;
+    }
     var ddCls = wbVisBgClass(fm.vis, "dd");
     var dd = el("dd", ddCls ? { class: ddCls } : {});
     if (!opts.ro && fm.vis === "restrito") dd.appendChild(wbAllowEditor(fm.allow, touch));
@@ -4222,7 +4268,7 @@
   // propósito: lá, vazio já É um valor de verdade ("não"), não "ainda não preenchido" — aplicar
   // a regra ali trocaria um "não" real por um "[TBA]" errado.
   function wbFieldValForWiki(type, val) {
-    if (type === "bool") return val || "";
+    if (type === "bool" || type === "cabecalho") return val || "";
     return (val || "").trim() ? val : "**[TBA]**";
   }
   // asEmail (optional) simulates what ONE SPECIFIC invited player would see instead of the real
@@ -4948,6 +4994,7 @@
         var k = window.prompt("Nome do campo:");
         if (k) wbAddField(variant, k, touch);
       } }));
+      tray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ cabeçalho", style: "font-style:italic", onclick: function () { wbAddHeaderField(variant, touch); } }));
       card.appendChild(tray);
     }
   }
@@ -5346,6 +5393,7 @@
         var k = window.prompt("Nome do campo:");
         if (k) wbAddField(e, k, touch);
       } }));
+      tray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ cabeçalho", style: "font-style:italic", onclick: function () { wbAddHeaderField(e, touch); } }));
       card.appendChild(tray);
     }
     } else {
@@ -5388,6 +5436,7 @@
             var k = window.prompt("Nome do campo:");
             if (k) wbAddField(tax, k, touch);
           } }));
+          taxTray.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ cabeçalho", style: "font-style:italic", onclick: function () { wbAddHeaderField(tax, touch); } }));
           taxTray.appendChild(el("button", { class: "field-ghost", type: "button", style: "color:var(--neg)", text: "✕ remover aba de Taxonomia", onclick: function () {
             if (!window.confirm("Remover a aba de Taxonomia inteira? O conteúdo se perde.")) return;
             delete e.taxonomy; touch(true);

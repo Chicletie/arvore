@@ -783,6 +783,12 @@
           itable.appendChild(el("tr", {}, [el("th", { text: "Também conhecido(a) como" }), aliasTd]));
         }
         shortFields.forEach(function (f) {
+          // Cabeçalho — separador full-width dentro da infobox (tipo os "headers" da Fandom),
+          // sem valor nenhum, só o rótulo. Vira uma linha própria com colspan, não th/td normal.
+          if (f.type === "cabecalho") {
+            itable.appendChild(el("tr", { class: "infobox-header-row" }, [el("th", { colspan: "2", text: f.key })]));
+            return;
+          }
           var td = el("td", { "data-field-swap": f.key });
           if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
           else mdInline(td, f.value);
@@ -922,6 +928,10 @@
       if (taxShort.length) {
         var table = el("table", { class: "infobox-facts" });
         taxShort.forEach(function (f) {
+          if (f.type === "cabecalho") {
+            table.appendChild(el("tr", { class: "infobox-header-row" }, [el("th", { colspan: "2", text: f.key })]));
+            return;
+          }
           var td = el("td", { "data-field-swap": "tax:" + f.key });
           if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
           else mdInline(td, f.value);

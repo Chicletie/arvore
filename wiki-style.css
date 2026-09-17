@@ -77,6 +77,8 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .infobox-facts th, .infobox-facts td { padding: 7px 10px; text-align: left; vertical-align: top; }
 .infobox-facts th { width: 40%; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
 .infobox-facts td { font-family: var(--font-wb); font-size: 14.5px; }
+.infobox-header-row th { width: auto; background: var(--accent-wash); color: var(--gold-ink); letter-spacing: 0.08em; }
+.infobox-header-row:first-child th { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .infobox-alias-line { font-style: italic; margin: 0 0 3px; }
 .infobox-alias-line:last-child { margin: 0; }
 
