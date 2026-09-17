@@ -550,8 +550,6 @@
             fig.appendChild(el("img", { src: it.url, alt: it.caption || "" }));
             if (it.caption) fig.appendChild(el("figcaption", { text: it.caption }));
             slot.appendChild(fig);
-          } else if (it.kind === "capa") {
-            slot.appendChild(el("img", { class: "cover", style: "max-width:250px;display:block;margin-bottom:10px", src: it.url, alt: "" }));
           } else if (it.kind === "sessao") {
             slot.appendChild(el("div", { class: "cathead", style: "font-size:11px;margin-top:14px", text: (it.title || "Sessão") + (it.date ? " · " + it.date : "") }));
             slot.appendChild(renderMarkdown(it.recap));
@@ -746,13 +744,15 @@
     var galGroups = [];
     (data.gallery || []).forEach(function (g) { if (galGroups.indexOf(g.group) === -1) galGroups.push(g.group); });
 
-    // infobox — cover + short facts, floats beside the article on wide screens. When there's a
-    // gallery, the portrait becomes switchable: one tab per group (ex: "Primeira Temporada",
-    // "Segunda Temporada"), each showing that group's first image — same idea as a fandom
-    // infobox's season-switcher, tabs sit right above the picture.
+    // infobox — retrato + fatos curtos, flutua ao lado do artigo em telas largas. O retrato é
+    // alimentado só por imagens explicitamente marcadas "imagem de infobox" na galeria unificada
+    // (não tem mais "capa vira retrato automaticamente", nem "primeira imagem do grupo") — cada
+    // uma com seu próprio nome de aba e seu próprio foco de corte, viram abas trocáveis tipo o
+    // seletor de temporada de uma infobox de fandom quando há mais de uma.
     var hasAliases = data.aliases && data.aliases.length;
     var hasChildren = data.children && data.children.length;
-    if (data.cover || shortFields.length || galGroups.length || hasAliases || hasChildren || data.featuredQuote || data.birth || data.lunarBirth) {
+    var infoboxImages = data.infoboxImages || [];
+    if (shortFields.length || infoboxImages.length || hasAliases || hasChildren || data.featuredQuote || data.birth || data.lunarBirth) {
       var info = el("div", { class: "infobox" });
       // Citação em destaque — cabeçalho pequeno em cima do retrato, estilo Fandom (ex: a
       // primeira frase de uma infobox de personagem). Só o texto, sem "por Fulano" — a página
@@ -760,12 +760,7 @@
       if (data.featuredQuote) {
         info.appendChild(el("div", { class: "infobox-quote", text: "“" + data.featuredQuote.text + "”" }));
       }
-      var portraitOptions = [];
-      if (data.cover) portraitOptions.push({ label: "Capa", url: data.cover, vis: data.coverVis || "publico", focus: data.coverFocus });
-      galGroups.forEach(function (grp) {
-        var first = data.gallery.filter(function (g) { return g.group === grp; })[0];
-        if (first) portraitOptions.push({ label: grp || "Geral", url: first.url, vis: first.vis, focus: first.focus });
-      });
+      var portraitOptions = infoboxImages.map(function (img) { return { label: img.name || "Retrato", url: img.url, vis: img.vis || "publico", focus: img.focus }; });
       if (portraitOptions.length) {
         var portraitSlot = el("div", { class: "infobox-portrait" });
         function paintPortrait(opt) {
@@ -919,6 +914,16 @@
     // obra), sempre por último, cada uma subdividida por "obra" (rótulo livre, mesmo esquema
     // já usado na própria Galeria) — um grupo sem nenhum item nunca aparece, porque a lista de
     // grupos só é construída a partir dos itens que de fato existem.
+    // Galeria sempre mostra a imagem INTEIRA (object-fit:contain, nunca corta) — o foco de
+    // enquadramento só existe pra capa/infobox, que realmente precisam cortar pra caber num
+    // formato fixo; uma imagem solta na galeria não corta nunca, só encolhe pra caber na grade.
+    // Clicar abre em tamanho grande (lightbox simples, sem biblioteca nenhuma).
+    function openLightbox(url) {
+      var lb = el("div", { class: "wb-lightbox" });
+      lb.appendChild(el("img", { src: url, alt: "" }));
+      lb.addEventListener("click", function () { lb.remove(); });
+      document.body.appendChild(lb);
+    }
     function buildGalleryPanel() {
       var wrap = el("div", { class: "article" });
       galGroups.forEach(function (grp) {
@@ -927,9 +932,8 @@
         var grid = el("div", { class: "gal-grid" });
         items.forEach(function (g) {
           var fig = el("figure", { class: "gal-item" });
-          var galPos = "object-position:" + objPos(g.focus);
-          if (g.vis === "spoiler") fig.appendChild(spoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "", style: galPos }); }));
-          else fig.appendChild(el("img", { src: g.url, alt: g.caption || "", style: galPos }));
+          if (g.vis === "spoiler") fig.appendChild(spoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "" }); }));
+          else fig.appendChild(el("img", { src: g.url, alt: g.caption || "", onclick: function () { openLightbox(g.url); } }));
           if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
           grid.appendChild(fig);
         });

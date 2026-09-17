@@ -846,7 +846,6 @@
 
   /* ---- infobox / typed fields ---- */
   .wb-cover { width: 100%; max-height: 340px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); box-shadow: var(--shadow); margin-bottom: 12px; display: block; }
-  .wb-cover-actions { display: flex; gap: 8px; margin: -4px 0 14px; }
   .wb-fieldctl { display: inline-flex; gap: 4px; margin-left: 6px; opacity: 0.5; }
   .wb-fieldctl:hover { opacity: 1; }
   .wb-fieldctl button { background: none; border: 0; color: var(--faint); font-size: 11px; cursor: pointer; padding: 0 2px; }
@@ -902,8 +901,10 @@
   .wb-gal-grouphead { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold-ink); margin: 14px 0 6px; font-weight: 600; }
   .wb-gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; margin-bottom: 6px; }
   .wb-gal-item { margin: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
-  .wb-gal-item img { width: 100%; height: 110px; object-fit: cover; display: block; }
+  .wb-gal-item img { width: 100%; height: 110px; object-fit: contain; display: block; }
   .wb-gal-item figcaption { font-size: 11px; color: var(--muted); padding: 4px 6px; }
+  .wb-gal-badges { display: flex; gap: 4px; flex-wrap: wrap; padding: 4px 6px 0; }
+  .wb-gal-badge { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gold-ink); background: var(--accent-wash); border-radius: 20px; padding: 2px 7px; }
   .wb-gal-ctl { display: flex; gap: 2px; padding: 2px 4px 4px; }
   .wb-gal-ctl button { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 12px; padding: 2px 4px; }
   .wb-gal-ctl button:hover { color: var(--ink); }
@@ -1385,8 +1386,6 @@
       if (e.year === undefined) e.year = null;
       if (ENTRY_STATUS.map(function (x) { return x.id; }).indexOf(e.status) === -1) e.status = "rascunho";
       e.secret = !!e.secret;
-      if (typeof e.cover !== "string") e.cover = "";
-      if (!e.coverFocus || typeof e.coverFocus !== "object") e.coverFocus = { x: 50, y: 50 };
       // old boolean-secret data becomes "mestre" (same meaning: never leaves your account);
       // the literal old string "oculto" is likewise just renamed to "mestre" going forward.
       function wbMigrateVis(v, secretFlag) {
@@ -1394,8 +1393,6 @@
         if (WB_VIS.indexOf(v) !== -1) return v;
         return secretFlag ? "mestre" : "publico";
       }
-      e.coverVis = wbMigrateVis(e.coverVis, false);
-      if (!Array.isArray(e.coverAllow)) e.coverAllow = [];
       if (!e.tagVis || typeof e.tagVis !== "object") e.tagVis = {};
       if (!e.aliasVis || typeof e.aliasVis !== "object") e.aliasVis = {};
       // tagVis/aliasVis entries used to be a bare vis string; normalized here to always be
@@ -1513,6 +1510,19 @@
       });
       if (!Array.isArray(e.gallery)) e.gallery = [];
       e.gallery = e.gallery.filter(function (g) { return g && typeof g === "object"; });
+      // Galeria unificada (2026-09-17): não existe mais uma "imagem de capa" separada — capa e
+      // imagens de infobox agora são só marcações (isCover/isInfobox) numa imagem da galeria
+      // como outra qualquer. isCover é exclusivo (só uma por vez); isInfobox é livre (quantas
+      // quiser, mesmo dentro do mesmo grupo) e cada uma leva seu próprio nome no slider. Cada
+      // marcação tem seu PRÓPRIO ponto de foco — a capa alimenta os cards largos (home,
+      // personagem do dia, novidades), o infobox alimenta o retrato quase-quadrado — porque um
+      // ponto só nunca serve bem pros dois formatos ao mesmo tempo.
+      // Marca ANTES de normalizar os booleans: se nenhuma imagem desta entrada já tem a chave
+      // isInfobox (nem true nem false), é a primeira vez que essa entrada passa por essa versão
+      // — só nesse caso a migração abaixo (primeira imagem do grupo vira retrato) roda. Rodar
+      // toda vez desfaria um "eu não quero nenhuma imagem de infobox neste grupo" que o autor
+      // tenha escolhido depois.
+      var galNeverHadInfoboxFlag = e.gallery.every(function (g) { return g.isInfobox === undefined; });
       e.gallery.forEach(function (g) {
         if (g.id == null) g.id = uid();
         if (typeof g.group !== "string") g.group = "";
@@ -1520,8 +1530,38 @@
         if (typeof g.caption !== "string") g.caption = "";
         g.vis = wbMigrateVis(g.vis, false);
         if (!Array.isArray(g.allow)) g.allow = [];
-        if (!g.focus || typeof g.focus !== "object") g.focus = { x: 50, y: 50 };
+        g.isCover = !!g.isCover;
+        g.isInfobox = !!g.isInfobox;
+        if (typeof g.infoboxName !== "string") g.infoboxName = "";
+        if (!g.focusBanner || typeof g.focusBanner !== "object") g.focusBanner = (g.focus && typeof g.focus === "object") ? g.focus : { x: 50, y: 50 };
+        if (!g.focusInfobox || typeof g.focusInfobox !== "object") g.focusInfobox = (g.focus && typeof g.focus === "object") ? g.focus : { x: 50, y: 50 };
+        delete g.focus;
       });
+      // Só uma capa por vez — se a migração/dado antigo deixou mais de uma marcada, a primeira
+      // vence e as outras viram imagem normal (nunca perde a imagem, só a marcação).
+      var seenCover = false;
+      e.gallery.forEach(function (g) { if (g.isCover) { if (seenCover) g.isCover = false; else seenCover = true; } });
+      // Migração da capa antiga (propriedade própria da entrada) pra dentro da galeria — se a
+      // imagem já existir lá (mesma url), só marca; senão cria um item novo pra ela.
+      if (typeof e.cover === "string" && e.cover) {
+        var coverItem = e.gallery.filter(function (g) { return g.url === e.cover; })[0];
+        if (!coverItem) {
+          coverItem = { id: uid(), group: "", url: e.cover, caption: "", vis: wbMigrateVis(e.coverVis, false), allow: Array.isArray(e.coverAllow) ? e.coverAllow : [], isCover: false, isInfobox: false, infoboxName: "", focusBanner: { x: 50, y: 50 }, focusInfobox: { x: 50, y: 50 } };
+          e.gallery.unshift(coverItem);
+        }
+        if (!seenCover) { coverItem.isCover = true; coverItem.focusBanner = (e.coverFocus && typeof e.coverFocus === "object") ? e.coverFocus : coverItem.focusBanner; seenCover = true; }
+      }
+      delete e.cover; delete e.coverVis; delete e.coverFocus; delete e.coverAllow;
+      // Migração única do mecanismo antigo "primeira imagem do grupo vira retrato da infobox" —
+      // preserva o que já estava publicado sem exigir reconfigurar nada.
+      if (galNeverHadInfoboxFlag) {
+        var galGroupsSeen = {};
+        e.gallery.forEach(function (g) {
+          if (galGroupsSeen[g.group]) return;
+          galGroupsSeen[g.group] = true;
+          g.isInfobox = true; g.infoboxName = g.group || "Geral";
+        });
+      }
       if (e.wikiId !== undefined && typeof e.wikiId !== "string") e.wikiId = null;
       if (e.wikiId === undefined) e.wikiId = null;
       if (typeof e.wikiPublishedAt !== "string") e.wikiPublishedAt = "";
@@ -2262,7 +2302,7 @@
   // lista de tipos do mundo, só caindo pra types[0] se ele tiver sido removido de propósito.
   function wbStubEntry(uniId, title) {
     var stubType = C().types.indexOf("Conceito") !== -1 ? "Conceito" : (C().types[0] || "Conceito");
-    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [], birth: { year: null, month: null, day: null, display: null }, humanFormId: null };
+    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [], birth: { year: null, month: null, day: null, display: null }, humanFormId: null };
     C().entries.push(e); save();
     return e;
   }
@@ -3536,7 +3576,8 @@
         if (!shown.length) { listHost.appendChild(el("div", { class: "empty", text: "Nada encontrado." })); return; }
         shown.forEach(function (e) {
           var cd = el("div", { class: "wb-card2", onclick: function () { wbOpen(e); } });
-          if (e.cover) cd.appendChild(el("div", { class: "wb-card2-img", style: "background-image:url('" + e.cover.replace(/'/g, "%27") + "')" }));
+          var cardCover = wbCoverItem(e);
+          if (cardCover) cd.appendChild(el("div", { class: "wb-card2-img", style: "background-image:url('" + cardCover.url.replace(/'/g, "%27") + "')" }));
           else cd.appendChild(el("div", { class: "wb-card2-img", style: "background:linear-gradient(135deg," + typeColor(e.type) + "44," + typeColor(e.type) + "18)" }));
           cd.appendChild(el("div", { class: "wb-card2-body" }, [
             el("div", { class: "wb-card2-title", text: (e.favorite ? "★ " : "") + (e.secret ? "🔒 " : "") + wbDisplayName(e) }),
@@ -4218,6 +4259,10 @@
   function wbLupinoOf(e) {
     return C().entries.filter(function (x) { return x.type === "Lupino" && x.humanFormId === e.id; })[0] || null;
   }
+  // Galeria unificada: acha a imagem marcada como capa (no máximo uma, garantido em normWorld).
+  function wbCoverItem(e) {
+    return (e.gallery || []).filter(function (g) { return g.isCover; })[0] || null;
+  }
   // Bloco de edição da data de nascimento — só pra Personagem, e diferente de um campo comum:
   // não tem botão de remover (a propriedade em si nunca some, só fica vazia). "mostrar como"
   // começa sempre em "não mostrar" e SÓ muda por escolha explícita — nunca auto-seleciona
@@ -4879,8 +4924,17 @@
     var posts = (e.posts || []).filter(function (p) { return okVis(p.vis, p.allow); }).map(function (p) {
       return { id: p.id, title: p.title || "", date: p.date || "", body: p.body || "", vis: outVis(p.vis) };
     }).sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
-    var gallery = (e.gallery || []).filter(function (g) { return okVis(g.vis, g.allow) && g.url; }).map(function (g) {
-      return { group: g.group || "", url: g.url, caption: g.caption || "", vis: outVis(g.vis), focus: g.focus || null };
+    var coverItem = wbCoverItem(e);
+    var galleryVisible = (e.gallery || []).filter(function (g) { return okVis(g.vis, g.allow) && g.url; });
+    var gallery = galleryVisible.map(function (g) {
+      return { group: g.group || "", url: g.url, caption: g.caption || "", vis: outVis(g.vis) };
+    });
+    // Imagens de infobox — cada uma marcada isInfobox vira um slide do slider, com o próprio
+    // nome e o próprio foco de corte (independente do foco da capa, que alimenta outros lugares
+    // — ver wbCoverItem). Não existe mais "capa = primeiro slide automático": só entra aqui quem
+    // foi explicitamente marcado, capa ou não.
+    var infoboxImages = galleryVisible.filter(function (g) { return g.isInfobox; }).map(function (g) {
+      return { name: g.infoboxName || "Retrato", url: g.url, vis: outVis(g.vis), focus: g.focusInfobox || null };
     });
     // Eventos — só "publico" (o único outro estado é "mestre", tudo ou nada, sem meio-termo
     // de spoiler/restrito pra evento). Alimentam a "linha do tempo pessoal" da própria página
@@ -4934,14 +4988,15 @@
       tags: (e.tags || []).filter(function (t) { return okVis((e.tagVis[t] || {}).vis || "publico", (e.tagVis[t] || {}).allow); }).map(function (t) { return { text: t, vis: outVis((e.tagVis[t] || {}).vis || "publico") }; }),
       summary: e.summary || "",
       body: e.body || "",
-      cover: okVis(e.coverVis, e.coverAllow) ? (e.cover || "") : "",
-      coverVis: outVis(e.coverVis),
-      coverFocus: e.coverFocus || null,
+      cover: (coverItem && okVis(coverItem.vis, coverItem.allow)) ? coverItem.url : "",
+      coverVis: coverItem ? outVis(coverItem.vis) : "publico",
+      coverFocus: coverItem ? coverItem.focusBanner : null,
       fields: fields,
       taxonomy: taxonomy,
       sections: sections,
       posts: posts,
       gallery: gallery,
+      infoboxImages: infoboxImages,
       events: events,
       citacoes: citacoes,
       featuredQuote: featuredQuote,
@@ -5028,7 +5083,10 @@
     }) : [];
     var sections = (e.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
     var posts = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).map(function (p) { return { id: p.id, title: p.title || "", date: p.date || "", body: p.body || "", vis: "publico" }; });
-    var gallery = (e.gallery || []).filter(function (g) { return g.url; }).map(function (g) { return { group: g.group || "", url: g.url, caption: g.caption || "", vis: "publico", focus: g.focus || null }; });
+    var galleryAll = (e.gallery || []).filter(function (g) { return g.url; });
+    var gallery = galleryAll.map(function (g) { return { group: g.group || "", url: g.url, caption: g.caption || "", vis: "publico" }; });
+    var infoboxImages = galleryAll.filter(function (g) { return g.isInfobox; }).map(function (g) { return { name: g.infoboxName || "Retrato", url: g.url, vis: "publico", focus: g.focusInfobox || null }; });
+    var coverItemFull = wbCoverItem(e);
     var events = (e.events || []).map(function (ev) { return { id: ev.id, familyId: ev.familyId, label: ev.label || "", y: ev.y, m: ev.m, d: ev.d, note: ev.note || "", major: !!ev.major }; });
     var citacoes = C().quotes.filter(function (q) { return q.speakerId === e.id; }).map(function (q) {
       var cx = q.contextId && wbEntry(q.contextId);
@@ -5062,14 +5120,15 @@
       tags: (e.tags || []).map(function (t) { return { text: t, vis: "publico" }; }),
       summary: e.summary || "",
       body: e.body || "",
-      cover: e.cover || "",
+      cover: coverItemFull ? coverItemFull.url : "",
       coverVis: "publico",
-      coverFocus: e.coverFocus || null,
+      coverFocus: coverItemFull ? coverItemFull.focusBanner : null,
       fields: fields,
       taxonomy: taxonomy,
       sections: sections,
       posts: posts,
       gallery: gallery,
+      infoboxImages: infoboxImages,
       events: events,
       citacoes: citacoes,
       featuredQuote: featuredQuote,
@@ -5173,7 +5232,6 @@
     (e.gallery || []).forEach(function (g) {
       if (g.vis === "restrito" && g.url) items.push({ id: "galeria-" + g.id, kind: "galeria", group: g.group || "", url: g.url, caption: g.caption || "", permitidos: g.allow || [] });
     });
-    if (e.coverVis === "restrito" && e.cover) items.push({ id: "capa", kind: "capa", url: e.cover, permitidos: e.coverAllow || [] });
     (e.variants || []).forEach(function (variant) {
       Object.keys(variant.fields || {}).forEach(function (k) {
         var fm = variant.fieldMeta[k] || {};
@@ -5318,8 +5376,8 @@
       // Só "publico" (não spoiler) — a home/novidades mostra essa miniatura sempre visível,
       // sem nenhum jeito de clicar-pra-revelar, então uma capa marcada como spoiler não pode
       // vazar ali fora do contexto da própria página.
-      cover: e.coverVis === "publico" ? (e.cover || null) : null,
-      coverFocus: e.coverFocus || null,
+      cover: (function () { var c = wbCoverItem(e); return (c && c.vis === "publico") ? c.url : null; })(),
+      coverFocus: (function () { var c = wbCoverItem(e); return c ? c.focusBanner : null; })(),
       // Pra tira de estatísticas da home (Paradise Gate): páginas/palavras/conexões/notas.
       wordCount: wbSnapWordCount(snap),
       linkCount: (snap.links || []).length,
@@ -5618,7 +5676,7 @@
       title: e.title, aliases: e.aliases, dispAlias: e.dispAlias, summary: e.summary, body: e.body,
       fields: e.fields, fieldMeta: e.fieldMeta, sections: e.sections, posts: e.posts,
       tags: e.tags, tagVis: e.tagVis, aliasVis: e.aliasVis,
-      gallery: e.gallery, cover: e.cover, coverVis: e.coverVis, coverAllow: e.coverAllow,
+      gallery: e.gallery,
       variants: e.variants
     });
   }
@@ -5702,7 +5760,9 @@
     }
     setDiff(oldSnap.aliases, e.aliases, "apelido");
     setDiff(oldSnap.tags, e.tags, "tag", function (t) { return "#" + t; });
-    if ((oldSnap.cover || "") !== (e.cover || "")) bits.push("capa mudou");
+    var oldCoverUrl = (oldSnap.gallery || []).filter(function (g) { return g.isCover; })[0];
+    var newCoverItem = wbCoverItem(e);
+    if ((oldCoverUrl ? oldCoverUrl.url : "") !== (newCoverItem ? newCoverItem.url : "")) bits.push("capa mudou");
     var oldFieldKeys = Object.keys(oldSnap.fields || {}), newFieldKeys = Object.keys(e.fields || {});
     var addedF = newFieldKeys.filter(function (k) { return oldFieldKeys.indexOf(k) === -1; });
     var removedF = oldFieldKeys.filter(function (k) { return newFieldKeys.indexOf(k) === -1; });
@@ -5820,27 +5880,19 @@
     var card = el("div", { class: "card wb-read" + (ro ? " wb-reading" : "") + (w.justEntered ? " wb-enter" : "") });
     w.justEntered = false;
 
-    // cover image
-    var coverWrap = el("div");
-    function paintCover() {
-      coverWrap.textContent = "";
-      if (e.cover) {
-        coverWrap.appendChild(el("img", { class: "wb-cover", src: e.cover, alt: "", style: "object-position:" + wbObjPos(e.coverFocus) }));
-        if (!ro) {
-          coverWrap.appendChild(el("div", { class: "wb-cover-actions" }, [
-            el("button", { class: "btn ghost sm", type: "button", text: "trocar capa", onclick: function () { pickImage(function (url) { e.cover = url; e.coverFocus = { x: 50, y: 50 }; touch(true); }); } }),
-            el("button", { class: "btn ghost sm", type: "button", text: "remover", onclick: function () { e.cover = ""; touch(true); } }),
-            el("button", { class: "btn ghost sm", type: "button", text: "🎯 foco", title: "Ajustar qual parte da imagem fica visível quando cortada", onclick: function () { wbFocusPicker(e.cover, e.coverFocus, function (f) { e.coverFocus = f; touch(true); }); } }),
-            (function () { var s = wbVisSelect(e.coverVis, function (nv) { e.coverVis = nv; touch(true); }); s.className = "field"; s.style.width = "auto"; return s; })()
-          ]));
-          if (e.coverVis === "restrito") coverWrap.appendChild(wbAllowEditor(e.coverAllow, touch));
-        }
-      } else if (!ro) {
-        coverWrap.appendChild(el("button", { class: "field-ghost", type: "button", text: "＋ imagem de capa", onclick: function () { pickImage(function (url) { e.cover = url; e.coverFocus = { x: 50, y: 50 }; touch(true); }); } }));
+    // Capa: não é mais um campo próprio da entrada — é só uma marcação (isCover) numa imagem
+    // dentro da Galeria unificada, lá embaixo. Se já tiver uma marcada, mostra uma prévia rápida
+    // aqui em cima (sem controles — editar é lá na Galeria) só pra confirmar o que está valendo.
+    if (!ro) {
+      var coverPreviewWrap = el("div");
+      function paintCoverPreview() {
+        coverPreviewWrap.textContent = "";
+        var c = wbCoverItem(e);
+        if (c) coverPreviewWrap.appendChild(el("img", { class: "wb-cover", src: c.url, alt: "", style: "object-position:" + wbObjPos(c.focusBanner) }));
       }
+      paintCoverPreview();
+      card.appendChild(coverPreviewWrap);
     }
-    paintCover();
-    card.appendChild(coverWrap);
 
     // Citação em destaque — escolhida entre as citações onde ESTA entrada é a falante (ver
     // criacao.quotes); vira um cabeçalho pequeno em cima do retrato na infobox da wiki, estilo
@@ -6095,10 +6147,12 @@
       }
     }
 
-    // galeria — imagens agrupadas por "temporada"/rótulo livre, exportadas do mesmo jeito na wiki
+    // galeria unificada — um lugar só pra toda imagem da entrada. Grupo continua sendo só
+    // organização visual (rótulo livre); capa e imagens de infobox agora são marcações
+    // independentes numa imagem qualquer, não vêm mais de "grupo"/"primeira imagem" nenhum.
     if ((e.gallery || []).length || !ro) {
       card.appendChild(cat("Galeria"));
-      if (!ro) card.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Cada grupo (ex: \"Primeira Temporada\") vira uma aba de retrato na infobox da wiki, usando a primeira imagem do grupo. Todas as imagens do grupo também aparecem aqui embaixo, na Galeria." }));
+      if (!ro) card.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Grupo é só organização (ex: \"Primeira Temporada\"). Pra aparecer na infobox, marque a imagem com \"🖼 imagem de infobox\" no menu dela — pode marcar quantas quiser, mesmo do mesmo grupo, cada uma com seu próprio nome no slider. Só uma imagem pode ser \"📌 capa\" por vez." }));
       var galGroups = [];
       (e.gallery || []).forEach(function (g) { if (galGroups.indexOf(g.group) === -1) galGroups.push(g.group); });
       galGroups.forEach(function (grp) {
@@ -6109,28 +6163,51 @@
         items.forEach(function (g) {
           var fig = el("figure", { class: "wb-gal-item" + (g.vis !== "publico" ? " wb-gal-" + g.vis : "") });
           if (hideSecret && g.vis === "spoiler") {
-            fig.appendChild(wbSpoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "", style: "object-position:" + wbObjPos(g.focus) }); }));
+            fig.appendChild(wbSpoilerCover(function () { return el("img", { src: g.url, alt: g.caption || "" }); }));
           } else if (hideSecret && g.vis === "restrito") {
             fig.appendChild(wbRestritoPlaceholder(g.allow));
           } else {
-            fig.appendChild(el("img", { src: g.url, alt: g.caption || "", style: "object-position:" + wbObjPos(g.focus) }));
+            fig.appendChild(el("img", { src: g.url, alt: g.caption || "" }));
+          }
+          if (g.isCover || g.isInfobox) {
+            fig.appendChild(el("div", { class: "wb-gal-badges" }, [
+              g.isCover ? el("span", { class: "wb-gal-badge", text: "📌 capa" }) : null,
+              g.isInfobox ? el("span", { class: "wb-gal-badge", text: "🖼 " + (g.infoboxName || "infobox") }) : null
+            ]));
           }
           if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
           if (!ro) {
-            fig.appendChild(el("div", { class: "wb-gal-ctl" }, [
-              el("button", { type: "button", title: "Ajustar foco do corte", text: "🎯", onclick: function () { wbFocusPicker(g.url, g.focus, function (f) { g.focus = f; touch(true); }); } }),
-              wbCtlMenu([
-                el("div", { class: "wb-ctl-move" }, [
-                  el("button", { type: "button", text: "▲ acima", onclick: function () { wbMoveGalleryItem(e, g, -1); touch(true); } }),
-                  el("button", { type: "button", text: "▼ abaixo", onclick: function () { wbMoveGalleryItem(e, g, 1); touch(true); } })
-                ]),
-                wbCtlItem("✎ Legenda…", function () { var c = window.prompt("Legenda:", g.caption || ""); if (c != null) { g.caption = c.trim(); touch(true); } }),
-                wbCtlItem("📁 Mudar grupo…", function () { var gr = window.prompt("Grupo (deixe em branco pra 'Geral'):", g.group || ""); if (gr != null) { g.group = gr.trim(); touch(true); } }),
-                wbCtlRow("Wiki", wbVisSelect(g.vis, function (nv) { g.vis = nv; touch(true); })),
-                el("div", { class: "wb-ctl-divider" }),
-                wbCtlItem("✕ Remover", function () { e.gallery = e.gallery.filter(function (x) { return x.id !== g.id; }); touch(true); }, true)
-              ])
-            ]));
+            var galMenuItems = [
+              el("div", { class: "wb-ctl-move" }, [
+                el("button", { type: "button", text: "▲ acima", onclick: function () { wbMoveGalleryItem(e, g, -1); touch(true); } }),
+                el("button", { type: "button", text: "▼ abaixo", onclick: function () { wbMoveGalleryItem(e, g, 1); touch(true); } })
+              ]),
+              wbCtlItem("✎ Legenda…", function () { var c = window.prompt("Legenda:", g.caption || ""); if (c != null) { g.caption = c.trim(); touch(true); } }),
+              wbCtlItem("📁 Mudar grupo…", function () { var gr = window.prompt("Grupo (deixe em branco pra 'Geral'):", g.group || ""); if (gr != null) { g.group = gr.trim(); touch(true); } }),
+              wbCtlRow("Wiki", wbVisSelect(g.vis, function (nv) { g.vis = nv; touch(true); })),
+              el("div", { class: "wb-ctl-divider" }),
+              wbCtlItem(g.isCover ? "📌 Remover como capa" : "📌 Marcar como capa", function () {
+                if (!g.isCover) e.gallery.forEach(function (x) { x.isCover = false; });
+                g.isCover = !g.isCover;
+                touch(true);
+              }),
+              wbCtlItem(g.isInfobox ? "🖼 Remover da infobox" : "🖼 Marcar como imagem de infobox", function () {
+                g.isInfobox = !g.isInfobox;
+                if (g.isInfobox && !g.infoboxName) g.infoboxName = g.group || "Retrato";
+                touch(true);
+              })
+            ];
+            if (g.isInfobox) {
+              var nameIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 4px;max-width:calc(100% - 18px)", placeholder: "nome no slider da infobox", value: g.infoboxName || "" });
+              nameIn.addEventListener("change", function () { g.infoboxName = nameIn.value.trim(); touch(true); });
+              galMenuItems.push(nameIn);
+            }
+            if (g.isCover || g.isInfobox) {
+              galMenuItems.push(wbCtlItem("🎯 Ajustar enquadramento…", function () { wbOpenImageFraming(e, g, touch); }));
+            }
+            galMenuItems.push(el("div", { class: "wb-ctl-divider" }));
+            galMenuItems.push(wbCtlItem("✕ Remover", function () { e.gallery = e.gallery.filter(function (x) { return x.id !== g.id; }); touch(true); }, true));
+            fig.appendChild(el("div", { class: "wb-gal-ctl" }, [wbCtlMenu(galMenuItems)]));
             if (g.vis === "restrito") fig.appendChild(wbAllowEditor(g.allow, touch));
           }
           grid.appendChild(fig);
@@ -6148,7 +6225,7 @@
           var lastGroup = e.gallery.length ? e.gallery[e.gallery.length - 1].group : "";
           var grp = window.prompt("Grupo (ex: Primeira Temporada), deixe em branco pra 'Geral':", lastGroup || "");
           if (grp == null) return;
-          e.gallery.push({ id: uid(), group: grp.trim(), url: url, caption: "", vis: "publico", allow: [], focus: { x: 50, y: 50 } }); touch(true);
+          e.gallery.push({ id: uid(), group: grp.trim(), url: url, caption: "", vis: "publico", allow: [], isCover: false, isInfobox: false, infoboxName: "", focusBanner: { x: 50, y: 50 }, focusInfobox: { x: 50, y: 50 } }); touch(true);
         });
       } }));
     }
@@ -7757,40 +7834,95 @@
     inp.click();
   }
   // Foco ajustável em vez de cropper de verdade: a mesma imagem aparece em vários formatos
-  // diferentes (capa alta na infobox, miniatura baixa e larga, quadrado da galeria) — um recorte
-  // fixo serviria bem só pra um desses. Um ponto de foco (como o do Twitter/Squarespace) vira
-  // `object-position` em CSS em qualquer um desses lugares: a imagem original nunca é alterada,
-  // só qual parte dela fica visível quando o `object-fit:cover` precisa cortar algo.
-  function wbFocusPicker(url, currentFocus, onSave) {
+  // diferentes — um recorte fixo serviria bem só pra um deles. Um ponto de foco (como o do
+  // Twitter/Squarespace) vira `object-position` em CSS em qualquer um desses lugares: a imagem
+  // original nunca é alterada, só qual parte dela fica visível quando o `object-fit:cover`
+  // precisa cortar algo. Robusto de verdade: mostra o enquadramento EXATO de cada lugar onde a
+  // marcação atual da imagem (capa e/ou infobox) realmente aparece na wiki publicada, com uma
+  // prévia ao vivo por lugar — não só um marcador solto numa imagem sem contexto. Se a imagem
+  // tem mais de um lugar (ex: é capa E infobox ao mesmo tempo), abas trocam qual está sendo
+  // ajustado; cada lugar guarda seu próprio ponto, nenhum é compartilhado com outro.
+  function wbRobustFocusPicker(url, locations, onSave) {
+    // Fecha qualquer menu "⋯" ainda aberto (o popover é ancorado em <body>, então sobrevive por
+    // cima deste modal se não for fechado explicitamente).
+    document.querySelectorAll(".wb-ctl-menu[open]").forEach(function (d) { d.open = false; });
     var root = document.getElementById("modalRoot");
-    var focus = { x: (currentFocus && currentFocus.x != null) ? currentFocus.x : 50, y: (currentFocus && currentFocus.y != null) ? currentFocus.y : 50 };
+    var state = {};
+    locations.forEach(function (loc) { state[loc.key] = { x: (loc.current && loc.current.x != null) ? loc.current.x : 50, y: (loc.current && loc.current.y != null) ? loc.current.y : 50 }; });
+    var activeKey = locations[0].key;
     var m = el("div", { class: "modal-wrap", onclick: function (ev) { if (ev.target === m) root.innerHTML = ""; } });
     var box = el("div", { class: "modal" });
-    box.appendChild(el("h3", { text: "Ajustar foco da imagem" }));
-    box.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Toque ou arraste na imagem pra escolher qual parte fica visível quando ela for cortada (capa, miniaturas, galeria)." }));
+    box.appendChild(el("h3", { text: "Ajustar enquadramento" }));
+    box.appendChild(el("div", { class: "hint", style: "margin-top:0", text: "Toque ou arraste na imagem pra escolher o que fica visível em cada lugar onde ela aparece na wiki." }));
+    var tabsRow = el("div", { style: "display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" });
     var wrap = el("div", { class: "wb-focus-wrap" });
     var img = el("img", { class: "wb-focus-img", src: url, alt: "" });
     var marker = el("div", { class: "wb-focus-marker" });
     wrap.appendChild(img); wrap.appendChild(marker);
-    function paintMarker() { marker.style.left = focus.x + "%"; marker.style.top = focus.y + "%"; }
-    paintMarker();
+    var previewLabel = el("div", { class: "hint", style: "margin:10px 0 4px" });
+    var previewImg = el("img", { src: url, alt: "", style: "display:block;width:100%;max-width:260px;object-fit:cover;border:1px solid var(--border-strong);border-radius:var(--radius-sm)" });
+    function activeLoc() { return locations.filter(function (l) { return l.key === activeKey; })[0]; }
+    function paintAll() {
+      var f = state[activeKey], loc = activeLoc();
+      marker.style.left = f.x + "%"; marker.style.top = f.y + "%";
+      previewImg.style.objectPosition = f.x + "% " + f.y + "%";
+      previewImg.style.height = Math.round(260 / loc.ratio) + "px";
+      previewLabel.textContent = "Prévia — " + loc.label;
+    }
     function setFromEvent(clientX, clientY) {
       var r = img.getBoundingClientRect();
-      focus.x = Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100));
-      focus.y = Math.max(0, Math.min(100, ((clientY - r.top) / r.height) * 100));
-      paintMarker();
+      var f = state[activeKey];
+      f.x = Math.max(0, Math.min(100, ((clientX - r.left) / r.width) * 100));
+      f.y = Math.max(0, Math.min(100, ((clientY - r.top) / r.height) * 100));
+      paintAll();
     }
     var dragging = false;
     wrap.addEventListener("pointerdown", function (ev) { dragging = true; wrap.setPointerCapture(ev.pointerId); setFromEvent(ev.clientX, ev.clientY); });
     wrap.addEventListener("pointermove", function (ev) { if (dragging) setFromEvent(ev.clientX, ev.clientY); });
     wrap.addEventListener("pointerup", function () { dragging = false; });
+    if (locations.length > 1) {
+      locations.forEach(function (loc) {
+        var btn = el("button", { type: "button", class: "chip", "aria-pressed": loc.key === activeKey ? "true" : "false", text: loc.label });
+        btn.addEventListener("click", function () {
+          activeKey = loc.key;
+          Array.prototype.forEach.call(tabsRow.children, function (c) { c.setAttribute("aria-pressed", "false"); });
+          btn.setAttribute("aria-pressed", "true");
+          paintAll();
+        });
+        tabsRow.appendChild(btn);
+      });
+      box.appendChild(tabsRow);
+    }
     box.appendChild(wrap);
+    box.appendChild(previewLabel);
+    box.appendChild(previewImg);
+    paintAll();
     box.appendChild(el("div", { class: "modal-actions" }, [
       el("button", { class: "btn ghost", type: "button", text: "cancelar", onclick: function () { root.innerHTML = ""; } }),
-      el("button", { class: "btn", type: "button", text: "salvar foco", onclick: function () { onSave({ x: Math.round(focus.x), y: Math.round(focus.y) }); root.innerHTML = ""; } })
+      el("button", { class: "btn", type: "button", text: "salvar", onclick: function () {
+        var result = {};
+        locations.forEach(function (loc) { result[loc.key] = { x: Math.round(state[loc.key].x), y: Math.round(state[loc.key].y) }; });
+        onSave(result);
+        root.innerHTML = "";
+      } })
     ]));
     m.appendChild(box);
     root.appendChild(m);
+  }
+  // Junta os lugares que a marcação ATUAL da imagem realmente alimenta — "capa" liga o
+  // enquadramento largo (home/personagem do dia/novidades, tratados como um só porque são bem
+  // parecidos), "infobox" liga o quase-quadrado do retrato. Uma imagem marcada como as duas
+  // coisas ao mesmo tempo ganha as duas abas.
+  function wbOpenImageFraming(e, g, touch) {
+    var locations = [];
+    if (g.isInfobox) locations.push({ key: "infobox", label: "Infobox", ratio: 1.05, current: g.focusInfobox });
+    if (g.isCover) locations.push({ key: "banner", label: "Cartões (capa)", ratio: 2.1, current: g.focusBanner });
+    if (!locations.length) return;
+    wbRobustFocusPicker(g.url, locations, function (result) {
+      if (result.infobox) g.focusInfobox = result.infobox;
+      if (result.banner) g.focusBanner = result.banner;
+      touch(true);
+    });
   }
   function wbObjPos(focus) { return (focus && focus.x != null ? focus.x : 50) + "% " + (focus && focus.y != null ? focus.y : 50) + "%"; }
 
