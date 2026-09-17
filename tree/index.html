@@ -1765,6 +1765,35 @@
     paint();
     return wrap;
   }
+  // Menu "⋯" reutilizável: reúne ações que antes ficavam sempre visíveis (reordenar, tipo,
+  // visibilidade, remover…) atrás de um único gatilho pequeno, revelado só quando tocado —
+  // em vez de uma fileira de ícones/botões que cicla estados no ar o tempo inteiro. Cada item
+  // é um elemento pronto (button.wb-ctl-item pra uma ação, ou o resultado de wbCtlRow pra um
+  // rótulo+controle inline como um <select>).
+  function wbCtlMenu(items) {
+    var d = el("details", { class: "wb-ctl-menu" });
+    d.appendChild(el("summary", { "aria-label": "Mais opções", text: "⋯" }));
+    d.appendChild(el("div", { class: "wb-ctl-menu-body" }, items));
+    return d;
+  }
+  function wbCtlItem(label, onclick, danger) {
+    return el("button", { type: "button", class: "wb-ctl-item" + (danger ? " wb-ctl-danger" : ""), text: label, onclick: onclick });
+  }
+  function wbCtlRow(label, control) {
+    return el("div", { class: "wb-ctl-row" }, [el("span", { class: "wb-ctl-label", text: label }), control]);
+  }
+  function wbVisSelect(current, onChange) {
+    var sel = el("select", {});
+    WB_VIS.forEach(function (v) { sel.appendChild(el("option", { value: v, text: visInfo(v).glyph + " " + visInfo(v).label, selected: v === current ? "selected" : null })); });
+    sel.addEventListener("change", function () { onChange(sel.value); });
+    return sel;
+  }
+  function wbTypeSelect(current, onChange) {
+    var sel = el("select", {});
+    FIELD_TYPES.forEach(function (t) { sel.appendChild(el("option", { value: t.id, text: t.label, selected: t.id === current ? "selected" : null })); });
+    sel.addEventListener("change", function () { onChange(sel.value); });
+    return sel;
+  }
   var SVGNS = "http://www.w3.org/2000/svg";
   function svgEl(name, attrs) {
     var e = document.createElementNS(SVGNS, name);
