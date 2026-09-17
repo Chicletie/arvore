@@ -858,7 +858,9 @@
         }
         info.appendChild(itable);
       }
-      card.appendChild(info);
+      // Só anexado ao card mais abaixo (depois das abas de obra/campanha, se houver) — as abas
+      // precisam ficar ACIMA de tudo, full-width, então a infobox só pode começar a flutuar
+      // depois delas (senão elas ficam presas atrás da infobox, ver commit desse fix).
     }
 
     // Uma "aba" (Geral, ou uma variante por obra/campanha) é seu próprio resumo+corpo+TOC+campos
@@ -1029,6 +1031,9 @@
       });
       card.appendChild(tabsWrap);
     }
+    // Infobox entra só agora (depois das abas): ela flutua à direita a partir daqui, então as
+    // abas — inseridas antes — ficam acima dela em vez de presas atrás/embaixo.
+    if (info) card.appendChild(info);
     tabPanels.forEach(function (p, i) { p.el.hidden = i !== 0; card.appendChild(p.el); });
 
     // posts — diário datado da própria entrada (mais recente primeiro; já vem ordenado do

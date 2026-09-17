@@ -105,8 +105,11 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .wl-live { font-weight: 600; color: var(--gold-ink); text-decoration: none; border-bottom: 1px dotted var(--gold-ink); }
 .wl-live:hover { text-decoration: none; border-bottom-style: solid; }
 
-/* índice — jumps to each section anchor, sits right after the intro */
-.toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin: 4px 0 22px; max-width: 320px; clear: both; }
+/* índice — jumps to each section anchor, sits right after the intro. SEM clear:both de
+   propósito: igual a visão geral, deve respeitar a margem da infobox (flutuando ao lado dela)
+   em vez de pular pra baixo dela inteira só porque é mais compacto — um clear aqui empurrava
+   tudo que vem depois (índice E as seções) pra baixo da infobox mesmo sobrando espaço do lado. */
+.toc { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; margin: 4px 0 22px; max-width: 320px; }
 .toc-head { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--faint); margin-bottom: 6px; }
 .toc ol { margin: 0; padding-left: 20px; font-size: 14px; }
 .toc li { margin: 3px 0; }
