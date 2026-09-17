@@ -752,7 +752,7 @@
     // infobox's season-switcher, tabs sit right above the picture.
     var hasAliases = data.aliases && data.aliases.length;
     var hasChildren = data.children && data.children.length;
-    if (data.cover || shortFields.length || galGroups.length || hasAliases || hasChildren || data.featuredQuote) {
+    if (data.cover || shortFields.length || galGroups.length || hasAliases || hasChildren || data.featuredQuote || data.birth) {
       var info = el("div", { class: "infobox" });
       // Citação em destaque — cabeçalho pequeno em cima do retrato, estilo Fandom (ex: a
       // primeira frase de uma infobox de personagem). Só o texto, sem "por Fulano" — a página
@@ -790,8 +790,9 @@
         }
         info.appendChild(portraitSlot);
       }
-      if (hasAliases || shortFields.length || hasChildren) {
+      if (hasAliases || shortFields.length || hasChildren || data.birth) {
         var itable = el("table", { class: "infobox-facts" });
+        if (data.birth) itable.appendChild(el("tr", {}, [el("th", { text: "Nascimento" }), el("td", { text: data.birth })]));
         if (hasAliases) {
           var aliasTd = el("td");
           data.aliases.forEach(function (a) {

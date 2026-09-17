@@ -1433,6 +1433,37 @@
         });
       });
       if (typeof e.dispAlias !== "string") e.dispAlias = "";
+      // Data de nascimento — só faz sentido pra Personagem, mas a propriedade existe sempre
+      // (inofensivo pros outros tipos). Diferente de um campo comum: nunca some do editor
+      // (sem botão de remover), só fica vazia. Guarda até 3 números (ano/mês/dia) mais um
+      // "display" que escolhe qual dos 4 formatos aparece na infobox — o autor pode ANOTAR os
+      // 3, mas escolher mostrar só ano, ano+mês, os 3, ou mês+dia sem ano (pra citar aniversário
+      // sem revelar idade, por exemplo). "display" só vale se os pedaços que ele precisa
+      // existirem; senão é limpo aqui embaixo.
+      if (!e.birth || typeof e.birth !== "object") e.birth = { year: null, month: null, day: null, display: null };
+      ["year", "month", "day"].forEach(function (k) { if (typeof e.birth[k] !== "number" || isNaN(e.birth[k])) e.birth[k] = null; });
+      if (["ymd", "ym", "y", "md"].indexOf(e.birth.display) === -1) e.birth.display = null;
+      if (e.birth.display === "ymd" && (e.birth.year == null || e.birth.month == null || e.birth.day == null)) e.birth.display = null;
+      if (e.birth.display === "ym" && (e.birth.year == null || e.birth.month == null)) e.birth.display = null;
+      if (e.birth.display === "y" && e.birth.year == null) e.birth.display = null;
+      if (e.birth.display === "md" && (e.birth.month == null || e.birth.day == null)) e.birth.display = null;
+      // Migração única: um campo genérico antigo chamado "nascimento"/"aniversário" (jeito de
+      // registrar isso antes desse recurso existir) vira os campos novos, e o campo antigo some
+      // (senão a infobox mostraria a mesma informação duas vezes, uma bruta e uma formatada).
+      if (e.type === "Personagem" && e.birth.year == null && e.birth.month == null && e.birth.day == null) {
+        var oldBirthKey = Object.keys(e.fields).filter(function (k) { return /(anivers[áa]rio|nascimento)/i.test(k); })[0];
+        if (oldBirthKey) {
+          var oldBirthParts = (e.fields[oldBirthKey] || "").trim().split(/[-/.]/).map(function (x) { return parseInt(x, 10); });
+          if (oldBirthParts.length >= 3 && !isNaN(oldBirthParts[0]) && !isNaN(oldBirthParts[1]) && !isNaN(oldBirthParts[2])) {
+            e.birth = { year: oldBirthParts[0], month: oldBirthParts[1], day: oldBirthParts[2], display: "ymd" };
+          } else if (oldBirthParts.length === 2 && !isNaN(oldBirthParts[0]) && !isNaN(oldBirthParts[1])) {
+            e.birth = { year: oldBirthParts[0], month: oldBirthParts[1], day: null, display: "ym" };
+          } else if (oldBirthParts.length === 1 && !isNaN(oldBirthParts[0])) {
+            e.birth = { year: oldBirthParts[0], month: null, day: null, display: "y" };
+          }
+          if (e.birth.display) { delete e.fields[oldBirthKey]; delete e.fieldMeta[oldBirthKey]; }
+        }
+      }
       if (e.featuredQuoteId !== undefined && typeof e.featuredQuoteId !== "string") e.featuredQuoteId = null;
       if (e.featuredQuoteId === undefined) e.featuredQuoteId = null;
       if (!Array.isArray(e.history)) e.history = [];
@@ -2216,7 +2247,7 @@
   // lista de tipos do mundo, só caindo pra types[0] se ele tiver sido removido de propósito.
   function wbStubEntry(uniId, title) {
     var stubType = C().types.indexOf("Conceito") !== -1 ? "Conceito" : (C().types[0] || "Conceito");
-    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [] };
+    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [], birth: { year: null, month: null, day: null, display: null } };
     C().entries.push(e); save();
     return e;
   }
@@ -4111,6 +4142,66 @@
     if (!isNaN(p[1])) return (months[p[1] - 1] || ("mês " + p[1])) + " de " + p[0];
     return "ano " + p[0];
   }
+  // Data de nascimento (Personagem): quais dos 4 formatos fazem sentido oferecer, dado o que já
+  // foi anotado — "mês+dia sem ano" aparece mesmo com o ano preenchido (é a opção de citar
+  // aniversário sem revelar em que ano nasceu).
+  function wbBirthOptions(b) {
+    var opts = [];
+    if (b.year != null && b.month != null && b.day != null) opts.push({ id: "ymd", label: "dia, mês e ano" });
+    if (b.year != null && b.month != null) opts.push({ id: "ym", label: "mês e ano" });
+    if (b.year != null) opts.push({ id: "y", label: "só o ano" });
+    if (b.month != null && b.day != null) opts.push({ id: "md", label: "dia e mês, sem ano" });
+    return opts;
+  }
+  function wbFmtBirth(b, uniId) {
+    if (!b || !b.display) return "";
+    var months = uniMonths(uniId), mName = b.month != null ? (months[b.month - 1] || ("mês " + b.month)) : "";
+    if (b.display === "ymd") return b.day + " de " + mName + " de " + b.year;
+    if (b.display === "ym") return mName + " de " + b.year;
+    if (b.display === "y") return String(b.year);
+    if (b.display === "md") return b.day + " de " + mName;
+    return "";
+  }
+  // Bloco de edição da data de nascimento — só pra Personagem, e diferente de um campo comum:
+  // não tem botão de remover (a propriedade em si nunca some, só fica vazia). "mostrar como"
+  // começa sempre em "não mostrar" e SÓ muda por escolha explícita — nunca auto-seleciona
+  // sozinho quando o autor preenche ano/mês/dia, pra não publicar uma data sem intenção clara,
+  // e nunca desfaz um "não mostrar" já escolhido só porque um dos números mudou.
+  function wbRenderBirth(e, touch, ro) {
+    if (!e.birth || typeof e.birth !== "object") e.birth = { year: null, month: null, day: null, display: null };
+    if (ro) {
+      var roTxt = wbFmtBirth(e.birth, e.universeId);
+      return roTxt ? el("div", { class: "wb-birth" }, [el("div", { class: "wb-eyebrow", text: "Nascimento" }), el("div", { text: roTxt })]) : el("div");
+    }
+    var wrap = el("div", { class: "wb-birth", style: "margin:14px 0" });
+    wrap.appendChild(el("div", { class: "wb-eyebrow", text: "Nascimento" }));
+    var row = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin:4px 0" });
+    var yearIn = el("input", { type: "number", class: "field", style: "width:84px", placeholder: "ano", value: e.birth.year != null ? String(e.birth.year) : "" });
+    var monthSel = el("select", { class: "field" }, [el("option", { value: "", text: "mês…" })].concat(
+      uniMonths(e.universeId).map(function (mn, i) { return el("option", { value: String(i + 1), text: mn, selected: e.birth.month === i + 1 ? "selected" : null }); })
+    ));
+    var dayIn = el("input", { type: "number", class: "field", style: "width:64px", placeholder: "dia", min: "1", max: "31", value: e.birth.day != null ? String(e.birth.day) : "" });
+    var dispSel = el("select", { class: "field" });
+    var preview = el("div", { class: "hint", style: "margin:2px 0 0" });
+    function paint() {
+      var opts = wbBirthOptions(e.birth);
+      dispSel.textContent = "";
+      dispSel.disabled = !opts.length;
+      dispSel.appendChild(el("option", { value: "", text: opts.length ? "não mostrar" : "(preencha ano, mês ou dia)" }));
+      opts.forEach(function (o) { dispSel.appendChild(el("option", { value: o.id, text: o.label, selected: e.birth.display === o.id ? "selected" : null })); });
+      preview.textContent = e.birth.display ? ("Vai aparecer na infobox como “" + wbFmtBirth(e.birth, e.universeId) + "”.") : "Sem exibição escolhida — não aparece na infobox.";
+    }
+    yearIn.addEventListener("change", function () { var n = parseInt(yearIn.value, 10); e.birth.year = isNaN(n) ? null : n; if (!wbBirthOptions(e.birth).some(function (o) { return o.id === e.birth.display; })) e.birth.display = null; paint(); touch(true); });
+    monthSel.addEventListener("change", function () { e.birth.month = monthSel.value ? parseInt(monthSel.value, 10) : null; if (!wbBirthOptions(e.birth).some(function (o) { return o.id === e.birth.display; })) e.birth.display = null; paint(); touch(true); });
+    dayIn.addEventListener("change", function () { var n = parseInt(dayIn.value, 10); e.birth.day = isNaN(n) ? null : Math.max(1, Math.min(31, n)); if (!wbBirthOptions(e.birth).some(function (o) { return o.id === e.birth.display; })) e.birth.display = null; paint(); touch(true); });
+    dispSel.addEventListener("change", function () { e.birth.display = dispSel.value || null; paint(); touch(true); });
+    row.appendChild(yearIn); row.appendChild(monthSel); row.appendChild(dayIn);
+    wrap.appendChild(row);
+    wrap.appendChild(dispSel);
+    wrap.appendChild(preview);
+    paint();
+    return wrap;
+  }
   function wbFieldMeta(e, k) {
     var m = e.fieldMeta[k];
     if (!m || typeof m !== "object") return { type: guessFieldType(k), opts: [], vis: "publico", allow: [], _guessed: true };
@@ -4776,6 +4867,10 @@
       universe: f ? f.name : "",
       universeId: e.universeId,
       aliases: (e.aliases || []).filter(function (a) { return okVis((e.aliasVis[a] || {}).vis || "publico", (e.aliasVis[a] || {}).allow); }).map(function (a) { return { text: a, vis: outVis((e.aliasVis[a] || {}).vis || "publico"), note: wbAliasNote(e, e.aliasVis[a]), selfLink: wbAliasSelfLink(e, e.aliasVis[a]) }; }),
+      // Já vem formatada por extenso (ex: "14 de março de 1998") em vez de números crus — o
+      // calendário fictício do universo (uniMonths) nunca é publicado inteiro, só o nome do mês
+      // já resolvido pra ESTA data específica, então a wiki não precisa saber nada de calendário.
+      birth: e.type === "Personagem" ? (wbFmtBirth(e.birth, e.universeId) || null) : null,
       tags: (e.tags || []).filter(function (t) { return okVis((e.tagVis[t] || {}).vis || "publico", (e.tagVis[t] || {}).allow); }).map(function (t) { return { text: t, vis: outVis((e.tagVis[t] || {}).vis || "publico") }; }),
       summary: e.summary || "",
       body: e.body || "",
@@ -4902,6 +4997,7 @@
       type: e.type || "",
       universe: f ? f.name : "",
       aliases: (e.aliases || []).map(function (a) { return { text: a, vis: "publico", note: wbAliasNote(e, e.aliasVis[a]), selfLink: wbAliasSelfLink(e, e.aliasVis[a]) }; }),
+      birth: e.type === "Personagem" ? (wbFmtBirth(e.birth, e.universeId) || null) : null,
       tags: (e.tags || []).map(function (t) { return { text: t, vis: "publico" }; }),
       summary: e.summary || "",
       body: e.body || "",
@@ -5137,19 +5233,15 @@
     var m = t.replace(/[#*_>`~\[\]()|-]/g, " ").match(/\S+/g);
     return m ? m.length : 0;
   }
-  // Aniversário: reaproveita o mesmo campo tipo "data" de sempre (formato Y-M-D, ano primeiro
-  // — guessFieldType já sugere esse tipo pra um campo chamado "nascimento"), só que o site
-  // processa apenas dia+mês, IGNORANDO o ano — a idade de um personagem não é proporcional ao
-  // ano de verdade, já que a história se passa numa época diferente. Reconhece o campo pelo
-  // nome ("aniversário" ou "nascimento"); se for um campo marcado como não-público, não entra
-  // no índice (mesma regra de sempre: nada além de "publico" pode vazar num agregado público).
+  // Aniversário: só entra na pool de aniversariantes da home se dia+mês estiverem publicados
+  // (display "ymd" ou "md") — só ano, ou só ano+mês, não dá um DIA específico pra comemorar,
+  // então fica de fora do sorteio (mas ainda aparece normalmente na infobox). Ignora o ano em
+  // si (a idade de um personagem não é proporcional ao ano real, já que a história se passa numa
+  // época diferente) — só dia+mês viram o "MD" usado pra achar quem faz aniversário hoje.
   function wbBirthdayMD(e) {
-    var key = Object.keys(e.fields || {}).filter(function (k) { return /(anivers[áa]rio|nascimento)/i.test(k); })[0];
-    if (!key) return null;
-    if (wbFieldMeta(e, key).vis !== "publico") return null;
-    var p = (e.fields[key] || "").trim().split(/[-/.]/).map(function (x) { return parseInt(x, 10); });
-    if (p.length < 3 || isNaN(p[1]) || isNaN(p[2])) return null;
-    return (p[1] < 10 ? "0" : "") + p[1] + "-" + (p[2] < 10 ? "0" : "") + p[2];
+    var b = e.birth;
+    if (!b || b.month == null || b.day == null || (b.display !== "ymd" && b.display !== "md")) return null;
+    return (b.month < 10 ? "0" : "") + b.month + "-" + (b.day < 10 ? "0" : "") + b.day;
   }
   function wbIndexEntry(e, snap) {
     var f = flowerById(e.universeId);
@@ -5855,6 +5947,9 @@
 
     // sections / posts
     wbRenderSections(card, e, { hideSecret: hideSecret, ro: ro, touch: touch, cat: cat });
+
+    // nascimento — só Personagem, e sempre presente (não é um campo comum, não tem "remover")
+    if (e.type === "Personagem") card.appendChild(wbRenderBirth(e, touch, ro));
 
     // fields — short typed ones as a specimen label, long descriptive ones as roomy blocks
     var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && wbFieldMeta(e, k).vis === "mestre"); });
