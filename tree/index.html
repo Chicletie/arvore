@@ -4393,11 +4393,19 @@
         var byIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 4px;max-width:calc(100% - 18px)", placeholder: "nome…", value: entry.byText || "" });
         byIn.addEventListener("change", function () { entry.byText = byIn.value.trim(); e[visKey][t] = entry; touch(true); });
         chipMenuItems.push(byIn);
+        // Escolher uma entrada aqui preenche o nome sozinho (com o título dela) — só o NOME vira
+        // link na wiki (ex: "Alucard Kingsleigh (dado por Mia Bloodyfur)", só "Mia Bloodyfur" é
+        // clicável), o texto acima continua editável depois se quiser mostrar algo diferente do
+        // título da entrada, mas sem precisar digitar o nome duas vezes no caso comum.
         var byCombo = wbCombo({
           items: wbEntriesOf(e.universeId).filter(function (en) { return en.id !== e.id; }).map(function (en) { return { id: en.id, label: (en.title || "(sem título)") + " · " + en.type }; }),
           value: entry.byEntryId || "", allowEmpty: true, emptyLabel: "(sem link)",
           placeholder: "linkar a uma entrada (opcional)", wrapClass: "grow",
-          onChange: function (id) { entry.byEntryId = id || null; e[visKey][t] = entry; touch(true); }
+          onChange: function (id) {
+            entry.byEntryId = id || null;
+            if (id) { var target = wbEntry(id); if (target) { entry.byText = wbDisplayName(target); byIn.value = entry.byText; } }
+            e[visKey][t] = entry; touch(true);
+          }
         });
         byCombo.style.margin = "0 9px 4px";
         chipMenuItems.push(byCombo);
