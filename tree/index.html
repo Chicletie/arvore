@@ -1127,10 +1127,18 @@
   // um personagem de lá. Existe pra dar um lugar de verdade (com página própria, template
   // próprio) pra citações de quem nunca virou uma entrada de Personagem — a obra em si vira a
   // "casa" da citação nesse caso.
-  var WB_TYPES = ["Local", "Personagem", "Facção", "Sistema de Magia", "Divindade", "Evento histórico", "Item", "Publicação", "Criatura", "Língua / Povo", "Conceito"];
+  var WB_TYPES = ["Local", "Personagem", "Lupino", "Facção", "Sistema de Magia", "Divindade", "Evento histórico", "Item", "Publicação", "Criatura", "Língua / Povo", "Conceito"];
+  // "Lupino" (2026-09-17): sub-tipo de Personagem pra licantropos — a forma-lobo tem entrada
+  // própria (habilidades, aparência, nascimento etc. distintos da forma humana), mas SEMPRE
+  // ligada a uma entrada humana (wbIsCharacterType trata os dois tipos como equivalentes em
+  // tudo que é "isso é um Personagem?" — pool de aniversariante, campo de Nascimento, "personagem
+  // do dia" da home). O que torna Lupino especial fica isolado em `humanFormId` + na criação
+  // automática da ligação "alma-irmã" e das alcunhas cruzadas (ver wbLinkLupino).
+  function wbIsCharacterType(t) { return t === "Personagem" || t === "Lupino"; }
   var FRANCHISE_KINDS = ["Romance", "Trilogia", "Série", "Conto", "Novela", "Roteiro", "Quadrinho", "Campanha de RPG", "Outro"];
   var WB_TEMPLATES = {
     "Personagem": ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"],
+    "Lupino": ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"],
     "Local": ["População", "Governo", "Clima", "Geografia", "Economia", "História", "Pontos de interesse", "Atmosfera"],
     "Facção": ["Liderança", "Território", "Propósito", "Membros", "Recursos", "Aliados", "Rivais", "Segredos"],
     "Sistema de Magia": ["Fonte", "Quem pode usar", "Como funciona", "Custo / preço", "Limites", "Aparência / sensação", "Tabus"],
@@ -1450,7 +1458,7 @@
       // Migração única: um campo genérico antigo chamado "nascimento"/"aniversário" (jeito de
       // registrar isso antes desse recurso existir) vira os campos novos, e o campo antigo some
       // (senão a infobox mostraria a mesma informação duas vezes, uma bruta e uma formatada).
-      if (e.type === "Personagem" && e.birth.year == null && e.birth.month == null && e.birth.day == null) {
+      if (wbIsCharacterType(e.type) && e.birth.year == null && e.birth.month == null && e.birth.day == null) {
         var oldBirthKey = Object.keys(e.fields).filter(function (k) { return /(anivers[áa]rio|nascimento)/i.test(k); })[0];
         if (oldBirthKey) {
           var oldBirthParts = (e.fields[oldBirthKey] || "").trim().split(/[-/.]/).map(function (x) { return parseInt(x, 10); });
@@ -1464,6 +1472,9 @@
           if (e.birth.display) { delete e.fields[oldBirthKey]; delete e.fieldMeta[oldBirthKey]; }
         }
       }
+      // Forma humana de um Lupino — obrigatória em teoria (o formulário de criação exige
+      // escolher uma), mas normalizada aqui pra qualquer entrada por segurança/simplicidade.
+      if (typeof e.humanFormId !== "string") e.humanFormId = null;
       if (e.featuredQuoteId !== undefined && typeof e.featuredQuoteId !== "string") e.featuredQuoteId = null;
       if (e.featuredQuoteId === undefined) e.featuredQuoteId = null;
       if (!Array.isArray(e.history)) e.history = [];
@@ -1611,6 +1622,10 @@
         if (v.noteLinkId && !entryIdSet[v.noteLinkId]) v.noteLinkId = null;
         if (v.linkId && !entryIdSet[v.linkId]) { v.linkId = null; v.isLink = false; }
       });
+      // Forma humana apagada: o Lupino não trava a exclusão (mesma filosofia do resto do app),
+      // só perde a referência — fica visível pro autor porque wbRenderBirth/infobox simplesmente
+      // param de mostrar a ligação, e a criação de um Lupino novo sempre exige escolher uma.
+      if (e.humanFormId && !entryIdSet[e.humanFormId]) e.humanFormId = null;
     });
     cr.franchises.forEach(function (fr) {
       delete fr.rpg;
@@ -2247,9 +2262,29 @@
   // lista de tipos do mundo, só caindo pra types[0] se ele tiver sido removido de propósito.
   function wbStubEntry(uniId, title) {
     var stubType = C().types.indexOf("Conceito") !== -1 ? "Conceito" : (C().types[0] || "Conceito");
-    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [], birth: { year: null, month: null, day: null, display: null } };
+    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, cover: "", coverVis: "publico", coverAllow: [], gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [], birth: { year: null, month: null, day: null, display: null }, humanFormId: null };
     C().entries.push(e); save();
     return e;
+  }
+  // Liga um Lupino recém-criado à forma humana escolhida: marca humanFormId, cria a ligação
+  // "alma-irmã de" dos dois lados (mesmo mecanismo do formulário normal de Ligações — ver
+  // linkInverseOf mais acima), e dá a cada um uma alcunha que É o link pro outro (o próprio
+  // wbAliasSelfLink/wbAliasNote construídos antes, reaproveitados aqui: "Gau-grahana" na página
+  // do Devon com anotação "forma lupina", "Devon" na página do Gau com "forma humana").
+  function wbLinkLupino(lupino, humanId) {
+    var human = wbEntry(humanId);
+    if (!human) return;
+    lupino.humanFormId = humanId;
+    var label = "alma-irmã de";
+    if (!(lupino.links || []).some(function (l) { return l.to === humanId && l.label === label; })) lupino.links.push({ to: humanId, label: label, dispAs: human.dispAlias || "" });
+    if (!(human.links || []).some(function (l) { return l.to === lupino.id && l.label === label; })) human.links.push({ to: lupino.id, label: label, dispAs: lupino.dispAlias || "" });
+    function crossAlias(owner, target, note) {
+      var name = wbDisplayName(target);
+      if (owner.aliases.indexOf(name) === -1) owner.aliases.push(name);
+      owner.aliasVis[name] = { vis: "publico", allow: [], noteBefore: note, noteLink: "", noteLinkId: null, noteAfter: "", isLink: true, linkId: target.id };
+    }
+    crossAlias(lupino, human, "forma humana");
+    crossAlias(human, lupino, "forma lupina");
   }
   // Small "search or create" popover for linking to an entry from inside the WYSIWYG editor —
   // same universe-first grouping as everywhere else that links to entries, reusing wbCombo.
@@ -2743,7 +2778,7 @@
         if (!byTitle[name]) list.push({ e: e, msg: "menção órfã: [[" + name + "]]" });
       });
       if (!e.summary) list.push({ e: e, msg: "sem resumo" });
-      if (e.type === "Personagem" && !(e.franchiseIds || []).length && !wbCampaignsWith(e.id).length && (wbFranchisesOf(e.universeId).length || wbCampaignsOf(e.universeId).length)) list.push({ e: e, msg: "personagem sem obra" });
+      if (wbIsCharacterType(e.type) && !(e.franchiseIds || []).length && !wbCampaignsWith(e.id).length && (wbFranchisesOf(e.universeId).length || wbCampaignsOf(e.universeId).length)) list.push({ e: e, msg: "personagem sem obra" });
       if (!(e.links || []).length && !e.parentId) list.push({ e: e, msg: "sem nenhuma ligação" });
     });
     return list;
@@ -3186,6 +3221,9 @@
     var m = el("div", { class: "modal-wrap", onclick: function (ev) { if (ev.target === m) root.innerHTML = ""; } });
     var form = el("form", { class: "modal", onsubmit: function (ev) {
       ev.preventDefault();
+      // Lupino não existe sem forma humana — bloqueia aqui em vez de deixar criar solto e ter
+      // que consertar depois.
+      if (g("type").value === "Lupino" && !humanCombo.value) { humanErr.textContent = "Escolha a forma humana antes de criar."; return; }
       var e = wbStubEntry(g("universe").value, g("title").value.trim());
       e.type = g("type").value;
       e.status = "rascunho";
@@ -3194,6 +3232,7 @@
       if (x != null) e.x = x;
       if (y != null) e.y = y;
       if (g("tmpl") && g("tmpl").checked) (C().templates[e.type] || []).forEach(function (k) { if (!(k in e.fields)) { e.fields[k] = ""; e.fieldMeta[k] = { type: guessFieldType(k), opts: [], vis: guessFieldVis(k), allow: [] }; } });
+      if (e.type === "Lupino" && humanCombo.value) wbLinkLupino(e, humanCombo.value);
       var cp = campId && wbCampaign(campId);
       var cse = cp && (cp.seasons || []).filter(function (x) { return x.id === seasonId; })[0];
       if (cp && cse && cp.universeId === e.universeId && cse.roster.indexOf(e.id) === -1) cse.roster.push(e.id);
@@ -3207,17 +3246,27 @@
     var uniSel = el("select", { class: "field", name: "universe", style: "width:100%" });
     worlds().forEach(function (fl) { uniSel.appendChild(el("option", { value: fl.id, text: fl.name, selected: fl.id === uniId ? "selected" : null })); });
     var parCombo = wbCombo({ items: [], placeholder: "buscar entrada…", emptyLabel: "(raiz do universo)" });
+    // Forma humana — só aparece/obriga quando o tipo escolhido é Lupino (um licantropo não
+    // existe sem a metade humana). Lista qualquer Personagem/Lupino já existente no universo.
+    var humanErr = el("div", { class: "hint", style: "color:var(--neg)" });
+    var humanCombo = wbCombo({ items: [], placeholder: "buscar a forma humana…", allowEmpty: false });
+    var humanWrap = el("div", { class: "full", style: "display:none" }, [el("label", { class: "flab", text: "Forma humana (obrigatório pra Lupino)" }), humanCombo, humanErr]);
     function fillParents() {
-      parCombo.refreshItems(wbEntriesOf(uniSel.value).map(function (x2) { return { id: x2.id, label: x2.title || "(sem título)" }; }));
+      var pool = wbEntriesOf(uniSel.value);
+      parCombo.refreshItems(pool.map(function (x2) { return { id: x2.id, label: x2.title || "(sem título)" }; }));
+      humanCombo.refreshItems(pool.filter(function (x2) { return wbIsCharacterType(x2.type); }).map(function (x2) { return { id: x2.id, label: (x2.title || "(sem título)") + " · " + x2.type }; }));
     }
     fillParents();
     uniSel.addEventListener("change", fillParents);
+    typeSel.addEventListener("change", function () { humanWrap.style.display = typeSel.value === "Lupino" ? "" : "none"; humanErr.textContent = ""; });
+    if (typeSel.value === "Lupino") humanWrap.style.display = "";
     var tmplChk = el("input", { type: "checkbox", name: "tmpl", checked: "checked" });
     form.appendChild(el("h3", { text: "Nova entrada" }));
     form.appendChild(el("div", { class: "field-grid" }, [
       el("div", { class: "full" }, [el("label", { class: "flab", text: "Título" }), el("input", { class: "field", name: "title", style: "width:100%", autofocus: "autofocus", placeholder: "pode deixar em branco e nomear depois" })]),
       el("div", {}, [el("label", { class: "flab", text: "Tipo" }), typeSel]),
       el("div", {}, [el("label", { class: "flab", text: "Universo" }), uniSel]),
+      humanWrap,
       el("div", { class: "full" }, [el("label", { class: "flab", text: "Dentro de (opcional)" }), parCombo]),
       el("div", { class: "full" }, [el("label", { class: "flab", text: "Resumo (opcional)" }), el("input", { class: "field", name: "summary", style: "width:100%" })])
     ]));
@@ -4162,6 +4211,13 @@
     if (b.display === "md") return b.day + " de " + mName;
     return "";
   }
+  // Acha o Lupino ligado a uma entrada (busca reversa por humanFormId) — usado pra "Nascimento
+  // Lunar" espelhar o Nascimento do Lupino na própria página da forma humana, sem duplicar dado
+  // nenhum (sempre lido na hora, nunca copiado). Só um Lupino por forma humana faz sentido, então
+  // pega o primeiro que achar.
+  function wbLupinoOf(e) {
+    return C().entries.filter(function (x) { return x.type === "Lupino" && x.humanFormId === e.id; })[0] || null;
+  }
   // Bloco de edição da data de nascimento — só pra Personagem, e diferente de um campo comum:
   // não tem botão de remover (a propriedade em si nunca some, só fica vazia). "mostrar como"
   // começa sempre em "não mostrar" e SÓ muda por escolha explícita — nunca auto-seleciona
@@ -4870,7 +4926,11 @@
       // Já vem formatada por extenso (ex: "14 de março de 1998") em vez de números crus — o
       // calendário fictício do universo (uniMonths) nunca é publicado inteiro, só o nome do mês
       // já resolvido pra ESTA data específica, então a wiki não precisa saber nada de calendário.
-      birth: e.type === "Personagem" ? (wbFmtBirth(e.birth, e.universeId) || null) : null,
+      birth: wbIsCharacterType(e.type) ? (wbFmtBirth(e.birth, e.universeId) || null) : null,
+      // Nascimento Lunar (Lupino ligado a esta forma humana) — espelha o Nascimento do Lupino,
+      // nunca duplicado à mão. Só publica se o Lupino TAMBÉM estiver publicado (mesma regra de
+      // nunca vazar via um relacionamento o que a outra ponta não escolheu publicar).
+      lunarBirth: (function () { var lup = wbLupinoOf(e); return (lup && lup.wikiId) ? (wbFmtBirth(lup.birth, lup.universeId) || null) : null; })(),
       tags: (e.tags || []).filter(function (t) { return okVis((e.tagVis[t] || {}).vis || "publico", (e.tagVis[t] || {}).allow); }).map(function (t) { return { text: t, vis: outVis((e.tagVis[t] || {}).vis || "publico") }; }),
       summary: e.summary || "",
       body: e.body || "",
@@ -4997,7 +5057,8 @@
       type: e.type || "",
       universe: f ? f.name : "",
       aliases: (e.aliases || []).map(function (a) { return { text: a, vis: "publico", note: wbAliasNote(e, e.aliasVis[a]), selfLink: wbAliasSelfLink(e, e.aliasVis[a]) }; }),
-      birth: e.type === "Personagem" ? (wbFmtBirth(e.birth, e.universeId) || null) : null,
+      birth: wbIsCharacterType(e.type) ? (wbFmtBirth(e.birth, e.universeId) || null) : null,
+      lunarBirth: (function () { var lup = wbLupinoOf(e); return lup ? (wbFmtBirth(lup.birth, lup.universeId) || null) : null; })(),
       tags: (e.tags || []).map(function (t) { return { text: t, vis: "publico" }; }),
       summary: e.summary || "",
       body: e.body || "",
@@ -5263,7 +5324,7 @@
       wordCount: wbSnapWordCount(snap),
       linkCount: (snap.links || []).length,
       postsCount: (snap.posts || []).length,
-      birthdayMD: e.type === "Personagem" ? wbBirthdayMD(e) : null,
+      birthdayMD: wbIsCharacterType(e.type) ? wbBirthdayMD(e) : null,
       // Notas (título/data só, nunca o corpo) pra alimentar "Notas recentes" e busca por
       // título na home — o corpo fica de fora de propósito: indexar o texto inteiro de toda
       // nota de toda entrada infla o documento do wikiIndex sem necessidade (tem limite de
@@ -5949,7 +6010,7 @@
     wbRenderSections(card, e, { hideSecret: hideSecret, ro: ro, touch: touch, cat: cat });
 
     // nascimento — só Personagem, e sempre presente (não é um campo comum, não tem "remover")
-    if (e.type === "Personagem") card.appendChild(wbRenderBirth(e, touch, ro));
+    if (wbIsCharacterType(e.type)) card.appendChild(wbRenderBirth(e, touch, ro));
 
     // fields — short typed ones as a specimen label, long descriptive ones as roomy blocks
     var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && wbFieldMeta(e, k).vis === "mestre"); });

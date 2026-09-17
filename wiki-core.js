@@ -752,7 +752,7 @@
     // infobox's season-switcher, tabs sit right above the picture.
     var hasAliases = data.aliases && data.aliases.length;
     var hasChildren = data.children && data.children.length;
-    if (data.cover || shortFields.length || galGroups.length || hasAliases || hasChildren || data.featuredQuote || data.birth) {
+    if (data.cover || shortFields.length || galGroups.length || hasAliases || hasChildren || data.featuredQuote || data.birth || data.lunarBirth) {
       var info = el("div", { class: "infobox" });
       // Citação em destaque — cabeçalho pequeno em cima do retrato, estilo Fandom (ex: a
       // primeira frase de uma infobox de personagem). Só o texto, sem "por Fulano" — a página
@@ -790,9 +790,12 @@
         }
         info.appendChild(portraitSlot);
       }
-      if (hasAliases || shortFields.length || hasChildren || data.birth) {
+      if (hasAliases || shortFields.length || hasChildren || data.birth || data.lunarBirth) {
         var itable = el("table", { class: "infobox-facts" });
         if (data.birth) itable.appendChild(el("tr", {}, [el("th", { text: "Nascimento" }), el("td", { text: data.birth })]));
+        // Nascimento Lunar: só existe em quem tem um Lupino ligado (a forma humana de um
+        // licantropo) — espelha o Nascimento da entrada-lobo, nunca editado aqui diretamente.
+        if (data.lunarBirth) itable.appendChild(el("tr", {}, [el("th", { text: "Nascimento Lunar" }), el("td", { text: data.lunarBirth })]));
         if (hasAliases) {
           var aliasTd = el("td");
           data.aliases.forEach(function (a) {
@@ -1232,7 +1235,7 @@
       // Personagem do dia — se alguém publicado faz aniversário hoje, ganha prioridade (com
       // tag de aniversariante); senão sorteia entre os Personagens, excluindo quem está na
       // própria janela de aniversário (pra não parecer coincidência estranha perto da data).
-      var personagens = entries.filter(function (e) { return e.type === "Personagem"; });
+      var personagens = entries.filter(function (e) { return e.type === "Personagem" || e.type === "Lupino"; });
       var birthdayFolks = personagens.filter(function (e) { return e.birthdayMD === todayMD; });
       var isAniversariante = birthdayFolks.length > 0;
       var charPool = isAniversariante ? birthdayFolks : personagens.filter(function (e) { return !e.birthdayMD || !wbInBirthdayWindow(todayMD, e.birthdayMD); });
@@ -1243,8 +1246,8 @@
       entries.forEach(function (e) { (e.posts || []).forEach(function (p) { notePool.push({ id: p.id, title: p.title, date: p.date, entryId: e.id, entryTitle: e.title }); }); });
       var notePick = wbDailyPick(notePool, "nota");
 
-      // Entrada do dia — qualquer tipo menos Personagem (que já tem seu próprio destaque acima).
-      var entradaPool = entries.filter(function (e) { return e.type !== "Personagem"; });
+      // Entrada do dia — qualquer tipo menos Personagem/Lupino (que já têm seu próprio destaque acima).
+      var entradaPool = entries.filter(function (e) { return e.type !== "Personagem" && e.type !== "Lupino"; });
       var entradaPick = wbDailyPick(entradaPool, "entrada");
 
       // Ano em foco — sorteia entre os anos que têm ao menos um evento "principal", depois
