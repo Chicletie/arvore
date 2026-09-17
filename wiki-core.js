@@ -1243,6 +1243,16 @@
       var quotePool = [];
       entriesForDaily.forEach(function (e) { (e.citacoes || []).forEach(function (q) { quotePool.push(Object.assign({ speakerId: e.id, speakerTitle: e.title }, q)); }); });
       var quotePick = wbDailyPick(quotePool, "citacao");
+      
+      // >>> BUMP MANUAL: Força citação do Hermes por hoje <<<
+      if (todayGmt3 === "2026-09-17") {
+        quotePick = {
+          text: "'Não tenho escolha?' Esqueceu o que somos? Nós criamos escolhas",
+          speakerTitle: "Hermes",
+          speakerId: "hermes"
+        };
+      }
+
       var quoteWrap = el("div", { class: "spotlight-quote" });
       if (quotePick) {
         quoteWrap.appendChild(el("div", { class: "spotlight-quote-text", text: "“" + quotePick.text + "”" }));
@@ -1267,20 +1277,13 @@
       var isAniversariante = birthdayFolks.length > 0;
       var charPool = isAniversariante ? birthdayFolks : personagens.filter(function (e) { return !e.birthdayMD || !wbInBirthdayWindow(todayMD, e.birthdayMD); });
       var charPick = wbDailyPick(charPool, "personagem");
+      
       // Bump manual de lançamento (pedido do usuário, 2026-09-17): quase tudo foi publicado
       // hoje, então o sorteio normal ficou preso num pool pequeno demais. Prende o Personagem
-      // do dia no Alucard só nesse dia específico — auto-expira sozinho no próximo reset (a
-      // condição de data não bate mais), sem precisar lembrar de tirar depois.
+      // do dia no Alucard só nesse dia específico — auto-expira sozinho no próximo reset.
       if (todayGmt3 === "2026-09-17") {
         var bumpPick = entries.filter(function (e) { return e.id === "alucard-whitefang"; })[0];
         if (bumpPick) { charPick = bumpPick; isAniversariante = false; }
-        
-        // Força a citação do dia no Hermes especificamente para hoje:
-        quotePick = {
-          text: "'Não tenho escolha?' Esqueceu o que somos? Nós criamos escolhas",
-          speakerTitle: "Hermes",
-          speakerId: "hermes" 
-        };
       }
 
       // Entrada do dia — qualquer tipo menos Personagem/Lupino (que já têm seu próprio destaque acima).
