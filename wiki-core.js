@@ -1284,6 +1284,12 @@
       // Entrada do dia — qualquer tipo menos Personagem/Lupino (que já têm seu próprio destaque acima).
       var entradaPool = entriesForDaily.filter(function (e) { return e.type !== "Personagem" && e.type !== "Lupino"; });
       var entradaPick = wbDailyPick(entradaPool, "entrada");
+      // Mesmo bump manual de hoje (ver Personagem do dia acima) — Hades é a única entrada não-
+      // Personagem publicada e caiu no cooldown por ter sido publicada hoje. Auto-expira igual.
+      if (todayGmt3 === "2026-09-17") {
+        var bumpEntrada = entries.filter(function (e) { return e.id === "hades"; })[0];
+        if (bumpEntrada) entradaPick = bumpEntrada;
+      }
 
       // Ano em foco — sorteia entre os anos que têm ao menos um evento "principal", depois
       // lista TODOS os eventos principais daquele ano (de qualquer entrada).
