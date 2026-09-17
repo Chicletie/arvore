@@ -186,18 +186,19 @@
   function spoilerSpan(text) {
     return el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: text, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } });
   }
-  // Encaixa o link só no TRECHO do texto que corresponde ao nome da entrada ligada (ex: "dado
-  // por Mia Bloodyfur" → só "Mia Bloodyfur" vira link), nunca a frase toda — a anotação de uma
-  // alcunha é texto livre ("disfarce", "como agente de X", "dado por Y"...), então o link tem
-  // que respeitar qualquer contexto ao redor. Se o nome não aparece mais no texto (editado depois
-  // de linkar), mostra tudo como texto simples — nunca um link errado ou quebrado.
-  function appendAliasNote(container, text, linkName, href) {
-    var idx = (href && linkName) ? text.indexOf(linkName) : -1;
-    if (idx === -1) { container.appendChild(document.createTextNode(text)); return; }
-    if (idx > 0) container.appendChild(document.createTextNode(text.slice(0, idx)));
-    container.appendChild(el("a", { href: href, text: linkName }));
-    var restStart = idx + linkName.length;
-    if (restStart < text.length) container.appendChild(document.createTextNode(text.slice(restStart)));
+  // Anotação entre parênteses de uma alcunha, em até 3 pedaços (antes / trecho-com-link /
+  // depois — ex: "por [Mia Bloodyfur] na infância") — junta só os que tiverem texto, com um
+  // espaço entre eles (frase contínua), e só o pedaço do meio vira <a> (nunca a frase toda).
+  function appendAliasNote(container, note) {
+    var segs = [];
+    if (note.before) segs.push({ text: note.before });
+    if (note.link) segs.push({ text: note.link, href: note.linkWikiId ? wikiHref(note.linkWikiId) : null });
+    if (note.after) segs.push({ text: note.after });
+    segs.forEach(function (seg, i) {
+      if (i > 0) container.appendChild(document.createTextNode(" "));
+      if (seg.href) container.appendChild(el("a", { href: seg.href, text: seg.text }));
+      else container.appendChild(document.createTextNode(seg.text));
+    });
   }
   function chip(prefix, item) {
     if (item.vis === "spoiler") { var c = el("span", { class: "tag" }); c.appendChild(spoilerSpan(prefix + item.text)); return c; }
@@ -795,17 +796,20 @@
           var aliasTd = el("td");
           data.aliases.forEach(function (a) {
             var line = el("div", { class: "infobox-alias-line" });
-            var byStr = (a.by && a.by.text) ? " (" + a.by.text + ")" : "";
+            var note = a.note;
+            var noteFlat = note ? [note.before, note.link, note.after].filter(Boolean).join(" ") : "";
             if (a.vis === "spoiler") {
               // Spoiler esconde tudo atrás de um clique-pra-revelar só de texto — um link vivo
               // ali dentro não funcionaria direito (o clique alternaria o spoiler, não navegaria),
-              // então a anotação some junto do texto normal, sem link, igual o resto do spoiler.
-              line.appendChild(spoilerSpan(a.text + byStr));
+              // então tanto o link da alcunha quanto o da anotação somem, tudo vira texto normal,
+              // igual o resto do spoiler.
+              line.appendChild(spoilerSpan(a.text + (noteFlat ? " (" + noteFlat + ")" : "")));
             } else {
-              line.appendChild(document.createTextNode(a.text));
-              if (a.by && a.by.text) {
+              if (a.selfLink) line.appendChild(el("a", { href: wikiHref(a.selfLink), text: a.text }));
+              else line.appendChild(document.createTextNode(a.text));
+              if (noteFlat) {
                 line.appendChild(document.createTextNode(" ("));
-                appendAliasNote(line, a.by.text, a.by.name, a.by.wikiId ? wikiHref(a.by.wikiId) : null);
+                appendAliasNote(line, note);
                 line.appendChild(document.createTextNode(")"));
               }
             }

@@ -1392,14 +1392,44 @@
       if (!e.aliasVis || typeof e.aliasVis !== "object") e.aliasVis = {};
       // tagVis/aliasVis entries used to be a bare vis string; normalized here to always be
       // {vis, allow} so a restrito tag/alias has somewhere to keep its own allow-list.
-      // byText/byEntryId só têm sentido pra aliasVis (anotação entre parênteses, ex: "disfarce",
-      // "dado por Fulano"), mas ficam no mesmo shape pros dois mapas por simplicidade — tagVis
-      // nunca os lê nem os mostra.
+      // noteBefore/noteLink/noteLinkId/noteAfter/isLink/linkId só têm sentido pra aliasVis
+      // (anotação entre parênteses em 3 pedaços — "antes", "trecho linkável", "depois" — mais um
+      // link opcional na própria alcunha), mas ficam no mesmo shape pros dois mapas por
+      // simplicidade — tagVis nunca os lê nem os mostra.
       [e.tagVis, e.aliasVis].forEach(function (map) {
         Object.keys(map).forEach(function (k) {
           var cur = map[k];
-          if (cur && typeof cur === "object") { map[k] = { vis: wbMigrateVis(cur.vis, false), allow: Array.isArray(cur.allow) ? cur.allow : [], byText: typeof cur.byText === "string" ? cur.byText : "", byEntryId: typeof cur.byEntryId === "string" ? cur.byEntryId : null }; }
-          else { map[k] = { vis: wbMigrateVis(cur, false), allow: [], byText: "", byEntryId: null }; }
+          var obj = (cur && typeof cur === "object") ? cur : {};
+          var out = {
+            vis: wbMigrateVis(obj.vis !== undefined ? obj.vis : cur, false),
+            allow: Array.isArray(obj.allow) ? obj.allow : [],
+            noteBefore: typeof obj.noteBefore === "string" ? obj.noteBefore : "",
+            noteLink: typeof obj.noteLink === "string" ? obj.noteLink : "",
+            noteLinkId: typeof obj.noteLinkId === "string" ? obj.noteLinkId : null,
+            noteAfter: typeof obj.noteAfter === "string" ? obj.noteAfter : "",
+            isLink: !!obj.isLink,
+            linkId: typeof obj.linkId === "string" ? obj.linkId : null
+          };
+          // Migração do shape antigo (um texto único "byText" + link opcional "byEntryId") pro
+          // novo, de 3 campos — roda só uma vez, quando os campos novos ainda não existem. Tenta
+          // achar o nome da entrada ligada dentro do texto antigo pra separar em "antes"/"link"/
+          // "depois"; se não achar (ou nunca teve link), o texto inteiro vira "antes" — nunca
+          // perde texto, na pior hipótese só perde a divisão exata.
+          if (obj.noteBefore === undefined && typeof obj.byText === "string" && obj.byText.trim()) {
+            var oldText = obj.byText.trim();
+            var oldTarget = typeof obj.byEntryId === "string" ? cr.entries.filter(function (en) { return en.id === obj.byEntryId; })[0] : null;
+            var oldName = oldTarget ? oldTarget.title : null;
+            var idx = oldName ? oldText.indexOf(oldName) : -1;
+            if (idx !== -1) {
+              out.noteBefore = oldText.slice(0, idx).trim();
+              out.noteLink = oldName;
+              out.noteLinkId = obj.byEntryId;
+              out.noteAfter = oldText.slice(idx + oldName.length).trim();
+            } else {
+              out.noteBefore = oldText;
+            }
+          }
+          map[k] = out;
         });
       });
       if (typeof e.dispAlias !== "string") e.dispAlias = "";
@@ -1547,7 +1577,8 @@
       });
       Object.keys(e.aliasVis).forEach(function (k) {
         var v = e.aliasVis[k];
-        if (v.byEntryId && !entryIdSet[v.byEntryId]) v.byEntryId = null;
+        if (v.noteLinkId && !entryIdSet[v.noteLinkId]) v.noteLinkId = null;
+        if (v.linkId && !entryIdSet[v.linkId]) { v.linkId = null; v.isLink = false; }
       });
     });
     cr.franchises.forEach(function (fr) {
@@ -4386,43 +4417,64 @@
       ]), wbCtlRow("Wiki", wbVisSelect(v, function (nv) { entry.vis = nv; e[visKey][t] = entry; touch(true); }))];
       // Anotação entre parênteses — só faz sentido pra alcunhas, não pra tags. Fica depois do
       // texto da alcunha, na MESMA linha do infobox (não é uma alcunha nova nem entra na busca/
-      // dispAlias). Texto livre de propósito: nem toda alcunha tem um "dado por" (pode ser um
-      // disfarce, um cargo, uma forma assumida...), então não tem prefixo fixo — o usuário
-      // escreve a frase inteira como quiser ("disfarce", "dado por Mia Bloodyfur", "como agente
-      // da Paradise Gate"). Linkar uma entrada é opcional e só afeta ONDE dentro dessa frase um
-      // link aparece: a wiki procura o TÍTULO da entrada linkada dentro do texto e vira link só
-      // aquele trecho (nunca a frase toda) — se o texto for editado depois e o título não
-      // aparecer mais nele, mostra tudo como texto simples, nunca um link quebrado.
+      // dispAlias). Três campos, todos opcionais, sem prefixo fixo nenhum (nem toda alcunha tem
+      // um "dado por" — pode ser um disfarce, um cargo, uma forma assumida...): "antes" e
+      // "depois" são sempre texto simples; só o do meio pode virar link (ex: "por [Mia
+      // Bloodyfur] na infância" → só "Mia Bloodyfur" clicável). Junta os 3 com espaço só entre
+      // os que tiverem conteúdo, dando a ilusão de uma frase contínua; se nenhum tiver texto, a
+      // alcunha não ganha parênteses nenhum.
       if (arrKey === "aliases") {
+        var entryOpts = wbEntriesOf(e.universeId).filter(function (en) { return en.id !== e.id; }).map(function (en) { return { id: en.id, label: (en.title || "(sem título)") + " · " + en.type }; });
+
         chipMenuItems.push(el("div", { class: "wb-ctl-divider" }));
         chipMenuItems.push(el("div", { class: "wb-ctl-row", style: "flex-wrap:wrap" }, [el("span", { class: "wb-ctl-label", style: "width:100%", text: "Anotação (entre parênteses)" })]));
-        var byIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 4px;max-width:calc(100% - 18px)", placeholder: "ex: disfarce, dado por Fulano, como agente de…", value: entry.byText || "" });
-        byIn.addEventListener("change", function () { entry.byText = byIn.value.trim(); e[visKey][t] = entry; touch(true); });
-        chipMenuItems.push(byIn);
-        // Escolher uma entrada aqui não define o texto sozinho — só ajuda a escrevê-lo: se o
-        // campo tá vazio, preenche com o título dela (caso comum, "só o nome"); se já tem texto
-        // e o título ainda não aparece nele, acrescenta no final (deixa "como agente da " e
-        // escolhe a entrada → vira "como agente da Paradise Gate" sozinho).
-        var byCombo = wbCombo({
-          items: wbEntriesOf(e.universeId).filter(function (en) { return en.id !== e.id; }).map(function (en) { return { id: en.id, label: (en.title || "(sem título)") + " · " + en.type }; }),
-          value: entry.byEntryId || "", allowEmpty: true, emptyLabel: "(sem link)",
-          placeholder: "linkar um trecho a uma entrada (opcional)", wrapClass: "grow",
+
+        var beforeIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 2px;max-width:calc(100% - 18px)", placeholder: "texto antes, sem link (ex: disfarce, por, como)", value: entry.noteBefore || "" });
+        beforeIn.addEventListener("change", function () { entry.noteBefore = beforeIn.value.trim(); e[visKey][t] = entry; touch(true); });
+        chipMenuItems.push(beforeIn);
+
+        var linkIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 2px;max-width:calc(100% - 18px)", placeholder: "trecho com link (opcional)", value: entry.noteLink || "" });
+        linkIn.addEventListener("change", function () { entry.noteLink = linkIn.value.trim(); e[visKey][t] = entry; touch(true); });
+        chipMenuItems.push(linkIn);
+
+        // Escolher uma entrada aqui não sobrescreve texto já digitado — só preenche o campo do
+        // meio sozinho quando ele ainda tá vazio (caso comum: só o nome).
+        var linkCombo = wbCombo({
+          items: entryOpts, value: entry.noteLinkId || "", allowEmpty: true, emptyLabel: "(sem link)",
+          placeholder: "linkar esse trecho a uma entrada", wrapClass: "grow",
           onChange: function (id) {
-            entry.byEntryId = id || null;
-            if (id) {
-              var target = wbEntry(id);
-              if (target) {
-                var title = wbDisplayName(target), cur = (entry.byText || "").trim();
-                if (!cur) entry.byText = title;
-                else if (cur.indexOf(title) === -1) entry.byText = cur + " " + title;
-                byIn.value = entry.byText;
-              }
-            }
+            entry.noteLinkId = id || null;
+            if (id && !(entry.noteLink || "").trim()) { var target = wbEntry(id); if (target) { entry.noteLink = wbDisplayName(target); linkIn.value = entry.noteLink; } }
             e[visKey][t] = entry; touch(true);
           }
         });
-        byCombo.style.margin = "0 9px 4px";
-        chipMenuItems.push(byCombo);
+        linkCombo.style.margin = "0 9px 2px";
+        chipMenuItems.push(linkCombo);
+
+        var afterIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 4px;max-width:calc(100% - 18px)", placeholder: "texto depois, sem link (opcional)", value: entry.noteAfter || "" });
+        afterIn.addEventListener("change", function () { entry.noteAfter = afterIn.value.trim(); e[visKey][t] = entry; touch(true); });
+        chipMenuItems.push(afterIn);
+
+        chipMenuItems.push(el("div", { class: "wb-ctl-divider" }));
+
+        // Link na própria alcunha — independente da anotação entre parênteses, pode ter os dois
+        // ao mesmo tempo (ex: "Valkirr dos Vampiros" linkada, MAIS "(dado por Mia Bloodyfur)").
+        var selfCombo = wbCombo({
+          items: entryOpts, value: entry.linkId || "", allowEmpty: true, emptyLabel: "(escolher entrada)",
+          placeholder: "linkar a alcunha a uma entrada", wrapClass: "grow",
+          onChange: function (id) { entry.linkId = id || null; e[visKey][t] = entry; touch(true); }
+        });
+        selfCombo.style.margin = "2px 9px 4px";
+        selfCombo.style.display = entry.isLink ? "" : "none";
+        var linkChk = el("input", { type: "checkbox" });
+        linkChk.checked = !!entry.isLink;
+        linkChk.addEventListener("change", function () {
+          entry.isLink = linkChk.checked;
+          selfCombo.style.display = entry.isLink ? "" : "none";
+          e[visKey][t] = entry; touch(true);
+        });
+        chipMenuItems.push(el("label", { class: "wb-ctl-row", style: "cursor:pointer" }, [linkChk, el("span", { class: "wb-ctl-label", text: "🔗 esta alcunha é um hyperlink" })]));
+        chipMenuItems.push(selfCombo);
       }
       chipMenuItems.push(el("div", { class: "wb-ctl-divider" }));
       chipMenuItems.push(wbCtlItem("✕ Remover", function () { e[arrKey] = e[arrKey].filter(function (x) { return x !== t; }); delete e[visKey][t]; touch(true); }, true));
@@ -4599,18 +4651,27 @@
     var m = (fm.confidentialVariants || []).filter(function (cv) { return (cv.text || "").trim() && (cv.allow || []).indexOf(email) !== -1; })[0];
     return m ? m.text : null;
   }
-  // Anotação entre parênteses de uma alcunha (ex: "disfarce", "dado por Mia Bloodyfur", "como
-  // agente da Paradise Gate") — texto livre, sem estrutura fixa, já que nem toda alcunha tem um
-  // "dado por" (pode ser um disfarce, um cargo, uma forma assumida...). Se uma entrada foi
-  // linkada, devolve também o NOME dela (`name`) pra quem renderiza saber qual TRECHO do texto
-  // virar link (só o nome, não a frase toda) — mesma regra de nunca apontar pra uma página morta
-  // que o resto da wiki já segue: só linka se a entrada ligada estiver publicada, não-secreta, e
-  // respeitando o isolamento do universo Lótus.
-  function wbAliasBy(e, v) {
-    if (!v || !(v.byText || "").trim()) return null;
-    var target = v.byEntryId ? wbEntry(v.byEntryId) : null;
-    var linked = target && target.wikiId && !target.secret && !(e.universeId === "lotus" && target.universeId !== "lotus");
-    return { text: v.byText.trim(), wikiId: linked ? target.wikiId : null, name: linked ? wbDisplayName(target) : null };
+  // Regra compartilhada de "nunca aponta pra página morta" (publicada, não-secreta, respeita o
+  // isolamento do universo Lótus) — usada tanto pelo link do meio da anotação quanto pelo link
+  // da própria alcunha.
+  function wbAliasLinkTarget(e, entryId) {
+    var target = entryId ? wbEntry(entryId) : null;
+    var ok = target && target.wikiId && !target.secret && !(e.universeId === "lotus" && target.universeId !== "lotus");
+    return ok ? target.wikiId : null;
+  }
+  // Anotação entre parênteses de uma alcunha, em 3 pedaços (ex: "por [Mia Bloodyfur] na
+  // infância" → antes="por", link="Mia Bloodyfur", depois="na infância") — texto livre, sem
+  // prefixo fixo nenhum, já que nem toda alcunha tem um "dado por" (pode ser um disfarce, um
+  // cargo, uma forma assumida...). Só o pedaço do meio pode virar link; os outros dois são
+  // sempre texto simples. Devolve null se os 3 pedaços estiverem vazios (sem anotação nenhuma).
+  function wbAliasNote(e, v) {
+    if (!v || (!v.noteBefore && !v.noteLink && !v.noteAfter)) return null;
+    return { before: v.noteBefore || "", link: v.noteLink || "", linkWikiId: wbAliasLinkTarget(e, v.noteLinkId), after: v.noteAfter || "" };
+  }
+  // Link na própria alcunha (ex: "Valkirr dos Vampiros" inteira aponta pra entrada que explica o
+  // título) — independente da anotação entre parênteses, as duas coisas podem coexistir.
+  function wbAliasSelfLink(e, v) {
+    return (v && v.isLink) ? wbAliasLinkTarget(e, v.linkId) : null;
   }
   // asEmail (optional) simulates what ONE SPECIFIC invited player would see instead of the real
   // public snapshot: publico/spoiler content shows as usual, PLUS anything restrito that
@@ -4699,7 +4760,7 @@
       type: e.type || "",
       universe: f ? f.name : "",
       universeId: e.universeId,
-      aliases: (e.aliases || []).filter(function (a) { return okVis((e.aliasVis[a] || {}).vis || "publico", (e.aliasVis[a] || {}).allow); }).map(function (a) { return { text: a, vis: outVis((e.aliasVis[a] || {}).vis || "publico"), by: wbAliasBy(e, e.aliasVis[a]) }; }),
+      aliases: (e.aliases || []).filter(function (a) { return okVis((e.aliasVis[a] || {}).vis || "publico", (e.aliasVis[a] || {}).allow); }).map(function (a) { return { text: a, vis: outVis((e.aliasVis[a] || {}).vis || "publico"), note: wbAliasNote(e, e.aliasVis[a]), selfLink: wbAliasSelfLink(e, e.aliasVis[a]) }; }),
       tags: (e.tags || []).filter(function (t) { return okVis((e.tagVis[t] || {}).vis || "publico", (e.tagVis[t] || {}).allow); }).map(function (t) { return { text: t, vis: outVis((e.tagVis[t] || {}).vis || "publico") }; }),
       summary: e.summary || "",
       body: e.body || "",
@@ -4825,7 +4886,7 @@
       title: e.title || "(sem título)",
       type: e.type || "",
       universe: f ? f.name : "",
-      aliases: (e.aliases || []).map(function (a) { return { text: a, vis: "publico", by: wbAliasBy(e, e.aliasVis[a]) }; }),
+      aliases: (e.aliases || []).map(function (a) { return { text: a, vis: "publico", note: wbAliasNote(e, e.aliasVis[a]), selfLink: wbAliasSelfLink(e, e.aliasVis[a]) }; }),
       tags: (e.tags || []).map(function (t) { return { text: t, vis: "publico" }; }),
       summary: e.summary || "",
       body: e.body || "",
@@ -4933,8 +4994,8 @@
     (e.aliases || []).forEach(function (a) {
       var v = e.aliasVis[a] || {};
       if (v.vis === "restrito") {
-        var by = wbAliasBy(e, v);
-        items.push({ id: "alias-" + wbSlugify(a), kind: "alias", text: a + (by ? " (" + by.text + ")" : ""), permitidos: v.allow || [] });
+        var noteFlat = [v.noteBefore, v.noteLink, v.noteAfter].filter(Boolean).join(" ");
+        items.push({ id: "alias-" + wbSlugify(a), kind: "alias", text: a + (noteFlat ? " (" + noteFlat + ")" : ""), permitidos: v.allow || [] });
       }
     });
     (e.gallery || []).forEach(function (g) {
