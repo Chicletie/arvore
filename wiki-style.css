@@ -46,7 +46,10 @@ body.pg-theme h1, body.pg-theme .home-title, body.pg-theme .topbar a { letter-sp
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); line-height: 1.6; padding: 28px 16px 60px; }
 .page { max-width: 800px; margin: 0 auto; }
-.card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 28px; box-shadow: var(--shadow); }
+/* flow-root: contém a infobox flutuante na própria altura do card — sem isso, um card com
+   pouco conteúdo (comum agora no início da wiki) fica mais baixo que a infobox, e o fundo/
+   borda do card corta no meio dela em vez de acompanhar até onde ela realmente termina. */
+.card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius); padding: 26px 28px; box-shadow: var(--shadow); display: flow-root; }
 .eyebrow { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display: flex; gap: 6px; flex-wrap: wrap; }
 .crumb { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
 .crumb a { color: var(--gold-ink); text-decoration: none; }
