@@ -66,6 +66,7 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .infobox { float: none; width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin: 0 0 18px; overflow: hidden; }
 @media (min-width: 620px) { .infobox { float: right; width: 250px; margin: 0 0 16px 22px; } }
 .infobox .cover { width: 100%; display: block; max-height: 280px; object-fit: cover; }
+.infobox-quote { padding: 10px 14px; font-family: var(--font-wb); font-style: italic; font-size: 12.5px; line-height: 1.45; text-align: center; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
 .infobox-portrait { position: relative; }
 .infobox-tabs { display: flex; }
 .infobox-tab { flex: 1; border: 0; background: var(--surface-2); color: var(--muted); font-family: var(--font-body); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 4px; cursor: pointer; border-bottom: 2px solid transparent; }

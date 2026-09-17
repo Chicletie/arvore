@@ -738,8 +738,14 @@
     // infobox's season-switcher, tabs sit right above the picture.
     var hasAliases = data.aliases && data.aliases.length;
     var hasChildren = data.children && data.children.length;
-    if (data.cover || shortFields.length || galGroups.length || hasAliases || hasChildren) {
+    if (data.cover || shortFields.length || galGroups.length || hasAliases || hasChildren || data.featuredQuote) {
       var info = el("div", { class: "infobox" });
+      // Citação em destaque — cabeçalho pequeno em cima do retrato, estilo Fandom (ex: a
+      // primeira frase de uma infobox de personagem). Só o texto, sem "por Fulano" — a página
+      // inteira já deixa claro de quem é a citação.
+      if (data.featuredQuote) {
+        info.appendChild(el("div", { class: "infobox-quote", text: "“" + data.featuredQuote.text + "”" }));
+      }
       var portraitOptions = [];
       if (data.cover) portraitOptions.push({ label: "Capa", url: data.cover, vis: data.coverVis || "publico", focus: data.coverFocus });
       galGroups.forEach(function (grp) {

@@ -1373,6 +1373,8 @@
         });
       });
       if (typeof e.dispAlias !== "string") e.dispAlias = "";
+      if (e.featuredQuoteId !== undefined && typeof e.featuredQuoteId !== "string") e.featuredQuoteId = null;
+      if (e.featuredQuoteId === undefined) e.featuredQuoteId = null;
       if (!Array.isArray(e.history)) e.history = [];
       // Variantes por obra/campanha ("abas" tipo Luzes / PG: Genesis): cada uma é um pacote
       // paralelo de resumo+corpo+campos+seções, só que ligado a UMA obra específica — tudo
@@ -1489,6 +1491,11 @@
       if (typeof q.group !== "string") q.group = "";
       if (WB_VIS.indexOf(q.vis) === -1) q.vis = "publico";
       if (!Array.isArray(q.allow)) q.allow = [];
+    });
+    // Citação em destaque órfã (a citação escolhida foi apagada, ou deixou de ter esta entrada
+    // como falante) some sozinha em vez de apontar pra um id morto.
+    cr.entries.forEach(function (e) {
+      if (e.featuredQuoteId && !cr.quotes.some(function (q) { return q.id === e.featuredQuoteId && q.speakerId === e.id; })) e.featuredQuoteId = null;
     });
     cr.franchises.forEach(function (fr) {
       delete fr.rpg;
@@ -4335,6 +4342,10 @@
       var cxLinked = cx && cx.wikiId && !cx.secret;
       return { id: q.id, text: q.text, group: q.group || "", note: q.note || "", vis: outVis(q.vis), contextTitle: cxLinked ? wbDisplayName(cx) : "", contextId: cxLinked ? cx.wikiId : null };
     });
+    // Citação em destaque — pega do array já resolvido/filtrado acima; se a citação escolhida
+    // não estiver visível pra este leitor (ex: é restrita e ele não está na lista), simplesmente
+    // não aparece, sem placeholder nenhum — não faz sentido um "spoiler" logo no topo da página.
+    var featuredQuote = e.featuredQuoteId ? (citacoes.filter(function (q) { return q.id === e.featuredQuoteId; })[0] || null) : null;
     var ancestors = wbWikiAncestors(e);
     var children = wbWikiChildren(e);
     var variants = (e.variants || []).map(function (variant) {
@@ -4368,6 +4379,7 @@
       gallery: gallery,
       events: events,
       citacoes: citacoes,
+      featuredQuote: featuredQuote,
       ancestors: ancestors,
       children: children,
       variants: variants,
@@ -4457,6 +4469,7 @@
       var cx = q.contextId && wbEntry(q.contextId);
       return { id: q.id, text: q.text, group: q.group || "", note: q.note || "", vis: "publico", contextTitle: cx ? wbDisplayName(cx) : "", contextId: cx && cx.wikiId ? cx.wikiId : null };
     });
+    var featuredQuote = e.featuredQuoteId ? (citacoes.filter(function (q) { return q.id === e.featuredQuoteId; })[0] || null) : null;
     // Prévia do dono: mostra a cadeia INTEIRA de ancestrais e TODOS os filhos, publicados ou
     // não (mesma filosofia do resto desta função — nada é filtrado aqui, é só pra quem já está
     // vendo tudo por dentro). targetId fica null quando o ancestral/filho ainda não tem wikiId.
@@ -4492,6 +4505,7 @@
       gallery: gallery,
       events: events,
       citacoes: citacoes,
+      featuredQuote: featuredQuote,
       ancestors: ancestors,
       children: children,
       variants: variants,
@@ -5214,6 +5228,25 @@
     }
     paintCover();
     card.appendChild(coverWrap);
+
+    // Citação em destaque — escolhida entre as citações onde ESTA entrada é a falante (ver
+    // criacao.quotes); vira um cabeçalho pequeno em cima do retrato na infobox da wiki, estilo
+    // Fandom. Só aparece o seletor se já existir ao menos uma citação pra escolher.
+    if (!ro) {
+      var myQuotes = C().quotes.filter(function (q) { return q.speakerId === e.id; });
+      if (myQuotes.length) {
+        var quoteRow = el("div", { class: "hint", style: "margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap" });
+        quoteRow.appendChild(el("span", { text: "🗨 citação em destaque:" }));
+        quoteRow.appendChild(wbCombo({
+          items: myQuotes.map(function (q) { return { id: q.id, label: "“" + (q.text.length > 60 ? q.text.slice(0, 60) + "…" : q.text) + "”" }; }),
+          value: e.featuredQuoteId || "",
+          allowEmpty: true, emptyLabel: "(nenhuma)",
+          wrapClass: "grow",
+          onChange: function (id) { e.featuredQuoteId = id || null; touch(true); }
+        }));
+        card.appendChild(quoteRow);
+      }
+    }
 
     var crumb = wbBreadcrumb(e);
     if (crumb.length > 1) {
