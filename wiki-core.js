@@ -782,8 +782,21 @@
           var aliasTd = el("td");
           data.aliases.forEach(function (a) {
             var line = el("div", { class: "infobox-alias-line" });
-            if (a.vis === "spoiler") line.appendChild(spoilerSpan(a.text));
-            else line.appendChild(document.createTextNode(a.text));
+            var byStr = (a.by && a.by.text) ? " (dado por " + a.by.text + ")" : "";
+            if (a.vis === "spoiler") {
+              // Spoiler esconde tudo atrás de um clique-pra-revelar só de texto — um link vivo
+              // ali dentro não funcionaria direito (o clique alternaria o spoiler, não navegaria),
+              // então a atribuição some junto do texto normal, sem link, igual o resto do spoiler.
+              line.appendChild(spoilerSpan(a.text + byStr));
+            } else {
+              line.appendChild(document.createTextNode(a.text));
+              if (a.by && a.by.text) {
+                line.appendChild(document.createTextNode(" (dado por "));
+                if (a.by.wikiId) line.appendChild(el("a", { href: wikiHref(a.by.wikiId), text: a.by.text }));
+                else line.appendChild(document.createTextNode(a.by.text));
+                line.appendChild(document.createTextNode(")"));
+              }
+            }
             aliasTd.appendChild(line);
           });
           itable.appendChild(el("tr", {}, [el("th", { text: "Também conhecido(a) como" }), aliasTd]));
@@ -798,6 +811,10 @@
           var td = el("td", { "data-field-swap": f.key });
           if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
           else mdInline(td, f.value);
+          // f.master só existe na prévia do dono (wbBuildFullSnapshot) — a publicação de verdade
+          // (wbBuildWikiSnapshot) nunca preenche esse campo, então isto nunca aparece pra ninguém
+          // além do próprio autor olhando "ver como wiki".
+          if (f.master) td.appendChild(el("div", { class: "wb-master-note", text: "🎭 " + f.master }));
           itable.appendChild(el("tr", {}, [el("th", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }), td]));
         });
         // Contém — o reverso do breadcrumb do topo (ex: uma província lista suas cidades),
@@ -846,6 +863,7 @@
         var fbody = anchorPrefix === "geral-" ? el("div", { "data-field-swap": f.key }) : el("div");
         if (f.vis === "spoiler") fbody.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
         else fbody.appendChild(renderMarkdown(f.value));
+        if (f.master) fbody.appendChild(el("div", { class: "wb-master-note", text: "🎭 " + f.master }));
         article.appendChild(fbody);
       });
       // <details> em vez de div — dá pro leitor recolher uma seção que não interessa (o autor já
@@ -941,6 +959,7 @@
           var td = el("td", { "data-field-swap": "tax:" + f.key });
           if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
           else mdInline(td, f.value);
+          if (f.master) td.appendChild(el("div", { class: "wb-master-note", text: "🎭 " + f.master }));
           table.appendChild(el("tr", {}, [el("th", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }), td]));
         });
         wrap.appendChild(table);
@@ -950,6 +969,7 @@
         var fbody = el("div", { "data-field-swap": "tax:" + f.key });
         if (f.vis === "spoiler") fbody.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
         else fbody.appendChild(renderMarkdown(f.value));
+        if (f.master) fbody.appendChild(el("div", { class: "wb-master-note", text: "🎭 " + f.master }));
         wrap.appendChild(fbody);
       });
       return wrap;

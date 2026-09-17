@@ -1368,11 +1368,13 @@
       if (!e.aliasVis || typeof e.aliasVis !== "object") e.aliasVis = {};
       // tagVis/aliasVis entries used to be a bare vis string; normalized here to always be
       // {vis, allow} so a restrito tag/alias has somewhere to keep its own allow-list.
+      // byText/byEntryId só têm sentido pra aliasVis (quem deu aquele apelido), mas ficam no
+      // mesmo shape pros dois mapas por simplicidade — tagVis nunca os lê nem os mostra.
       [e.tagVis, e.aliasVis].forEach(function (map) {
         Object.keys(map).forEach(function (k) {
           var cur = map[k];
-          if (cur && typeof cur === "object") { map[k] = { vis: wbMigrateVis(cur.vis, false), allow: Array.isArray(cur.allow) ? cur.allow : [] }; }
-          else { map[k] = { vis: wbMigrateVis(cur, false), allow: [] }; }
+          if (cur && typeof cur === "object") { map[k] = { vis: wbMigrateVis(cur.vis, false), allow: Array.isArray(cur.allow) ? cur.allow : [], byText: typeof cur.byText === "string" ? cur.byText : "", byEntryId: typeof cur.byEntryId === "string" ? cur.byEntryId : null }; }
+          else { map[k] = { vis: wbMigrateVis(cur, false), allow: [], byText: "", byEntryId: null }; }
         });
       });
       if (typeof e.dispAlias !== "string") e.dispAlias = "";
@@ -1517,6 +1519,10 @@
       e.events.forEach(function (ev) {
         if (ev.locationEntryId && !entryIdSet[ev.locationEntryId]) ev.locationEntryId = null;
         ev.involvedIds = ev.involvedIds.filter(function (id) { return entryIdSet[id]; });
+      });
+      Object.keys(e.aliasVis).forEach(function (k) {
+        var v = e.aliasVis[k];
+        if (v.byEntryId && !entryIdSet[v.byEntryId]) v.byEntryId = null;
       });
     });
     cr.franchises.forEach(function (fr) {
@@ -3297,6 +3303,11 @@
         el("button", { class: "chip", type: "button", "aria-pressed": "true", onclick: function () { wbGo({ typeFilter: null }); } }, [el("span", { text: (typeIcon(w.typeFilter) || "") + " " + w.typeFilter + "  ✕" })])
       ]));
     }
+    var pubBar = el("div", { class: "lens-bar", style: "margin-bottom:12px" }, [
+      el("button", { class: "chip sm", type: "button", "aria-pressed": w.hidePublished ? "true" : "false", onclick: function () { wbGo({ hidePublished: !w.hidePublished }); } }, [el("span", { text: "🚫 ocultar publicadas" })]),
+      el("button", { class: "chip sm", type: "button", "aria-pressed": w.hideUnpublished ? "true" : "false", onclick: function () { wbGo({ hideUnpublished: !w.hideUnpublished }); } }, [el("span", { text: "🚫 ocultar não-publicadas" })])
+    ]);
+    v.appendChild(pubBar);
     var listHost = el("div");
     v.appendChild(listHost);
 
@@ -3304,6 +3315,8 @@
       var q = (w.wbQuery || "").toLowerCase();
       if (w.typeFilter && e.type !== w.typeFilter) return false;
       if (w.entStatusHide[e.status]) return false;
+      if (w.hidePublished && e.wikiId) return false;
+      if (w.hideUnpublished && !e.wikiId) return false;
       if (!q) return true;
       return (e.title + " " + (e.aliases || []).join(" ") + " " + e.summary + " " + e.body + " " + e.tags.join(" ")).toLowerCase().indexOf(q) !== -1;
     }
@@ -3976,7 +3989,20 @@
     if (!m || typeof m !== "object") return { type: guessFieldType(k), opts: [], vis: "publico", allow: [], _guessed: true };
     if (!Array.isArray(m.opts)) m.opts = [];
     if (!Array.isArray(m.allow)) m.allow = [];
-    if (m.confidential !== undefined && !Array.isArray(m.confidentialAllow)) m.confidentialAllow = [];
+    // Campo confidencial: era um único texto+allow por campo, virou uma LISTA de versões (cada
+    // uma com seu próprio texto e sua própria lista de permitidos) + uma nota de mestre separada
+    // (nunca publicada). Migra o shape antigo pra uma versão única na nova lista, uma vez.
+    if (m.confidential !== undefined) {
+      if (!Array.isArray(m.confidentialVariants)) m.confidentialVariants = [{ id: uid(), text: m.confidential, allow: Array.isArray(m.confidentialAllow) ? m.confidentialAllow : [] }];
+      delete m.confidential; delete m.confidentialAllow;
+    }
+    if (Array.isArray(m.confidentialVariants)) {
+      m.confidentialVariants.forEach(function (cv) {
+        if (cv.id == null) cv.id = uid();
+        if (typeof cv.text !== "string") cv.text = "";
+        if (!Array.isArray(cv.allow)) cv.allow = [];
+      });
+    }
     if (!m.type) m.type = "texto";
     return m;
   }
@@ -4043,35 +4069,61 @@
     e.fieldMeta[name] = { type: guessFieldType(name), opts: [], vis: guessFieldVis(name), allow: [] };
     touch(true);
   }
-  // Versão confidencial de um campo público/spoiler: TROCA o valor mostrado (na wiki) por um
-  // texto próprio pra quem estiver na lista de permitidos, em vez de esconder o campo inteiro
-  // (isso já existia via vis="restrito", que é tudo-ou-nada). Pensado pro caso "Personalidade
-  // pública" vs. "Personalidade que quem tem acesso especial vê" — o campo continua público
-  // pra todo mundo, só que quem tem a chave vê uma versão diferente, não uma versão A MAIS.
-  // Reaproveita o mesmo padrão de wbAllowEditor; não faz sentido pra vis restrito/mestre (que
-  // já controlam o campo inteiro) nem em modo leitura (o próprio dono sempre vê os dois).
+  // Versões privadas de um campo público/spoiler: em vez de esconder o campo inteiro (isso já
+  // existe via vis="restrito"/"mestre", que é tudo-ou-nada), o campo continua público pra todo
+  // mundo mas ganha camadas por cima — uma nota de mestre (nunca sai do app, nem por unlock nem
+  // por "ver como jogador X") e/ou 0..N versões confidenciais, cada uma com seu próprio texto e
+  // sua própria lista de permitidos. Dois jogadores na mesma lista compartilham a mesma versão;
+  // jogadores em listas diferentes veem versões diferentes; quem não está em nenhuma vê o valor
+  // público normal. Sem nenhuma versão criada, só existe o público (ou o oculto do mestre).
+  function wbConfTextarea(longField, placeholder, getVal, setVal) {
+    var ta = el("textarea", { class: longField ? "wb-lfield-input" : "field", placeholder: placeholder, style: longField ? "" : "width:100%;min-height:60px" });
+    ta.value = getVal() || "";
+    bindGrow(ta);
+    var deb;
+    ta.addEventListener("input", function () { clearTimeout(deb); deb = setTimeout(function () { setVal(ta.value); }, 500); });
+    ta.addEventListener("blur", function () { clearTimeout(deb); if (getVal() !== ta.value) setVal(ta.value); });
+    return ta;
+  }
   function wbConfidentialEditor(e, k, touch, longField) {
     var fm = wbFieldMeta(e, k);
-    if (fm.confidential === undefined) {
-      // wbFieldMeta pode devolver um objeto "adivinhado" (campo antigo sem fieldMeta próprio
-      // ainda), que se perde no próximo render se só mexer nele direto — por isso o primeiro
-      // toque usa wbFieldMetaWrite (igual o botão de tipo/vis já faz), garantindo que o campo
-      // ganhe um fieldMeta de verdade, persistido, antes de escrever confidential/allow nele.
-      return el("button", { class: "field-ghost", type: "button", style: "font-size:11px;margin-top:6px", text: "🔐+ versão confidencial pra quem tem acesso", onclick: function () { var m = wbFieldMetaWrite(e, k); m.confidential = ""; m.confidentialAllow = []; touch(true); } });
+    var wrap = el("div", { class: "wb-confidential-group" });
+
+    if (fm.master === undefined) {
+      wrap.appendChild(el("button", { class: "field-ghost", type: "button", style: "font-size:11px;margin-top:6px", text: "🎭+ nota do mestre (nunca é publicada)", onclick: function () { var m = wbFieldMetaWrite(e, k); m.master = ""; touch(true); } }));
+    } else {
+      var mWrap = el("div", { class: "wb-sec wb-sec-restrito", style: "margin-top:8px" });
+      var mHead = el("div", { class: "wb-sec-head" });
+      mHead.appendChild(el("span", { class: "wb-lfield-lab", text: "🎭 nota do mestre (só você vê, nunca publicada)" }));
+      mHead.appendChild(el("button", { type: "button", title: "Remover nota do mestre", text: "✕", onclick: function () { delete fm.master; touch(true); } }));
+      mWrap.appendChild(mHead);
+      mWrap.appendChild(wbConfTextarea(longField, "Anotação privada sobre este campo, só pra você…",
+        function () { return fm.master; },
+        function (v) { fm.master = v; save(); flashSaved(); }));
+      wrap.appendChild(mWrap);
     }
-    var wrap = el("div", { class: "wb-sec wb-sec-restrito", style: "margin-top:8px" });
-    var head = el("div", { class: "wb-sec-head" });
-    head.appendChild(el("span", { class: "wb-lfield-lab", text: "🔐 versão confidencial (substitui esta pra quem tiver acesso)" }));
-    head.appendChild(el("button", { type: "button", title: "Remover versão confidencial", text: "✕", onclick: function () { delete fm.confidential; delete fm.confidentialAllow; touch(true); } }));
-    wrap.appendChild(head);
-    wrap.appendChild(wbAllowEditor(fm.confidentialAllow, touch));
-    var ta = el("textarea", { class: longField ? "wb-lfield-input" : "field", placeholder: "Texto que substitui o campo público pra quem estiver na lista acima…", style: longField ? "" : "width:100%;min-height:60px" });
-    ta.value = fm.confidential || "";
-    bindGrow(ta);
-    var confDeb;
-    ta.addEventListener("input", function () { clearTimeout(confDeb); confDeb = setTimeout(function () { fm.confidential = ta.value; save(); flashSaved(); }, 500); });
-    ta.addEventListener("blur", function () { clearTimeout(confDeb); if (fm.confidential !== ta.value) { fm.confidential = ta.value; save(); flashSaved(); } });
-    wrap.appendChild(ta);
+
+    (fm.confidentialVariants || []).forEach(function (variant) {
+      var multi = fm.confidentialVariants.length > 1;
+      var vWrap = el("div", { class: "wb-sec wb-sec-restrito", style: "margin-top:8px" });
+      var vHead = el("div", { class: "wb-sec-head" });
+      vHead.appendChild(el("span", { class: "wb-lfield-lab", text: "🔐 versão confidencial" + (multi ? " · " + (fm.confidentialVariants.indexOf(variant) + 1) : "") + " (substitui esta pra quem tiver acesso)" }));
+      vHead.appendChild(el("button", { type: "button", title: "Remover esta versão", text: "✕", onclick: function () { fm.confidentialVariants = fm.confidentialVariants.filter(function (x) { return x !== variant; }); touch(true); } }));
+      vWrap.appendChild(vHead);
+      vWrap.appendChild(wbAllowEditor(variant.allow, touch));
+      vWrap.appendChild(wbConfTextarea(longField, "Texto que substitui o campo público pra quem estiver na lista acima…",
+        function () { return variant.text; },
+        function (v) { variant.text = v; save(); flashSaved(); }));
+      wrap.appendChild(vWrap);
+    });
+    wrap.appendChild(el("button", { class: "field-ghost", type: "button", style: "font-size:11px;margin-top:6px", text: "🔐+ versão confidencial pra quem tem acesso", onclick: function () {
+      // Primeiro toque (campo ainda "adivinhado") precisa de wbFieldMetaWrite pra não perder a
+      // escrita num objeto descartável — mesmo cuidado de sempre, mesmo já tendo variantes.
+      var m = wbFieldMetaWrite(e, k);
+      if (!Array.isArray(m.confidentialVariants)) m.confidentialVariants = [];
+      m.confidentialVariants.push({ id: uid(), text: "", allow: [] });
+      touch(true);
+    } }));
     return wrap;
   }
   function wbRenderLongField(e, k, opts) {
@@ -4242,6 +4294,23 @@
       chip.appendChild(el("button", { type: "button", class: "ntag-del", "aria-label": "remover", text: "✕", onclick: function () { e[arrKey] = e[arrKey].filter(function (x) { return x !== t; }); delete e[visKey][t]; touch(true); } }));
       wrap.appendChild(chip);
       if (v === "restrito") { if (!Array.isArray(entry.allow)) entry.allow = []; wrap.appendChild(wbAllowEditor(entry.allow, touch)); }
+      // "Quem deu esse apelido" — só faz sentido pra alcunhas, não pra tags. Fica entre
+      // parênteses no infobox, depois do texto da alcunha, na MESMA linha (não é uma alcunha
+      // nova nem entra na busca/dispAlias). Link é opcional: se a entrada ligada não estiver
+      // publicada, a wiki simplesmente mostra o nome sem link, nunca aponta pra uma página morta.
+      if (arrKey === "aliases") {
+        var byRow = el("div", { class: "hint", style: "width:100%;margin:2px 0 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap" });
+        var byIn = el("input", { class: "field", style: "max-width:180px", placeholder: "quem deu esse apelido…", value: entry.byText || "" });
+        byIn.addEventListener("change", function () { entry.byText = byIn.value.trim(); e[visKey][t] = entry; touch(true); });
+        byRow.appendChild(byIn);
+        byRow.appendChild(wbCombo({
+          items: wbEntriesOf(e.universeId).filter(function (en) { return en.id !== e.id; }).map(function (en) { return { id: en.id, label: (en.title || "(sem título)") + " · " + en.type }; }),
+          value: entry.byEntryId || "", allowEmpty: true, emptyLabel: "(sem link)",
+          placeholder: "linkar a uma entrada (opcional)", wrapClass: "grow",
+          onChange: function (id) { entry.byEntryId = id || null; e[visKey][t] = entry; touch(true); }
+        }));
+        wrap.appendChild(byRow);
+      }
     });
     return wrap;
   }
@@ -4397,6 +4466,23 @@
     if (type === "bool" || type === "cabecalho") return val || "";
     return (val || "").trim() ? val : "**[TBA]**";
   }
+  // Qual versão confidencial (se alguma) este email específico deveria ver — usado só pela
+  // simulação "ver como jogador X" (nunca publicado assim; a wiki de verdade usa o mecanismo de
+  // unlock via wikiRestrito, que já filtra por regra do Firestore, sem precisar disto).
+  function wbConfVariantForEmail(fm, email) {
+    var m = (fm.confidentialVariants || []).filter(function (cv) { return (cv.text || "").trim() && (cv.allow || []).indexOf(email) !== -1; })[0];
+    return m ? m.text : null;
+  }
+  // "Quem deu esse apelido" — resolve pro texto + (se der) o wikiId do link, com a mesma regra
+  // de nunca apontar pra uma página morta que o resto da wiki já segue (wbWikiAncestors):
+  // a entrada ligada só vira link se estiver publicada, não-secreta, e respeitando o isolamento
+  // do universo Lótus.
+  function wbAliasBy(e, v) {
+    if (!v || !(v.byText || "").trim()) return null;
+    var target = v.byEntryId ? wbEntry(v.byEntryId) : null;
+    var linked = target && target.wikiId && !target.secret && !(e.universeId === "lotus" && target.universeId !== "lotus");
+    return { text: v.byText.trim(), wikiId: linked ? target.wikiId : null };
+  }
   // asEmail (optional) simulates what ONE SPECIFIC invited player would see instead of the real
   // public snapshot: publico/spoiler content shows as usual, PLUS anything restrito that
   // player's email is on the allow-list for — shown inline (downgraded to "publico" in the
@@ -4415,7 +4501,7 @@
       // confidencial trocada, já que essa troca de verdade acontece via mountRestrito/Firestore
       // (fora deste snapshot) e essa prévia não passa por ali — sem isso, simular um jogador
       // que TEM acesso à versão confidencial mostraria a versão pública errada pra ele.
-      if (asEmail && (fm.confidential || "").trim() && (fm.confidentialAllow || []).indexOf(asEmail) !== -1) val = fm.confidential;
+      if (asEmail) { var confVal = wbConfVariantForEmail(fm, asEmail); if (confVal !== null) val = confVal; }
       fields.push({ key: k, type: fm.type, value: wbFieldValForWiki(fm.type, val), vis: outVis(fm.vis), opts: fm.opts || [] });
     });
     // Taxonomia (só Criatura, opt-in) — mesma filtragem por vis dos campos normais, já que
@@ -4431,7 +4517,7 @@
         var fm = wbFieldMeta(e.taxonomy, k);
         if (!okVis(fm.vis, fm.allow)) return;
         var val = e.taxonomy.fields[k] || "";
-        if (asEmail && (fm.confidential || "").trim() && (fm.confidentialAllow || []).indexOf(asEmail) !== -1) val = fm.confidential;
+        if (asEmail) { var taxConfVal = wbConfVariantForEmail(fm, asEmail); if (taxConfVal !== null) val = taxConfVal; }
         taxonomy.push({ key: k, type: fm.type, value: wbFieldValForWiki(fm.type, val), vis: outVis(fm.vis), opts: fm.opts || [] });
       });
     }
@@ -4484,7 +4570,7 @@
       type: e.type || "",
       universe: f ? f.name : "",
       universeId: e.universeId,
-      aliases: (e.aliases || []).filter(function (a) { return okVis((e.aliasVis[a] || {}).vis || "publico", (e.aliasVis[a] || {}).allow); }).map(function (a) { return { text: a, vis: outVis((e.aliasVis[a] || {}).vis || "publico") }; }),
+      aliases: (e.aliases || []).filter(function (a) { return okVis((e.aliasVis[a] || {}).vis || "publico", (e.aliasVis[a] || {}).allow); }).map(function (a) { return { text: a, vis: outVis((e.aliasVis[a] || {}).vis || "publico"), by: wbAliasBy(e, e.aliasVis[a]) }; }),
       tags: (e.tags || []).filter(function (t) { return okVis((e.tagVis[t] || {}).vis || "publico", (e.tagVis[t] || {}).allow); }).map(function (t) { return { text: t, vis: outVis((e.tagVis[t] || {}).vis || "publico") }; }),
       summary: e.summary || "",
       body: e.body || "",
@@ -4574,11 +4660,11 @@
     var f = flowerById(e.universeId);
     var fields = Object.keys(e.fields || {}).map(function (k) {
       var fm = wbFieldMeta(e, k);
-      return { key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.fields[k] || ""), vis: "publico", opts: fm.opts || [] };
+      return { key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.fields[k] || ""), vis: "publico", opts: fm.opts || [], master: fm.master || null };
     });
     var taxonomy = (e.taxonomy && e.type === "Criatura") ? Object.keys(e.taxonomy.fields || {}).map(function (k) {
       var fm = wbFieldMeta(e.taxonomy, k);
-      return { key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.taxonomy.fields[k] || ""), vis: "publico", opts: fm.opts || [] };
+      return { key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.taxonomy.fields[k] || ""), vis: "publico", opts: fm.opts || [], master: fm.master || null };
     }) : [];
     var sections = (e.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
     var posts = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).map(function (p) { return { id: p.id, title: p.title || "", date: p.date || "", body: p.body || "", vis: "publico" }; });
@@ -4610,7 +4696,7 @@
       title: e.title || "(sem título)",
       type: e.type || "",
       universe: f ? f.name : "",
-      aliases: (e.aliases || []).map(function (a) { return { text: a, vis: "publico" }; }),
+      aliases: (e.aliases || []).map(function (a) { return { text: a, vis: "publico", by: wbAliasBy(e, e.aliasVis[a]) }; }),
       tags: (e.tags || []).map(function (t) { return { text: t, vis: "publico" }; }),
       summary: e.summary || "",
       body: e.body || "",
@@ -4679,8 +4765,12 @@
       // Versão confidencial: TROCA o campo já público/spoiler no lugar dele pra quem estiver
       // na lista, em vez de escondê-lo (ver "campo-confidencial" em wiki-core.js/mountRestrito).
       // Só publica se tiver texto e pelo menos um permitido — sem isso não há nada pra trocar.
-      if ((fm.vis === "publico" || fm.vis === "spoiler") && (fm.confidential || "").trim() && (fm.confidentialAllow || []).length) {
-        items.push({ id: "campo-confidencial-" + wbSlugify(k), kind: "campo-confidencial", key: k, value: fm.confidential, permitidos: fm.confidentialAllow });
+      if (fm.vis === "publico" || fm.vis === "spoiler") {
+        (fm.confidentialVariants || []).forEach(function (cv, i) {
+          if ((cv.text || "").trim() && (cv.allow || []).length) {
+            items.push({ id: "campo-confidencial-" + wbSlugify(k) + "-" + i, kind: "campo-confidencial", key: k, value: cv.text, permitidos: cv.allow });
+          }
+        });
       }
     });
     // Taxonomia (só Criatura) — mesmo tratamento restrito/confidencial dos campos normais, só
@@ -4692,8 +4782,12 @@
       Object.keys(e.taxonomy.fields || {}).forEach(function (k) {
         var fm = wbFieldMeta(e.taxonomy, k);
         if (fm.vis === "restrito") items.push({ id: "campo-tax-" + wbSlugify(k), kind: "campo", key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.taxonomy.fields[k] || ""), opts: fm.opts || [], permitidos: fm.allow || [] });
-        if ((fm.vis === "publico" || fm.vis === "spoiler") && (fm.confidential || "").trim() && (fm.confidentialAllow || []).length) {
-          items.push({ id: "campo-tax-confidencial-" + wbSlugify(k), kind: "campo-confidencial", key: "tax:" + k, value: fm.confidential, permitidos: fm.confidentialAllow });
+        if (fm.vis === "publico" || fm.vis === "spoiler") {
+          (fm.confidentialVariants || []).forEach(function (cv, i) {
+            if ((cv.text || "").trim() && (cv.allow || []).length) {
+              items.push({ id: "campo-tax-confidencial-" + wbSlugify(k) + "-" + i, kind: "campo-confidencial", key: "tax:" + k, value: cv.text, permitidos: cv.allow });
+            }
+          });
         }
       });
     }
@@ -4709,7 +4803,10 @@
     });
     (e.aliases || []).forEach(function (a) {
       var v = e.aliasVis[a] || {};
-      if (v.vis === "restrito") items.push({ id: "alias-" + wbSlugify(a), kind: "alias", text: a, permitidos: v.allow || [] });
+      if (v.vis === "restrito") {
+        var by = wbAliasBy(e, v);
+        items.push({ id: "alias-" + wbSlugify(a), kind: "alias", text: a + (by ? " (dado por " + by.text + ")" : ""), permitidos: v.allow || [] });
+      }
     });
     (e.gallery || []).forEach(function (g) {
       if (g.vis === "restrito" && g.url) items.push({ id: "galeria-" + g.id, kind: "galeria", group: g.group || "", url: g.url, caption: g.caption || "", permitidos: g.allow || [] });
