@@ -4216,6 +4216,15 @@
   // never leaves your account at all). "spoiler" is kept but flagged so wiki.html renders it
   // behind a reveal — same rules as "modo leitor".
   function wbWikiVisible(v) { return v === "publico" || v === "spoiler"; }
+  // Regra: todo campo (curto ou "nota", da entrada, de uma variante de obra ou da taxonomia)
+  // que EXISTE mas está vazio publica como "**[TBA]**" em vez de sumir em branco — só campos
+  // ausentes (nunca criados) continuam simplesmente não aparecendo. "bool" fica de fora de
+  // propósito: lá, vazio já É um valor de verdade ("não"), não "ainda não preenchido" — aplicar
+  // a regra ali trocaria um "não" real por um "[TBA]" errado.
+  function wbFieldValForWiki(type, val) {
+    if (type === "bool") return val || "";
+    return (val || "").trim() ? val : "**[TBA]**";
+  }
   // asEmail (optional) simulates what ONE SPECIFIC invited player would see instead of the real
   // public snapshot: publico/spoiler content shows as usual, PLUS anything restrito that
   // player's email is on the allow-list for — shown inline (downgraded to "publico" in the
@@ -4235,7 +4244,7 @@
       // (fora deste snapshot) e essa prévia não passa por ali — sem isso, simular um jogador
       // que TEM acesso à versão confidencial mostraria a versão pública errada pra ele.
       if (asEmail && (fm.confidential || "").trim() && (fm.confidentialAllow || []).indexOf(asEmail) !== -1) val = fm.confidential;
-      fields.push({ key: k, type: fm.type, value: val, vis: outVis(fm.vis), opts: fm.opts || [] });
+      fields.push({ key: k, type: fm.type, value: wbFieldValForWiki(fm.type, val), vis: outVis(fm.vis), opts: fm.opts || [] });
     });
     // Taxonomia (só Criatura, opt-in) — mesma filtragem por vis dos campos normais, já que
     // reaproveita o mesmíssimo wbFieldMeta/fieldMeta por baixo (ver o editor em wbEntryView).
@@ -4251,7 +4260,7 @@
         if (!okVis(fm.vis, fm.allow)) return;
         var val = e.taxonomy.fields[k] || "";
         if (asEmail && (fm.confidential || "").trim() && (fm.confidentialAllow || []).indexOf(asEmail) !== -1) val = fm.confidential;
-        taxonomy.push({ key: k, type: fm.type, value: val, vis: outVis(fm.vis), opts: fm.opts || [] });
+        taxonomy.push({ key: k, type: fm.type, value: wbFieldValForWiki(fm.type, val), vis: outVis(fm.vis), opts: fm.opts || [] });
       });
     }
     var sections = (e.sections || []).filter(function (s) { return okVis(s.vis, s.allow); }).map(function (s) {
@@ -4287,7 +4296,7 @@
       Object.keys(variant.fields || {}).forEach(function (k) {
         var fm = variant.fieldMeta[k] || { type: "texto", vis: "publico", opts: [] };
         if (!okVis(fm.vis, fm.allow)) return;
-        vfields.push({ key: k, type: fm.type, value: variant.fields[k] || "", vis: outVis(fm.vis), opts: fm.opts || [] });
+        vfields.push({ key: k, type: fm.type, value: wbFieldValForWiki(fm.type, variant.fields[k] || ""), vis: outVis(fm.vis), opts: fm.opts || [] });
       });
       var vsections = (variant.sections || []).filter(function (s) { return okVis(s.vis, s.allow); }).map(function (s) {
         return { title: s.title || "", body: s.body || "", vis: outVis(s.vis) };
@@ -4388,11 +4397,11 @@
     var f = flowerById(e.universeId);
     var fields = Object.keys(e.fields || {}).map(function (k) {
       var fm = wbFieldMeta(e, k);
-      return { key: k, type: fm.type, value: e.fields[k] || "", vis: "publico", opts: fm.opts || [] };
+      return { key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.fields[k] || ""), vis: "publico", opts: fm.opts || [] };
     });
     var taxonomy = (e.taxonomy && e.type === "Criatura") ? Object.keys(e.taxonomy.fields || {}).map(function (k) {
       var fm = wbFieldMeta(e.taxonomy, k);
-      return { key: k, type: fm.type, value: e.taxonomy.fields[k] || "", vis: "publico", opts: fm.opts || [] };
+      return { key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.taxonomy.fields[k] || ""), vis: "publico", opts: fm.opts || [] };
     }) : [];
     var sections = (e.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
     var posts = (e.posts || []).slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); }).map(function (p) { return { id: p.id, title: p.title || "", date: p.date || "", body: p.body || "", vis: "publico" }; });
@@ -4414,7 +4423,7 @@
     var variants = (e.variants || []).map(function (variant) {
       var vfields = Object.keys(variant.fields || {}).map(function (k) {
         var fm = variant.fieldMeta[k] || { type: "texto", opts: [] };
-        return { key: k, type: fm.type, value: variant.fields[k] || "", vis: "publico", opts: fm.opts || [] };
+        return { key: k, type: fm.type, value: wbFieldValForWiki(fm.type, variant.fields[k] || ""), vis: "publico", opts: fm.opts || [] };
       });
       var vsections = (variant.sections || []).map(function (s) { return { title: s.title || "", body: s.body || "", vis: "publico" }; });
       return { label: variant.label, summary: variant.summary || "", body: variant.body || "", fields: vfields, sections: vsections };
@@ -4487,7 +4496,7 @@
     var items = [];
     Object.keys(e.fields || {}).forEach(function (k) {
       var fm = wbFieldMeta(e, k);
-      if (fm.vis === "restrito") items.push({ id: "campo-" + wbSlugify(k), kind: "campo", key: k, type: fm.type, value: e.fields[k] || "", opts: fm.opts || [], permitidos: fm.allow || [] });
+      if (fm.vis === "restrito") items.push({ id: "campo-" + wbSlugify(k), kind: "campo", key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.fields[k] || ""), opts: fm.opts || [], permitidos: fm.allow || [] });
       // Versão confidencial: TROCA o campo já público/spoiler no lugar dele pra quem estiver
       // na lista, em vez de escondê-lo (ver "campo-confidencial" em wiki-core.js/mountRestrito).
       // Só publica se tiver texto e pelo menos um permitido — sem isso não há nada pra trocar.
@@ -4495,6 +4504,20 @@
         items.push({ id: "campo-confidencial-" + wbSlugify(k), kind: "campo-confidencial", key: k, value: fm.confidential, permitidos: fm.confidentialAllow });
       }
     });
+    // Taxonomia (só Criatura) — mesmo tratamento restrito/confidencial dos campos normais, só
+    // que faltava até agora (achado nesta mesma varredura): sem isso, um campo de taxonomia
+    // marcado restrito simplesmente sumia pra sempre, nem publicado nem desbloqueável por
+    // ninguém. "tax:" no key da versão confidencial evita colidir com um campo de mesmo nome
+    // na aba Geral (ver data-field-swap em wiki-core.js).
+    if (e.taxonomy && e.type === "Criatura") {
+      Object.keys(e.taxonomy.fields || {}).forEach(function (k) {
+        var fm = wbFieldMeta(e.taxonomy, k);
+        if (fm.vis === "restrito") items.push({ id: "campo-tax-" + wbSlugify(k), kind: "campo", key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.taxonomy.fields[k] || ""), opts: fm.opts || [], permitidos: fm.allow || [] });
+        if ((fm.vis === "publico" || fm.vis === "spoiler") && (fm.confidential || "").trim() && (fm.confidentialAllow || []).length) {
+          items.push({ id: "campo-tax-confidencial-" + wbSlugify(k), kind: "campo-confidencial", key: "tax:" + k, value: fm.confidential, permitidos: fm.confidentialAllow });
+        }
+      });
+    }
     (e.sections || []).forEach(function (s) {
       if (s.vis === "restrito") items.push({ id: "secao-" + s.id, kind: "secao", title: s.title || "", body: s.body || "", permitidos: s.allow || [] });
     });
@@ -4516,7 +4539,7 @@
     (e.variants || []).forEach(function (variant) {
       Object.keys(variant.fields || {}).forEach(function (k) {
         var fm = variant.fieldMeta[k] || {};
-        if (fm.vis === "restrito") items.push({ id: "campo-" + variant.id + "-" + wbSlugify(k), kind: "campo", key: k, type: fm.type, value: variant.fields[k] || "", opts: fm.opts || [], variant: variant.label, permitidos: fm.allow || [] });
+        if (fm.vis === "restrito") items.push({ id: "campo-" + variant.id + "-" + wbSlugify(k), kind: "campo", key: k, type: fm.type, value: wbFieldValForWiki(fm.type, variant.fields[k] || ""), opts: fm.opts || [], variant: variant.label, permitidos: fm.allow || [] });
       });
       (variant.sections || []).forEach(function (s) {
         if (s.vis === "restrito") items.push({ id: "secao-" + variant.id + "-" + s.id, kind: "secao", title: s.title || "", body: s.body || "", variant: variant.label, permitidos: s.allow || [] });

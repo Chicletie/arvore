@@ -916,10 +916,13 @@
       var wrap = el("div", { class: "article" });
       var taxShort = (data.taxonomy || []).filter(function (f) { return f.type !== "nota"; });
       var taxLong = (data.taxonomy || []).filter(function (f) { return f.type === "nota"; });
+      // data-field-swap leva um prefixo "tax:" pra nunca colidir com um campo de MESMO NOME na
+      // aba Geral (ex: as duas podem ter uma "História") — sem isso, a troca confidencial de um
+      // campo de taxonomia poderia acabar acertando o campo errado.
       if (taxShort.length) {
         var table = el("table", { class: "infobox-facts" });
         taxShort.forEach(function (f) {
-          var td = el("td");
+          var td = el("td", { "data-field-swap": "tax:" + f.key });
           if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
           else mdInline(td, f.value);
           table.appendChild(el("tr", {}, [el("th", { text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }), td]));
@@ -928,8 +931,10 @@
       }
       taxLong.forEach(function (f) {
         wrap.appendChild(el("div", { class: "cathead", text: f.key + (f.vis === "spoiler" ? " 🙈" : "") }));
-        if (f.vis === "spoiler") wrap.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
-        else wrap.appendChild(renderMarkdown(f.value));
+        var fbody = el("div", { "data-field-swap": "tax:" + f.key });
+        if (f.vis === "spoiler") fbody.appendChild(spoilerCover(function () { return renderMarkdown(f.value); }));
+        else fbody.appendChild(renderMarkdown(f.value));
+        wrap.appendChild(fbody);
       });
       return wrap;
     }
