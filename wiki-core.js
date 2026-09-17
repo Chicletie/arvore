@@ -1274,12 +1274,14 @@
       if (todayGmt3 === "2026-09-17") {
         var bumpPick = entries.filter(function (e) { return e.id === "alucard-whitefang"; })[0];
         if (bumpPick) { charPick = bumpPick; isAniversariante = false; }
+        
+        // Força a citação do dia no Hermes especificamente para hoje:
+        quotePick = {
+          text: "'Não tenho escolha?' Esqueceu o que somos? Nós criamos escolhas",
+          speakerTitle: "Hermes",
+          speakerId: "hermes" 
+        };
       }
-
-      // Nota do dia
-      var notePool = [];
-      entriesForDaily.forEach(function (e) { (e.posts || []).forEach(function (p) { notePool.push({ id: p.id, title: p.title, date: p.date, entryId: e.id, entryTitle: e.title }); }); });
-      var notePick = wbDailyPick(notePool, "nota");
 
       // Entrada do dia — qualquer tipo menos Personagem/Lupino (que já têm seu próprio destaque acima).
       var entradaPool = entriesForDaily.filter(function (e) { return e.type !== "Personagem" && e.type !== "Lupino"; });
