@@ -1267,6 +1267,14 @@
       var isAniversariante = birthdayFolks.length > 0;
       var charPool = isAniversariante ? birthdayFolks : personagens.filter(function (e) { return !e.birthdayMD || !wbInBirthdayWindow(todayMD, e.birthdayMD); });
       var charPick = wbDailyPick(charPool, "personagem");
+      // Bump manual de lançamento (pedido do usuário, 2026-09-17): quase tudo foi publicado
+      // hoje, então o sorteio normal ficou preso num pool pequeno demais. Prende o Personagem
+      // do dia no Alucard só nesse dia específico — auto-expira sozinho no próximo reset (a
+      // condição de data não bate mais), sem precisar lembrar de tirar depois.
+      if (todayGmt3 === "2026-09-17") {
+        var bumpPick = entries.filter(function (e) { return e.id === "alucard-whitefang"; })[0];
+        if (bumpPick) { charPick = bumpPick; isAniversariante = false; }
+      }
 
       // Nota do dia
       var notePool = [];
