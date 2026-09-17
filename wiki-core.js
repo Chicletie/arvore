@@ -1257,7 +1257,22 @@
       if (yearPick != null) {
         yearWrap.appendChild(el("a", { class: "spotlight-year-num", href: wikiHref("_timeline") + "?ano=" + yearPick, text: String(yearPick) }));
         var yList = el("div", { class: "spotlight-year-list" });
-        yearEvents[yearPick].sort(function (a, b) { return wbEventSortKey(a) - wbEventSortKey(b); }).forEach(function (ev) {
+        // Um evento propagado (ex: nasceu num personagem, replicado como principal num local
+        // envolvido) não pode contar duas vezes na pool nem aparecer duas vezes na lista — as
+        // cópias de uma mesma família contam como UM slot só, e quando esse slot "ganha" o
+        // sorteio do ano, sorteia de novo (mesmo esquema determinístico do dia) qual das cópias
+        // principais é a exibida.
+        var famGroups = {}, famOrder = [];
+        yearEvents[yearPick].forEach(function (ev) {
+          var fam = ev.familyId || ev.id;
+          if (!famGroups[fam]) { famGroups[fam] = []; famOrder.push(fam); }
+          famGroups[fam].push(ev);
+        });
+        var dedupedYear = famOrder.map(function (fam) {
+          var grp = famGroups[fam];
+          return grp.length > 1 ? wbDailyPick(grp, "evtfam:" + fam) : grp[0];
+        });
+        dedupedYear.sort(function (a, b) { return wbEventSortKey(a) - wbEventSortKey(b); }).forEach(function (ev) {
           yList.appendChild(el("a", { class: "timeline-event major", href: wikiHref(ev.entryId) }, [
             el("span", { class: "ev-date", text: wbFmtEventDate(ev) }),
             el("span", { class: "ev-text", text: ev.label })
