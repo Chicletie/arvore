@@ -471,6 +471,9 @@
   .ntag-vis { background: none; border: 0; color: inherit; padding: 3px 7px; cursor: pointer; font-family: inherit; font-size: inherit; }
   .ntag-del { background: none; border: 0; border-left: 1px solid var(--border); color: var(--faint); padding: 3px 6px; cursor: pointer; font-size: inherit; }
   .ntag-del:hover { color: var(--neg); }
+  .ntag-lab { padding: 3px 4px 3px 9px; align-self: center; }
+  .ntag-chip .wb-ctl-menu { margin-left: 0; border-left: 1px solid var(--border); align-self: stretch; display: flex; align-items: center; }
+  .ntag-chip .wb-ctl-menu > summary { width: 20px; height: 100%; border-radius: 0; color: var(--faint); font-size: 11px; }
 
   .entry { padding: 14px 0; border-bottom: 1px solid var(--border); }
   .entry:last-child { border-bottom: none; }
@@ -4361,27 +4364,32 @@
         return;
       }
       var chip = el("span", { class: "ntag-chip" + (v !== "publico" ? " ntag-" + v : ""), style: tagColor ? "border-color:" + tagColor : null });
-      chip.appendChild(el("button", { type: "button", class: "ntag-vis", style: tagColor ? "color:" + tagColor : null, title: "Wiki: " + visInfo(v).label + " (toque p/ mudar)", text: (v !== "publico" ? visInfo(v).glyph + " " : "") + prefix + t, onclick: function () { entry.vis = nextVis(v); e[visKey][t] = entry; touch(true); } }));
-      chip.appendChild(el("button", { type: "button", class: "ntag-del", "aria-label": "remover", text: "✕", onclick: function () { e[arrKey] = e[arrKey].filter(function (x) { return x !== t; }); delete e[visKey][t]; touch(true); } }));
-      wrap.appendChild(chip);
-      if (v === "restrito") { if (!Array.isArray(entry.allow)) entry.allow = []; wrap.appendChild(wbAllowEditor(entry.allow, touch)); }
+      chip.appendChild(el("span", { class: "ntag-lab", style: tagColor ? "color:" + tagColor : null, text: (v !== "publico" ? visInfo(v).glyph + " " : "") + prefix + t }));
+      var chipMenuItems = [wbCtlRow("Wiki", wbVisSelect(v, function (nv) { entry.vis = nv; e[visKey][t] = entry; touch(true); }))];
       // "Quem deu esse apelido" — só faz sentido pra alcunhas, não pra tags. Fica entre
       // parênteses no infobox, depois do texto da alcunha, na MESMA linha (não é uma alcunha
       // nova nem entra na busca/dispAlias). Link é opcional: se a entrada ligada não estiver
       // publicada, a wiki simplesmente mostra o nome sem link, nunca aponta pra uma página morta.
       if (arrKey === "aliases") {
-        var byRow = el("div", { class: "hint", style: "width:100%;margin:2px 0 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap" });
-        var byIn = el("input", { class: "field", style: "max-width:180px", placeholder: "quem deu esse apelido…", value: entry.byText || "" });
+        chipMenuItems.push(el("div", { class: "wb-ctl-divider" }));
+        chipMenuItems.push(el("div", { class: "wb-ctl-row", style: "flex-wrap:wrap" }, [el("span", { class: "wb-ctl-label", style: "width:100%", text: "Quem deu esse apelido" })]));
+        var byIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 4px;max-width:calc(100% - 18px)", placeholder: "nome…", value: entry.byText || "" });
         byIn.addEventListener("change", function () { entry.byText = byIn.value.trim(); e[visKey][t] = entry; touch(true); });
-        byRow.appendChild(byIn);
-        byRow.appendChild(wbCombo({
+        chipMenuItems.push(byIn);
+        var byCombo = wbCombo({
           items: wbEntriesOf(e.universeId).filter(function (en) { return en.id !== e.id; }).map(function (en) { return { id: en.id, label: (en.title || "(sem título)") + " · " + en.type }; }),
           value: entry.byEntryId || "", allowEmpty: true, emptyLabel: "(sem link)",
           placeholder: "linkar a uma entrada (opcional)", wrapClass: "grow",
           onChange: function (id) { entry.byEntryId = id || null; e[visKey][t] = entry; touch(true); }
-        }));
-        wrap.appendChild(byRow);
+        });
+        byCombo.style.margin = "0 9px 4px";
+        chipMenuItems.push(byCombo);
       }
+      chipMenuItems.push(el("div", { class: "wb-ctl-divider" }));
+      chipMenuItems.push(wbCtlItem("✕ Remover", function () { e[arrKey] = e[arrKey].filter(function (x) { return x !== t; }); delete e[visKey][t]; touch(true); }, true));
+      chip.appendChild(wbCtlMenu(chipMenuItems));
+      wrap.appendChild(chip);
+      if (v === "restrito") { if (!Array.isArray(entry.allow)) entry.allow = []; wrap.appendChild(wbAllowEditor(entry.allow, touch)); }
     });
     return wrap;
   }
@@ -5533,7 +5541,7 @@
             el("button", { class: "btn ghost sm", type: "button", text: "trocar capa", onclick: function () { pickImage(function (url) { e.cover = url; e.coverFocus = { x: 50, y: 50 }; touch(true); }); } }),
             el("button", { class: "btn ghost sm", type: "button", text: "remover", onclick: function () { e.cover = ""; touch(true); } }),
             el("button", { class: "btn ghost sm", type: "button", text: "🎯 foco", title: "Ajustar qual parte da imagem fica visível quando cortada", onclick: function () { wbFocusPicker(e.cover, e.coverFocus, function (f) { e.coverFocus = f; touch(true); }); } }),
-            el("button", { class: "btn ghost sm", type: "button", text: "Wiki: " + visInfo(e.coverVis).label + " (toque p/ mudar)", title: "Wiki: " + visInfo(e.coverVis).label + " (toque p/ mudar)", onclick: function () { e.coverVis = nextVis(e.coverVis); touch(true); } })
+            (function () { var s = wbVisSelect(e.coverVis, function (nv) { e.coverVis = nv; touch(true); }); s.className = "field"; s.style.width = "auto"; return s; })()
           ]));
           if (e.coverVis === "restrito") coverWrap.appendChild(wbAllowEditor(e.coverAllow, touch));
         }
@@ -5817,13 +5825,18 @@
           if (g.caption) fig.appendChild(el("figcaption", { text: g.caption }));
           if (!ro) {
             fig.appendChild(el("div", { class: "wb-gal-ctl" }, [
-              el("button", { type: "button", title: "Mover pra cima", text: "▲", onclick: function () { wbMoveGalleryItem(e, g, -1); touch(true); } }),
-              el("button", { type: "button", title: "Mover pra baixo", text: "▼", onclick: function () { wbMoveGalleryItem(e, g, 1); touch(true); } }),
-              el("button", { type: "button", title: "Legenda", text: "✎", onclick: function () { var c = window.prompt("Legenda:", g.caption || ""); if (c != null) { g.caption = c.trim(); touch(true); } } }),
-              el("button", { type: "button", title: "Mudar grupo (ex: Primeira Temporada), deixe em branco pra 'Geral'", text: "📁", onclick: function () { var gr = window.prompt("Grupo (deixe em branco pra 'Geral'):", g.group || ""); if (gr != null) { g.group = gr.trim(); touch(true); } } }),
               el("button", { type: "button", title: "Ajustar foco do corte", text: "🎯", onclick: function () { wbFocusPicker(g.url, g.focus, function (f) { g.focus = f; touch(true); }); } }),
-              el("button", { type: "button", title: "Wiki: " + visInfo(g.vis).label + " (toque p/ mudar)", text: visInfo(g.vis).glyph, onclick: function () { g.vis = nextVis(g.vis); touch(true); } }),
-              el("button", { type: "button", title: "Remover", text: "✕", onclick: function () { e.gallery = e.gallery.filter(function (x) { return x.id !== g.id; }); touch(true); } })
+              wbCtlMenu([
+                el("div", { class: "wb-ctl-move" }, [
+                  el("button", { type: "button", text: "▲ acima", onclick: function () { wbMoveGalleryItem(e, g, -1); touch(true); } }),
+                  el("button", { type: "button", text: "▼ abaixo", onclick: function () { wbMoveGalleryItem(e, g, 1); touch(true); } })
+                ]),
+                wbCtlItem("✎ Legenda…", function () { var c = window.prompt("Legenda:", g.caption || ""); if (c != null) { g.caption = c.trim(); touch(true); } }),
+                wbCtlItem("📁 Mudar grupo…", function () { var gr = window.prompt("Grupo (deixe em branco pra 'Geral'):", g.group || ""); if (gr != null) { g.group = gr.trim(); touch(true); } }),
+                wbCtlRow("Wiki", wbVisSelect(g.vis, function (nv) { g.vis = nv; touch(true); })),
+                el("div", { class: "wb-ctl-divider" }),
+                wbCtlItem("✕ Remover", function () { e.gallery = e.gallery.filter(function (x) { return x.id !== g.id; }); touch(true); }, true)
+              ])
             ]));
             if (g.vis === "restrito") fig.appendChild(wbAllowEditor(g.allow, touch));
           }
