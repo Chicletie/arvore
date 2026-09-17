@@ -4162,13 +4162,13 @@
         wrap.appendChild(rd);
       }
     } else {
-      var ta = el("textarea", { class: "wb-lfield-input", placeholder: "Escrever…" });
-      ta.value = e.fields[k] || "";
-      bindGrow(ta);
-      var deb;
-      ta.addEventListener("input", function () { clearTimeout(deb); deb = setTimeout(function () { e.fields[k] = ta.value; e.updated = todayKey(); save(); flashSaved(); }, 500); });
-      ta.addEventListener("blur", function () { clearTimeout(deb); if (e.fields[k] !== ta.value) { e.fields[k] = ta.value; e.updated = todayKey(); save(); flashSaved(); } });
-      wrap.appendChild(ta);
+      // Mesmo editor rico (toolbar WYSIWYG) que a descrição, seções e posts já usam — antes era
+      // um textarea puro sem toolbar nenhuma, a única entrada de texto longo do app sem o editor.
+      wrap.appendChild(mdBox(
+        function () { return e.fields[k]; },
+        function (v) { e.fields[k] = v; touch(false); },
+        e.universeId, { placeholder: "Escrever…", minHeight: "20vh" }
+      ));
     }
     return wrap;
   }
