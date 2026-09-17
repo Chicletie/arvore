@@ -1392,8 +1392,9 @@
       if (!e.aliasVis || typeof e.aliasVis !== "object") e.aliasVis = {};
       // tagVis/aliasVis entries used to be a bare vis string; normalized here to always be
       // {vis, allow} so a restrito tag/alias has somewhere to keep its own allow-list.
-      // byText/byEntryId só têm sentido pra aliasVis (quem deu aquele apelido), mas ficam no
-      // mesmo shape pros dois mapas por simplicidade — tagVis nunca os lê nem os mostra.
+      // byText/byEntryId só têm sentido pra aliasVis (anotação entre parênteses, ex: "disfarce",
+      // "dado por Fulano"), mas ficam no mesmo shape pros dois mapas por simplicidade — tagVis
+      // nunca os lê nem os mostra.
       [e.tagVis, e.aliasVis].forEach(function (map) {
         Object.keys(map).forEach(function (k) {
           var cur = map[k];
@@ -4383,27 +4384,40 @@
           var arr = e[arrKey]; var tmp = arr[idx + 1]; arr[idx + 1] = arr[idx]; arr[idx] = tmp; touch(true);
         } })
       ]), wbCtlRow("Wiki", wbVisSelect(v, function (nv) { entry.vis = nv; e[visKey][t] = entry; touch(true); }))];
-      // "Quem deu esse apelido" — só faz sentido pra alcunhas, não pra tags. Fica entre
-      // parênteses no infobox, depois do texto da alcunha, na MESMA linha (não é uma alcunha
-      // nova nem entra na busca/dispAlias). Link é opcional: se a entrada ligada não estiver
-      // publicada, a wiki simplesmente mostra o nome sem link, nunca aponta pra uma página morta.
+      // Anotação entre parênteses — só faz sentido pra alcunhas, não pra tags. Fica depois do
+      // texto da alcunha, na MESMA linha do infobox (não é uma alcunha nova nem entra na busca/
+      // dispAlias). Texto livre de propósito: nem toda alcunha tem um "dado por" (pode ser um
+      // disfarce, um cargo, uma forma assumida...), então não tem prefixo fixo — o usuário
+      // escreve a frase inteira como quiser ("disfarce", "dado por Mia Bloodyfur", "como agente
+      // da Paradise Gate"). Linkar uma entrada é opcional e só afeta ONDE dentro dessa frase um
+      // link aparece: a wiki procura o TÍTULO da entrada linkada dentro do texto e vira link só
+      // aquele trecho (nunca a frase toda) — se o texto for editado depois e o título não
+      // aparecer mais nele, mostra tudo como texto simples, nunca um link quebrado.
       if (arrKey === "aliases") {
         chipMenuItems.push(el("div", { class: "wb-ctl-divider" }));
-        chipMenuItems.push(el("div", { class: "wb-ctl-row", style: "flex-wrap:wrap" }, [el("span", { class: "wb-ctl-label", style: "width:100%", text: "Quem deu esse apelido" })]));
-        var byIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 4px;max-width:calc(100% - 18px)", placeholder: "nome…", value: entry.byText || "" });
+        chipMenuItems.push(el("div", { class: "wb-ctl-row", style: "flex-wrap:wrap" }, [el("span", { class: "wb-ctl-label", style: "width:100%", text: "Anotação (entre parênteses)" })]));
+        var byIn = el("input", { class: "field", style: "width:100%;margin:2px 9px 4px;max-width:calc(100% - 18px)", placeholder: "ex: disfarce, dado por Fulano, como agente de…", value: entry.byText || "" });
         byIn.addEventListener("change", function () { entry.byText = byIn.value.trim(); e[visKey][t] = entry; touch(true); });
         chipMenuItems.push(byIn);
-        // Escolher uma entrada aqui preenche o nome sozinho (com o título dela) — só o NOME vira
-        // link na wiki (ex: "Alucard Kingsleigh (dado por Mia Bloodyfur)", só "Mia Bloodyfur" é
-        // clicável), o texto acima continua editável depois se quiser mostrar algo diferente do
-        // título da entrada, mas sem precisar digitar o nome duas vezes no caso comum.
+        // Escolher uma entrada aqui não define o texto sozinho — só ajuda a escrevê-lo: se o
+        // campo tá vazio, preenche com o título dela (caso comum, "só o nome"); se já tem texto
+        // e o título ainda não aparece nele, acrescenta no final (deixa "como agente da " e
+        // escolhe a entrada → vira "como agente da Paradise Gate" sozinho).
         var byCombo = wbCombo({
           items: wbEntriesOf(e.universeId).filter(function (en) { return en.id !== e.id; }).map(function (en) { return { id: en.id, label: (en.title || "(sem título)") + " · " + en.type }; }),
           value: entry.byEntryId || "", allowEmpty: true, emptyLabel: "(sem link)",
-          placeholder: "linkar a uma entrada (opcional)", wrapClass: "grow",
+          placeholder: "linkar um trecho a uma entrada (opcional)", wrapClass: "grow",
           onChange: function (id) {
             entry.byEntryId = id || null;
-            if (id) { var target = wbEntry(id); if (target) { entry.byText = wbDisplayName(target); byIn.value = entry.byText; } }
+            if (id) {
+              var target = wbEntry(id);
+              if (target) {
+                var title = wbDisplayName(target), cur = (entry.byText || "").trim();
+                if (!cur) entry.byText = title;
+                else if (cur.indexOf(title) === -1) entry.byText = cur + " " + title;
+                byIn.value = entry.byText;
+              }
+            }
             e[visKey][t] = entry; touch(true);
           }
         });
@@ -4585,15 +4599,18 @@
     var m = (fm.confidentialVariants || []).filter(function (cv) { return (cv.text || "").trim() && (cv.allow || []).indexOf(email) !== -1; })[0];
     return m ? m.text : null;
   }
-  // "Quem deu esse apelido" — resolve pro texto + (se der) o wikiId do link, com a mesma regra
-  // de nunca apontar pra uma página morta que o resto da wiki já segue (wbWikiAncestors):
-  // a entrada ligada só vira link se estiver publicada, não-secreta, e respeitando o isolamento
-  // do universo Lótus.
+  // Anotação entre parênteses de uma alcunha (ex: "disfarce", "dado por Mia Bloodyfur", "como
+  // agente da Paradise Gate") — texto livre, sem estrutura fixa, já que nem toda alcunha tem um
+  // "dado por" (pode ser um disfarce, um cargo, uma forma assumida...). Se uma entrada foi
+  // linkada, devolve também o NOME dela (`name`) pra quem renderiza saber qual TRECHO do texto
+  // virar link (só o nome, não a frase toda) — mesma regra de nunca apontar pra uma página morta
+  // que o resto da wiki já segue: só linka se a entrada ligada estiver publicada, não-secreta, e
+  // respeitando o isolamento do universo Lótus.
   function wbAliasBy(e, v) {
     if (!v || !(v.byText || "").trim()) return null;
     var target = v.byEntryId ? wbEntry(v.byEntryId) : null;
     var linked = target && target.wikiId && !target.secret && !(e.universeId === "lotus" && target.universeId !== "lotus");
-    return { text: v.byText.trim(), wikiId: linked ? target.wikiId : null };
+    return { text: v.byText.trim(), wikiId: linked ? target.wikiId : null, name: linked ? wbDisplayName(target) : null };
   }
   // asEmail (optional) simulates what ONE SPECIFIC invited player would see instead of the real
   // public snapshot: publico/spoiler content shows as usual, PLUS anything restrito that
@@ -4917,7 +4934,7 @@
       var v = e.aliasVis[a] || {};
       if (v.vis === "restrito") {
         var by = wbAliasBy(e, v);
-        items.push({ id: "alias-" + wbSlugify(a), kind: "alias", text: a + (by ? " (dado por " + by.text + ")" : ""), permitidos: v.allow || [] });
+        items.push({ id: "alias-" + wbSlugify(a), kind: "alias", text: a + (by ? " (" + by.text + ")" : ""), permitidos: v.allow || [] });
       }
     });
     (e.gallery || []).forEach(function (g) {

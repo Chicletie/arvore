@@ -186,6 +186,19 @@
   function spoilerSpan(text) {
     return el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: text, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } });
   }
+  // Encaixa o link só no TRECHO do texto que corresponde ao nome da entrada ligada (ex: "dado
+  // por Mia Bloodyfur" → só "Mia Bloodyfur" vira link), nunca a frase toda — a anotação de uma
+  // alcunha é texto livre ("disfarce", "como agente de X", "dado por Y"...), então o link tem
+  // que respeitar qualquer contexto ao redor. Se o nome não aparece mais no texto (editado depois
+  // de linkar), mostra tudo como texto simples — nunca um link errado ou quebrado.
+  function appendAliasNote(container, text, linkName, href) {
+    var idx = (href && linkName) ? text.indexOf(linkName) : -1;
+    if (idx === -1) { container.appendChild(document.createTextNode(text)); return; }
+    if (idx > 0) container.appendChild(document.createTextNode(text.slice(0, idx)));
+    container.appendChild(el("a", { href: href, text: linkName }));
+    var restStart = idx + linkName.length;
+    if (restStart < text.length) container.appendChild(document.createTextNode(text.slice(restStart)));
+  }
   function chip(prefix, item) {
     if (item.vis === "spoiler") { var c = el("span", { class: "tag" }); c.appendChild(spoilerSpan(prefix + item.text)); return c; }
     return el("span", { class: "tag", text: prefix + item.text });
@@ -782,18 +795,17 @@
           var aliasTd = el("td");
           data.aliases.forEach(function (a) {
             var line = el("div", { class: "infobox-alias-line" });
-            var byStr = (a.by && a.by.text) ? " (dado por " + a.by.text + ")" : "";
+            var byStr = (a.by && a.by.text) ? " (" + a.by.text + ")" : "";
             if (a.vis === "spoiler") {
               // Spoiler esconde tudo atrás de um clique-pra-revelar só de texto — um link vivo
               // ali dentro não funcionaria direito (o clique alternaria o spoiler, não navegaria),
-              // então a atribuição some junto do texto normal, sem link, igual o resto do spoiler.
+              // então a anotação some junto do texto normal, sem link, igual o resto do spoiler.
               line.appendChild(spoilerSpan(a.text + byStr));
             } else {
               line.appendChild(document.createTextNode(a.text));
               if (a.by && a.by.text) {
-                line.appendChild(document.createTextNode(" (dado por "));
-                if (a.by.wikiId) line.appendChild(el("a", { href: wikiHref(a.by.wikiId), text: a.by.text }));
-                else line.appendChild(document.createTextNode(a.by.text));
+                line.appendChild(document.createTextNode(" ("));
+                appendAliasNote(line, a.by.text, a.by.name, a.by.wikiId ? wikiHref(a.by.wikiId) : null);
                 line.appendChild(document.createTextNode(")"));
               }
             }
