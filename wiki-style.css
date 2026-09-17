@@ -212,7 +212,12 @@ a.tag:hover { border-color: var(--gold); }
 .login-box h3 { margin: 0 0 12px; font-family: var(--font-display); font-weight: 500; }
 .login-box input { width: 100%; padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: 14px; }
 .login-box textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--ink); font-family: var(--font-body); font-size: 14px; min-height: 90px; resize: vertical; }
-.login-box button.submit { width: 100%; padding: 9px; background: var(--ink); color: var(--paper); border: 0; border-radius: 4px; cursor: pointer; font-weight: 600; }
+/* Botão "cheio" reaproveita a MESMA linguagem visual do resto da wiki (pill dourado, ver
+   .login-bar/.tag-chip) — antes usava --ink/--paper diretamente, que no tema Paradise Gate
+   escuro inverte pra um botão claro sobre fundo escuro, destoando de tudo ao redor. */
+.login-box button.submit { width: 100%; padding: 9px; background: var(--accent-wash); color: var(--gold-ink); border: 1px solid var(--border-strong); border-radius: 999px; cursor: pointer; font-weight: 600; font-family: var(--font-body); transition: background .15s, color .15s, border-color .15s; }
+.login-box button.submit:hover { background: var(--gold); color: var(--paper); border-color: var(--gold); }
+.login-box button.submit:disabled { opacity: 0.6; cursor: default; }
 .login-box .err { color: var(--warn); font-size: 12.5px; margin: 4px 0 8px; }
 .login-box .cancel { display: block; text-align: center; margin-top: 10px; color: var(--faint); background: none; border: 0; cursor: pointer; font-size: 12.5px; }
 
