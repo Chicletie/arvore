@@ -34,21 +34,30 @@ exports.createPlayerAccount = onCall({ secrets: [brevoApiKey] }, async (request)
     }
   }
 
-  // Sem o segundo argumento, o Admin SDK gera um link que aponta pra página de ação genérica
-  // hospedada pelo próprio Firebase (rotina-555dd.firebaseapp.com/__/auth/action) — a mesma
-  // action URL customizada já usada no fluxo client-side de "esqueci minha senha"
-  // (openLoginModal em wiki-core.js) precisa ser passada aqui também, senão só metade dos
-  // dois jeitos de chegar num link de senha (esqueci-senha vs. convite) fica com a cara do site.
-  var actionCodeSettings = { url: "https://paradisegate.com.br/reset-senha.html", handleCodeInApp: true };
+  // actionCodeSettings/handleCodeInApp NÃO faz o link do Admin SDK apontar direto pra
+  // reset-senha.html — testado de verdade (log de diagnóstico) e confirmado contra a
+  // documentação: pra um app só-web (sem app Android/iOS configurado), o link do
+  // generatePasswordResetLink continua sempre passando pela página de ação genérica do
+  // Firebase (rotina-555dd.firebaseapp.com/__/auth/action) primeiro, com "url" virando só um
+  // parâmetro "continueUrl" que aquela página pode ou não oferecer como link de volta —
+  // nunca um redirecionamento de verdade. Contorna de vez: como quem manda o email aqui somos
+  // NÓS (via Brevo, não o próprio Firebase), não precisamos do link que o Firebase devolve
+  // como destino final — só do oobCode que vem embutido nele. Extrai o oobCode e monta a URL
+  // final na mão, sempre apontando pra reset-senha.html, não importa o que o Firebase preferir.
   var link;
   try {
-    link = await admin.auth().generatePasswordResetLink(email, actionCodeSettings);
+    link = await admin.auth().generatePasswordResetLink(email);
   } catch (err) {
     throw new HttpsError("internal", "Conta criada, mas não consegui gerar o link de acesso: " + (err.message || err));
   }
+  var oobCode = null;
+  try { oobCode = new URL(link).searchParams.get("oobCode"); } catch (err) {}
+  var finalLink = oobCode
+    ? "https://paradisegate.com.br/reset-senha.html?mode=resetPassword&oobCode=" + encodeURIComponent(oobCode)
+    : link; // nunca deveria cair aqui, mas se o formato do link mudar um dia, ainda manda ALGO em vez de travar o convite inteiro
 
   try {
-    await sendInviteEmail(email, link, isNew, brevoApiKey.value());
+    await sendInviteEmail(email, finalLink, isNew, brevoApiKey.value());
   } catch (err) {
     throw new HttpsError("internal", "Conta pronta, mas não consegui mandar o email: " + (err.message || err));
   }
