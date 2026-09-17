@@ -34,9 +34,15 @@ exports.createPlayerAccount = onCall({ secrets: [brevoApiKey] }, async (request)
     }
   }
 
+  // Sem o segundo argumento, o Admin SDK gera um link que aponta pra página de ação genérica
+  // hospedada pelo próprio Firebase (rotina-555dd.firebaseapp.com/__/auth/action) — a mesma
+  // action URL customizada já usada no fluxo client-side de "esqueci minha senha"
+  // (openLoginModal em wiki-core.js) precisa ser passada aqui também, senão só metade dos
+  // dois jeitos de chegar num link de senha (esqueci-senha vs. convite) fica com a cara do site.
+  var actionCodeSettings = { url: "https://paradisegate.com.br/reset-senha.html", handleCodeInApp: true };
   var link;
   try {
-    link = await admin.auth().generatePasswordResetLink(email);
+    link = await admin.auth().generatePasswordResetLink(email, actionCodeSettings);
   } catch (err) {
     throw new HttpsError("internal", "Conta criada, mas não consegui gerar o link de acesso: " + (err.message || err));
   }
