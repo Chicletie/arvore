@@ -860,7 +860,7 @@
   .wb-ctl-menu.wb-fieldctl { opacity: 0.5; }
   .wb-ctl-menu.wb-fieldctl:hover, .wb-ctl-menu.wb-fieldctl[open] { opacity: 1; }
   .wb-ctl-menu[open] > summary { background: var(--accent-wash); color: var(--ink); }
-  .wb-ctl-menu-body { position: fixed; z-index: 6; background: var(--paper); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column; gap: 2px; max-height: 70vh; overflow-y: auto; }
+  .wb-ctl-menu-body { position: fixed; z-index: 80; background: var(--paper); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 6px; display: flex; flex-direction: column; gap: 2px; max-height: 70vh; overflow-y: auto; }
   .wb-ctl-item { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 7px 9px; border-radius: 4px; cursor: pointer; font: inherit; font-size: 12.5px; color: var(--ink); }
   .wb-ctl-item:hover { background: var(--accent-wash); }
   .wb-ctl-item.wb-ctl-danger { color: var(--warn); }
@@ -1798,20 +1798,30 @@
     var summary = el("summary", { "aria-label": "Mais opções", text: "⋯" });
     var body = el("div", { class: "wb-ctl-menu-body" }, items);
     d.appendChild(summary);
-    d.appendChild(body);
-    // position:fixed calculado no abrir (não CSS puro ancorado à direita do gatilho) — perto da
-    // borda da tela (comum em mobile, onde o "⋯" de um campo curto fica bem à direita), um
-    // popover só-CSS vazaria pra fora da viewport à esquerda. Recalculado a cada abertura, então
-    // sobrevive a reflow entre uma abertura e outra.
+    // O corpo do menu é ancorado direto em <body> quando aberto, em vez de ficar dentro da
+    // hierarquia normal do DOM — campos/seções/tags criam seu próprio contexto de empilhamento
+    // (position:relative + z-index, usado pros fundos listrados de spoiler/restrito), e dentro
+    // de um contexto assim um irmão mais novo no DOM sempre pinta por cima de um mais velho, não
+    // importa o z-index do popover (que só compete DENTRO do contexto do próprio pai). Resultado
+    // real, não só visual: um "⋯" aberto na primeira seção ficava parcialmente inclicável porque
+    // a segunda seção pintava por cima da metade de baixo do popover. Ancorado direto em <body>,
+    // o popover nunca mais disputa contexto de empilhamento com nada da página.
+    function cleanupOrphans() {
+      document.querySelectorAll("body > .wb-ctl-menu-body").forEach(function (b) { if (b !== body) b.remove(); });
+    }
     d.addEventListener("toggle", function () {
-      if (!d.open) return;
+      cleanupOrphans();
+      if (!d.open) { if (body.parentNode) body.parentNode.removeChild(body); return; }
+      document.body.appendChild(body);
+      // position:fixed calculado no abrir (não CSS puro ancorado à direita do gatilho) — perto da
+      // borda da tela (comum em mobile, onde o "⋯" de um campo curto fica bem à direita), um
+      // popover só-CSS vazaria pra fora da viewport à esquerda. Recalculado a cada abertura, então
+      // sobrevive a reflow entre uma abertura e outra.
       var r = summary.getBoundingClientRect();
       var bw = Math.min(220, window.innerWidth - 16);
       var left = Math.max(8, Math.min(r.right - bw, window.innerWidth - bw - 8));
-      body.style.position = "fixed";
       body.style.left = left + "px";
       body.style.top = (r.bottom + 4) + "px";
-      body.style.right = "auto";
       body.style.width = bw + "px";
     });
     return d;
@@ -4346,7 +4356,7 @@
   function wbVisChipList(e, arrKey, visKey, prefix, touch, opts) {
     opts = opts || {};
     var wrap = el("div", { class: "note-tags" });
-    (e[arrKey] || []).forEach(function (t) {
+    (e[arrKey] || []).forEach(function (t, idx) {
       var entry = e[visKey][t] || { vis: "publico", allow: [] };
       var v = entry.vis || "publico";
       if (opts.hideSecret && v === "mestre") return;
@@ -4365,7 +4375,14 @@
       }
       var chip = el("span", { class: "ntag-chip" + (v !== "publico" ? " ntag-" + v : ""), style: tagColor ? "border-color:" + tagColor : null });
       chip.appendChild(el("span", { class: "ntag-lab", style: tagColor ? "color:" + tagColor : null, text: (v !== "publico" ? visInfo(v).glyph + " " : "") + prefix + t }));
-      var chipMenuItems = [wbCtlRow("Wiki", wbVisSelect(v, function (nv) { entry.vis = nv; e[visKey][t] = entry; touch(true); }))];
+      var chipMenuItems = [el("div", { class: "wb-ctl-move" }, [
+        el("button", { type: "button", text: "▲ antes", disabled: idx === 0 ? "disabled" : null, onclick: function () {
+          var arr = e[arrKey]; var tmp = arr[idx - 1]; arr[idx - 1] = arr[idx]; arr[idx] = tmp; touch(true);
+        } }),
+        el("button", { type: "button", text: "▼ depois", disabled: idx === e[arrKey].length - 1 ? "disabled" : null, onclick: function () {
+          var arr = e[arrKey]; var tmp = arr[idx + 1]; arr[idx + 1] = arr[idx]; arr[idx] = tmp; touch(true);
+        } })
+      ]), wbCtlRow("Wiki", wbVisSelect(v, function (nv) { entry.vis = nv; e[visKey][t] = entry; touch(true); }))];
       // "Quem deu esse apelido" — só faz sentido pra alcunhas, não pra tags. Fica entre
       // parênteses no infobox, depois do texto da alcunha, na MESMA linha (não é uma alcunha
       // nova nem entra na busca/dispAlias). Link é opcional: se a entrada ligada não estiver
@@ -7336,6 +7353,7 @@
       if (typeof Ambience !== "undefined") Ambience.setActive(true);
       return;
     }
+    document.querySelectorAll("body > .wb-ctl-menu-body").forEach(function (b) { b.remove(); });
     host.innerHTML = "";
     var content = views.criacao();
     host.appendChild(content);
