@@ -1077,6 +1077,15 @@
     if (offset) d.setDate(d.getDate() + offset);
     return keyOf(d);
   }
+  // "YYYY-MM-DD" de hoje em GMT-3 fixo (não o fuso local da máquina) — usado só pra carimbar
+  // firstPublishedAt na wiki, que precisa bater exatamente com o corte que wiki-core.js usa
+  // pros sorteios "do dia" (ver wbGmt3DateKey lá), senão os dois lados podem discordar sobre
+  // "hoje" perto da virada da noite.
+  function wbGmt3DateKey() {
+    var d = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+  }
   function parseKey(k) { return new Date(k + "T00:00:00"); }
   function addDaysKey(k, n) { var d = parseKey(k); d.setDate(d.getDate() + n); return keyOf(d); }
   function diffDays(a, b) { return Math.round((parseKey(a) - parseKey(b)) / MS_DAY); }
@@ -1565,6 +1574,10 @@
       if (e.wikiId !== undefined && typeof e.wikiId !== "string") e.wikiId = null;
       if (e.wikiId === undefined) e.wikiId = null;
       if (typeof e.wikiPublishedAt !== "string") e.wikiPublishedAt = "";
+      // Backfill pra quem já estava publicado antes do campo existir — usa a última data de
+      // publicação conhecida como aproximação da primeira, pra não fazer uma entrada antiga
+      // "sumir" dos sorteios "do dia" só porque foi republicada depois dessa trava existir.
+      if (typeof e.wikiFirstPublishedAt !== "string") e.wikiFirstPublishedAt = e.wikiId ? (e.wikiPublishedAt || todayKey()) : "";
       if (!e.fieldMeta || typeof e.fieldMeta !== "object") e.fieldMeta = {};
       Object.keys(e.fieldMeta).forEach(function (k) {
         var fm = e.fieldMeta[k]; if (!fm || typeof fm !== "object") { delete e.fieldMeta[k]; return; }
@@ -1730,6 +1743,7 @@
         if (typeof se.wikiId !== "string") se.wikiId = null;
         if (se.wikiId === undefined) se.wikiId = null;
         if (typeof se.wikiPublishedAt !== "string") se.wikiPublishedAt = "";
+        if (typeof se.wikiFirstPublishedAt !== "string") se.wikiFirstPublishedAt = se.wikiId ? (se.wikiPublishedAt || todayKey()) : "";
         // Defaults to its own last-published date (not today) so a season that was already
         // published and hasn't actually changed doesn't suddenly show up as "stale" the first
         // time this field exists — only a REAL edit after this point should ever mark it stale.
@@ -2302,7 +2316,7 @@
   // lista de tipos do mundo, só caindo pra types[0] se ele tiver sido removido de propósito.
   function wbStubEntry(uniId, title) {
     var stubType = C().types.indexOf("Conceito") !== -1 ? "Conceito" : (C().types[0] || "Conceito");
-    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [], birth: { year: null, month: null, day: null, display: null }, humanFormId: null };
+    var e = { id: uid(), universeId: uniId || "raiz", type: stubType, title: title || "", aliases: [], dispAlias: "", summary: "", body: "", fields: {}, fieldMeta: {}, sections: [], variants: [], status: "semente", secret: false, gallery: [], tagVis: {}, aliasVis: {}, wikiId: null, wikiPublishedAt: "", wikiFirstPublishedAt: "", tags: [], links: [], franchiseIds: [], parentId: null, favorite: false, year: null, events: [], x: null, y: null, updated: todayKey(), history: [], birth: { year: null, month: null, day: null, display: null }, humanFormId: null };
     C().entries.push(e); save();
     return e;
   }
@@ -5362,7 +5376,7 @@
     if (!b || b.month == null || b.day == null || (b.display !== "ymd" && b.display !== "md")) return null;
     return (b.month < 10 ? "0" : "") + b.month + "-" + (b.day < 10 ? "0" : "") + b.day;
   }
-  function wbIndexEntry(e, snap) {
+  function wbIndexEntry(e, snap, firstPub) {
     var f = flowerById(e.universeId);
     return {
       title: e.title || "(sem título)",
@@ -5373,6 +5387,10 @@
       tags: (e.tags || []).filter(function (t) { return ((e.tagVis[t] || {}).vis || "publico") === "publico"; }),
       search: wbEntrySearchText(snap),
       updatedAt: todayKey(),
+      // Data (GMT-3) da PRIMEIRA publicação, nunca muda depois — trava a entrada fora dos
+      // sorteios "do dia" da wiki até o próximo reset, pra publicar algo novo não reembaralhar
+      // quem já estava valendo pro dia (wiki-core.js's entriesForDaily lê este campo).
+      firstPublishedAt: firstPub || e.wikiFirstPublishedAt || todayKey(),
       // Só "publico" (não spoiler) — a home/novidades mostra essa miniatura sempre visível,
       // sem nenhum jeito de clicar-pra-revelar, então uma capa marcada como spoiler não pode
       // vazar ali fora do contexto da própria página.
@@ -5405,9 +5423,12 @@
     if (!fbFs) { window.alert("Sem conexão com a nuvem agora. Tente de novo em instantes."); return; }
     if (!fbUser) { window.alert("Entre na sua conta pra publicar (menu ⋯ › sincronização)."); return; }
     var id = e.wikiId || wbUniqueWikiSlug(e);
+    // Carimbado só na primeira publicação e nunca mais — é o que trava a entrada fora dos
+    // sorteios "do dia" da wiki até o próximo reset GMT-3 (ver wbGmt3DateKey/wiki-core.js).
+    var firstPub = e.wikiFirstPublishedAt || wbGmt3DateKey();
     var snap = wbBuildWikiSnapshot(e);
     fbFs.collection("wikiPublic").doc(id).set(snap).then(function () {
-      var idxUpdate = {}; idxUpdate["entries." + id] = wbIndexEntry(e, snap);
+      var idxUpdate = {}; idxUpdate["entries." + id] = wbIndexEntry(e, snap, firstPub);
       // set({}, {merge:true}) SEM nenhuma chave: cria o doc se faltar sem substituir nada (só
       // mencionar "entries" no set, mesmo como {}, troca o campo inteiro — já causou um bug
       // real de apagar as outras entradas do índice). O update() logo depois É a forma certa
@@ -5420,7 +5441,7 @@
     }).then(function () {
       return wbSyncRestrito(id, wbRestritoItems(e));
     }).then(function () {
-      e.wikiId = id; e.wikiPublishedAt = todayKey();
+      e.wikiId = id; e.wikiPublishedAt = todayKey(); e.wikiFirstPublishedAt = firstPub;
       // Guardado pra alimentar o "ver mudanças" no painel de publicação — o mesmo formato já
       // usado pelo histórico de versões (wbEntrySnapshot/wbEntryDiffSummary), reaproveitado em
       // vez de inventar um diff novo só pra publicado-vs-atual.
@@ -5582,16 +5603,17 @@
     if (!fbFs) { window.alert("Sem conexão com a nuvem agora. Tente de novo em instantes."); return; }
     if (!fbUser) { window.alert("Entre na sua conta pra publicar (menu ⋯ › sincronização)."); return; }
     var id = se.wikiId || wbUniqueSeasonSlug(cp, se);
+    var firstPub = se.wikiFirstPublishedAt || wbGmt3DateKey();
     var snap = wbBuildSeasonSnapshot(cp, se);
     fbFs.collection("wikiPublic").doc(id).set(snap).then(function () {
-      var idxUpdate = {}; idxUpdate["entries." + id] = { title: (cp.name || "Campanha") + " · " + (se.name || "Temporada"), type: "Temporada", universe: flowerById(cp.universeId) ? flowerById(cp.universeId).name : "", universeId: cp.universeId, franchiseIds: [], tags: [], search: wbSeasonSearchText(snap), updatedAt: todayKey() };
+      var idxUpdate = {}; idxUpdate["entries." + id] = { title: (cp.name || "Campanha") + " · " + (se.name || "Temporada"), type: "Temporada", universe: flowerById(cp.universeId) ? flowerById(cp.universeId).name : "", universeId: cp.universeId, franchiseIds: [], tags: [], search: wbSeasonSearchText(snap), updatedAt: todayKey(), firstPublishedAt: firstPub };
       return fbFs.collection("wikiIndex").doc(cp.universeId).set({}, { merge: true }).then(function () {
         return fbFs.collection("wikiIndex").doc(cp.universeId).update(idxUpdate);
       });
     }).then(function () {
       return wbSyncRestrito(id, wbSeasonRestritoItems(se));
     }).then(function () {
-      se.wikiId = id; se.wikiPublishedAt = todayKey(); touch(true);
+      se.wikiId = id; se.wikiPublishedAt = todayKey(); se.wikiFirstPublishedAt = firstPub; touch(true);
     }).catch(function (err) {
       window.alert("Não consegui publicar: " + (err && err.message ? err.message : err));
     });

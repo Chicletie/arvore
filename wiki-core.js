@@ -239,11 +239,12 @@
     for (var i = out.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)); var t = out[i]; out[i] = out[j]; out[j] = t; }
     return out;
   }
-  // Dia LOCAL do visitante (não UTC): Date.now()/86400000 viraria o "dia" à meia-noite UTC, que
-  // no Brasil é 21h — ficaria fora de sincronia com wbTodayMD (que usa getMonth()/getDate()
-  // locais), fazendo a exclusão de aniversário e o próprio sorteio discordarem sobre "hoje"
-  // bem na virada da noite.
-  function wbDayIndex() { var d = new Date(); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000); }
+  // Dia fixo em GMT-3 (Brasília, sem horário de verão) — o MESMO dia pra qualquer visitante,
+  // não o fuso local do navegador dele (um visitante em outro fuso viria um "hoje" diferente
+  // do resto, quebrando a promessa de "todo mundo vê a mesma escolha"). Troca exatamente às
+  // 00h GMT-3, sincronizado com wbTodayMD/wbGmt3DateKey abaixo.
+  var WB_GMT3_OFFSET_MS = 3 * 60 * 60 * 1000;
+  function wbDayIndex() { return Math.floor((Date.now() - WB_GMT3_OFFSET_MS) / 86400000); }
   function wbDailyPick(pool, seedName) {
     if (!pool || !pool.length) return null;
     var day = wbDayIndex(), n = pool.length, cycle = Math.floor(day / n), pos = day % n;
@@ -256,8 +257,19 @@
     return doy;
   }
   function wbTodayMD() {
-    var d = new Date();
-    return (d.getMonth() + 1 < 10 ? "0" : "") + (d.getMonth() + 1) + "-" + (d.getDate() < 10 ? "0" : "") + d.getDate();
+    var d = new Date(Date.now() - WB_GMT3_OFFSET_MS);
+    return (d.getUTCMonth() + 1 < 10 ? "0" : "") + (d.getUTCMonth() + 1) + "-" + (d.getUTCDate() < 10 ? "0" : "") + d.getUTCDate();
+  }
+  // "YYYY-MM-DD" de hoje em GMT-3 — comparado com o "firstPublishedAt" gravado no índice pra
+  // uma entrada lançada HOJE não entrar nos sorteios do dia (personagem/citação/nota/entrada/
+  // ano) até o próximo reset; sem essa trava, publicar algo novo muda o tamanho do pool de
+  // wbDailyPick na hora e reembaralha TUDO (a escolha de quem já estava valendo pro dia muda
+  // sem motivo, o que a wiki nunca deveria fazer). Ausência do campo (entradas publicadas antes
+  // dessa trava existir) é tratada como "sempre elegível", nunca excluída por engano.
+  function wbGmt3DateKey() {
+    var d = new Date(Date.now() - WB_GMT3_OFFSET_MS);
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
   }
   // Um aniversariante não deve sortear como personagem-do-dia ALEATÓRIO num dia qualquer
   // dentro do próprio mês de aniversário — pareceria erro/coincidência estranha perto da data
@@ -1215,10 +1227,16 @@
     // mesmo dia sem precisar de nenhum estado gravado em lugar nenhum.
     if (pg) {
       var todayMD = wbTodayMD();
+      // Só entra nos sorteios do dia quem já estava publicado ANTES de hoje (GMT-3) — uma
+      // entrada lançada hoje só passa a concorrer a partir do próximo reset. "Novidades"/
+      // "Notas recentes" continuam usando `entries` sem filtro, essa trava é só pros 5 sorteios
+      // "do dia" abaixo.
+      var todayGmt3 = wbGmt3DateKey();
+      var entriesForDaily = entries.filter(function (e) { return !e.firstPublishedAt || e.firstPublishedAt < todayGmt3; });
 
       // Citação do dia
       var quotePool = [];
-      entries.forEach(function (e) { (e.citacoes || []).forEach(function (q) { quotePool.push(Object.assign({ speakerId: e.id, speakerTitle: e.title }, q)); }); });
+      entriesForDaily.forEach(function (e) { (e.citacoes || []).forEach(function (q) { quotePool.push(Object.assign({ speakerId: e.id, speakerTitle: e.title }, q)); }); });
       var quotePick = wbDailyPick(quotePool, "citacao");
       var quoteWrap = el("div", { class: "spotlight-quote" });
       if (quotePick) {
@@ -1239,7 +1257,7 @@
       // Personagem do dia — se alguém publicado faz aniversário hoje, ganha prioridade (com
       // tag de aniversariante); senão sorteia entre os Personagens, excluindo quem está na
       // própria janela de aniversário (pra não parecer coincidência estranha perto da data).
-      var personagens = entries.filter(function (e) { return e.type === "Personagem" || e.type === "Lupino"; });
+      var personagens = entriesForDaily.filter(function (e) { return e.type === "Personagem" || e.type === "Lupino"; });
       var birthdayFolks = personagens.filter(function (e) { return e.birthdayMD === todayMD; });
       var isAniversariante = birthdayFolks.length > 0;
       var charPool = isAniversariante ? birthdayFolks : personagens.filter(function (e) { return !e.birthdayMD || !wbInBirthdayWindow(todayMD, e.birthdayMD); });
@@ -1247,17 +1265,17 @@
 
       // Nota do dia
       var notePool = [];
-      entries.forEach(function (e) { (e.posts || []).forEach(function (p) { notePool.push({ id: p.id, title: p.title, date: p.date, entryId: e.id, entryTitle: e.title }); }); });
+      entriesForDaily.forEach(function (e) { (e.posts || []).forEach(function (p) { notePool.push({ id: p.id, title: p.title, date: p.date, entryId: e.id, entryTitle: e.title }); }); });
       var notePick = wbDailyPick(notePool, "nota");
 
       // Entrada do dia — qualquer tipo menos Personagem/Lupino (que já têm seu próprio destaque acima).
-      var entradaPool = entries.filter(function (e) { return e.type !== "Personagem" && e.type !== "Lupino"; });
+      var entradaPool = entriesForDaily.filter(function (e) { return e.type !== "Personagem" && e.type !== "Lupino"; });
       var entradaPick = wbDailyPick(entradaPool, "entrada");
 
       // Ano em foco — sorteia entre os anos que têm ao menos um evento "principal", depois
       // lista TODOS os eventos principais daquele ano (de qualquer entrada).
       var yearEvents = {};
-      entries.forEach(function (e) { (e.events || []).forEach(function (ev) { if (ev.major) { (yearEvents[ev.y] = yearEvents[ev.y] || []).push(Object.assign({ entryId: e.id, entryTitle: e.title }, ev)); } }); });
+      entriesForDaily.forEach(function (e) { (e.events || []).forEach(function (ev) { if (ev.major) { (yearEvents[ev.y] = yearEvents[ev.y] || []).push(Object.assign({ entryId: e.id, entryTitle: e.title }, ev)); } }); });
       var yearsPool = Object.keys(yearEvents).map(Number);
       var yearPick = wbDailyPick(yearsPool, "ano");
 
