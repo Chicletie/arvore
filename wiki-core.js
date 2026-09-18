@@ -1047,10 +1047,12 @@
       });
       card.appendChild(tabsWrap);
     }
-    // Infobox entra só agora (depois das abas): ela flutua à direita a partir daqui, então as
-    // abas — inseridas antes — ficam acima dela em vez de presas atrás/embaixo.
-    if (info) card.appendChild(info);
-    tabPanels.forEach(function (p, i) { p.el.hidden = i !== 0; card.appendChild(p.el); });
+    // No desktop, article and infobox share an explicit two-column layout. This avoids relying
+    // on float/clear interaction, which differs when Firefox lays out the following block.
+    var entryLayout = el("div", { class: "entry-layout" });
+    if (info) entryLayout.appendChild(info);
+    tabPanels.forEach(function (p, i) { p.el.hidden = i !== 0; entryLayout.appendChild(p.el); });
+    card.appendChild(entryLayout);
 
     // posts — diário datado da própria entrada (mais recente primeiro; já vem ordenado do
     // snapshot). É sobre a entrada inteira, não de uma variante de obra específica, então mora

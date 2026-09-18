@@ -1,10 +1,10 @@
 /* tree — service worker (offline + atualização) */
-var CACHE = "arvore-cache-v117";
+var CACHE = "arvore-cache-v118";
 var SHELL = [
   "./",
   "./index.html",
   "./wiki.html",
-  "./wiki-core.js",
+  "./wiki-core.js?v=118",
   "./wiki-style.css?v=117",
   "./404.html",
   "./ursprung.html",
