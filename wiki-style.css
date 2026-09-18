@@ -108,6 +108,17 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .prose code.wb-code { font-family: ui-monospace, monospace; background: var(--accent-wash); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
 .prose blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--gold); color: var(--muted); overflow-wrap: anywhere; word-break: break-word; }
 .prose a { color: var(--gold-ink); }
+
+/* once the infobox is taller than the surrounding prose, the following major blocks must break out to full width */
+.article > .toc,
+.article > .cathead,
+.article > details.wiki-section,
+.article > .posts-wrap,
+.article > .wb-lfield,
+.article > .wb-taxonomy,
+.article > .article {
+  clear: both;
+}
 .wl-plain { font-weight: 600; }
 .wl-live { font-weight: 600; color: var(--gold-ink); text-decoration: none; border-bottom: 1px dotted var(--gold-ink); }
 .wl-live:hover { text-decoration: none; border-bottom-style: solid; }
