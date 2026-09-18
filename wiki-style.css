@@ -98,11 +98,15 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 
 .article { min-width: 0; }
 .summary { font-family: var(--font-wb); font-size: 18px; font-style: italic; color: var(--muted); margin: 0 0 14px; }
-.prose { font-family: var(--font-wb); font-size: 18px; }
-.prose p { margin: 0 0 14px; }
+.prose {
+  font-family: var(--font-wb); font-size: 18px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.prose p { margin: 0 0 14px; overflow-wrap: anywhere; word-break: break-word; }
 .prose img.wb-img { max-width: 100%; border-radius: var(--radius); margin: 10px 0; display: block; }
 .prose code.wb-code { font-family: ui-monospace, monospace; background: var(--accent-wash); padding: 1px 5px; border-radius: 3px; font-size: 0.9em; }
-.prose blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--gold); color: var(--muted); }
+.prose blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--gold); color: var(--muted); overflow-wrap: anywhere; word-break: break-word; }
 .prose a { color: var(--gold-ink); }
 .wl-plain { font-weight: 600; }
 .wl-live { font-weight: 600; color: var(--gold-ink); text-decoration: none; border-bottom: 1px dotted var(--gold-ink); }

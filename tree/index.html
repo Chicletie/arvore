@@ -825,7 +825,21 @@
   .md-edit { position: relative; }
   .md-edit .toastui-editor-defaultUI { border-color: var(--border-strong); border-radius: var(--radius-sm); }
   .md-edit .toastui-editor-toolbar { background: var(--surface); border-color: var(--border-strong); }
-  .md-edit .toastui-editor-contents { font-family: var(--font-wb); font-size: 16px; color: var(--ink); }
+  .md-edit .toastui-editor-contents {
+    font-family: var(--font-wb); font-size: 16px; color: var(--ink);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .md-edit .toastui-editor-contents p,
+  .md-edit .toastui-editor-contents li,
+  .md-edit .toastui-editor-contents div,
+  .md-edit .toastui-editor-contents pre,
+  .md-edit .toastui-editor-contents blockquote,
+  .md-edit .toastui-editor-contents table {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
   .wb-toast-tb { background: none; border: 0; font-size: 15px; width: 30px; height: 30px; cursor: pointer; border-radius: var(--radius-sm); }
   .wb-toast-tb:hover { background: var(--accent-wash); }
 
