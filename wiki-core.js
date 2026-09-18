@@ -1049,7 +1049,7 @@
     }
     // No desktop, article and infobox share an explicit two-column layout. This avoids relying
     // on float/clear interaction, which differs when Firefox lays out the following block.
-    var entryLayout = el("div", { class: "entry-layout" });
+    var entryLayout = el("div", { class: "entry-layout" + (info ? " has-infobox" : "") });
     if (info) entryLayout.appendChild(info);
     tabPanels.forEach(function (p, i) { p.el.hidden = i !== 0; entryLayout.appendChild(p.el); });
     card.appendChild(entryLayout);

@@ -90,12 +90,11 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .infobox-alias-line { font-style: italic; margin: 0 0 3px; }
 .infobox-alias-line:last-child { margin: 0; }
 
-.entry-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 0 22px; align-items: start; }
-.entry-layout > .infobox { grid-column: 2; grid-row: 1; float: none; width: auto; margin: 0; }
-.entry-layout > .article { grid-column: 1; grid-row: 1; min-width: 0; }
+.entry-layout { display: block; }
+.entry-layout.has-infobox > .infobox { float: right; width: 250px; margin: 0 0 16px 22px; }
+.entry-layout.has-infobox > .article { clear: none !important; min-width: 0; }
 @media (max-width: 619px) {
-   .entry-layout { display: block; }
-   .entry-layout > .infobox { width: 100%; margin: 0 0 18px; }
+   .entry-layout.has-infobox > .infobox { float: none; width: 100%; margin: 0 0 18px; }
 }
 
 /* abas de obra/campanha (variantes) — sit above the article body, mirror infobox tabs visually */
