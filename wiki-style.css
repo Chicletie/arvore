@@ -109,6 +109,18 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .prose blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--gold); color: var(--muted); overflow-wrap: anywhere; word-break: break-word; }
 .prose a { color: var(--gold-ink); }
 
+@media (min-width: 620px) {
+   /* Keep the article flowing beside the infobox in Firefox as well as Chromium. */
+   .article > .toc,
+   .article > .cathead,
+   .article > details.wiki-section,
+   .article > .wb-lfield,
+   .article > .wb-taxonomy,
+   .article > .article {
+      clear: none !important;
+   }
+}
+
 .wl-plain { font-weight: 600; }
 .wl-live { font-weight: 600; color: var(--gold-ink); text-decoration: none; border-bottom: 1px dotted var(--gold-ink); }
 .wl-live:hover { text-decoration: none; border-bottom-style: solid; }
