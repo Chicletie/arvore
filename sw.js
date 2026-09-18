@@ -1,6 +1,19 @@
 /* tree — service worker (offline + atualização) */
-var CACHE = "arvore-cache-v114";
-var SHELL = ["./tree/", "./tree/index.html", "./manifest.webmanifest", "./icon.svg"];
+var CACHE = "arvore-cache-v115";
+var SHELL = [
+  "./",
+  "./index.html",
+  "./wiki.html",
+  "./wiki-core.js",
+  "./wiki-style.css",
+  "./404.html",
+  "./ursprung.html",
+  "./reset-senha.html",
+  "./tree/",
+  "./tree/index.html",
+  "./manifest.webmanifest",
+  "./icon.svg"
+];
 
 self.addEventListener("install", function (e) {
   self.skipWaiting();
