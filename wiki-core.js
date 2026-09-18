@@ -239,6 +239,18 @@
     for (var i = out.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)); var t = out[i]; out[i] = out[j]; out[j] = t; }
     return out;
   }
+  // Chave estável pro sorteio: o Fisher-Yates abaixo é determinístico SÓ se o array de
+  // entrada vier na mesma ordem. `wikiIndex` guarda as páginas num mapa do Firestore, e mapa
+  // protobuf não tem ordem — Object.keys() pode sair diferente a cada .get(), o que fazia
+  // Personagem/Citação/Nota/Entrada/Ano do dia reembaralharem a cada refresh mesmo no mesmo
+  // dia. Ordenar por id/título/etc. antes de embaralhar deixa a escolha global de verdade.
+  function wbDailyKey(item) {
+    if (typeof item === "number") return "n:" + item;
+    if (typeof item === "string") return "s:" + item;
+    if (!item || typeof item !== "object") return String(item);
+    return ["id", "speakerId", "entryId", "familyId", "title", "text", "date", "y", "m", "d", "label"]
+      .map(function (k) { return item[k] == null ? "" : String(item[k]); }).join("\t");
+  }
   // Dia fixo em GMT-3 (Brasília, sem horário de verão) — o MESMO dia pra qualquer visitante,
   // não o fuso local do navegador dele (um visitante em outro fuso viria um "hoje" diferente
   // do resto, quebrando a promessa de "todo mundo vê a mesma escolha"). Troca exatamente às
@@ -247,8 +259,12 @@
   function wbDayIndex() { return Math.floor((Date.now() - WB_GMT3_OFFSET_MS) / 86400000); }
   function wbDailyPick(pool, seedName) {
     if (!pool || !pool.length) return null;
-    var day = wbDayIndex(), n = pool.length, cycle = Math.floor(day / n), pos = day % n;
-    return wbSeededShuffle(pool, seedName + ":" + cycle)[pos];
+    var sorted = pool.slice().sort(function (a, b) {
+      var ka = wbDailyKey(a), kb = wbDailyKey(b);
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+    var day = wbDayIndex(), n = sorted.length, cycle = Math.floor(day / n), pos = day % n;
+    return wbSeededShuffle(sorted, seedName + ":" + cycle)[pos];
   }
   var WB_MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   function wbMdToDoy(md) {
