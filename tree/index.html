@@ -1237,6 +1237,17 @@
     if (String(item || "").indexOf(TEMPLATE_HEADER_PREFIX) === 0) return "cabecalho";
     return CHARACTER_SHORT_FIELDS.indexOf(name) !== -1 ? "texto" : guessFieldType(name);
   }
+  function wbOrderedFieldKeys(e) {
+    var keys = [], seen = {};
+    if (wbIsCharacterType(e.type)) {
+      (C().templates[e.type] || []).forEach(function (item) {
+        var key = templateFieldName(item);
+        if (key && Object.prototype.hasOwnProperty.call(e.fields || {}, key) && !seen[key]) { seen[key] = true; keys.push(key); }
+      });
+    }
+    Object.keys(e.fields || {}).forEach(function (key) { if (!seen[key]) { seen[key] = true; keys.push(key); } });
+    return keys;
+  }
   var ENTRY_STATUS = [
     { id: "semente", label: "semente", glyph: "🌱" },
     { id: "rascunho", label: "rascunho", glyph: "✍" },
@@ -4978,7 +4989,7 @@
     function okVis(v, allow) { return wbWikiVisible(v) || (asEmail && v === "restrito" && (allow || []).indexOf(asEmail) !== -1); }
     function outVis(v) { return (asEmail && v === "restrito") ? "publico" : v; }
     var fields = [];
-    Object.keys(e.fields || {}).forEach(function (k) {
+    wbOrderedFieldKeys(e).forEach(function (k) {
       var fm = wbFieldMeta(e, k);
       if (!okVis(fm.vis, fm.allow)) return;
       var val = e.fields[k] || "";
@@ -5161,7 +5172,7 @@
   // (.card, .tag, .eyebrow…) can never collide with index.html's own same-named classes.
   function wbBuildFullSnapshot(e) {
     var f = flowerById(e.universeId);
-    var fields = Object.keys(e.fields || {}).map(function (k) {
+    var fields = wbOrderedFieldKeys(e).map(function (k) {
       var fm = wbFieldMeta(e, k);
       return { key: k, type: fm.type, value: wbFieldValForWiki(fm.type, e.fields[k] || ""), vis: "publico", opts: fm.opts || [], master: fm.master || null };
     });
@@ -6198,7 +6209,7 @@
     if (wbIsCharacterType(e.type)) card.appendChild(wbRenderBirth(e, touch, ro));
 
     // fields — short typed ones as a specimen label, long descriptive ones as roomy blocks
-    var fkeys = Object.keys(e.fields || {}).filter(function (k) { return !(hideSecret && wbFieldMeta(e, k).vis === "mestre"); });
+    var fkeys = wbOrderedFieldKeys(e).filter(function (k) { return !(hideSecret && wbFieldMeta(e, k).vis === "mestre"); });
     var shortKeys = fkeys.filter(function (k) { return wbFieldMeta(e, k).type !== "nota"; });
     var longKeys = fkeys.filter(function (k) { return wbFieldMeta(e, k).type === "nota"; });
     if (!ro && (shortKeys.length || longKeys.length)) {
@@ -6217,7 +6228,7 @@
     // ghost suggestions
     if (!ro) {
       var tmpl = C().templates[e.type] || [];
-      var missing = tmpl.filter(function (k) { return !(k in e.fields); });
+      var missing = tmpl.filter(function (item) { return !(templateFieldName(item) in e.fields); });
       var tray = el("div", { class: "ghost-tray" });
       if (missing.length) tray.appendChild(el("div", { class: "ghost-head", text: "campos do modelo " + e.type }));
       missing.forEach(function (k) {
