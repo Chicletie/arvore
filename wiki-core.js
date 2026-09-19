@@ -186,6 +186,22 @@
   function spoilerSpan(text) {
     return el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: text, onclick: function (ev) { ev.currentTarget.classList.toggle("on"); } });
   }
+  function spoilerInline(buildInner, preview) {
+    var wrap = el("span", { class: "md-spoiler", tabindex: "0", role: "button", text: preview || "🙈 spoiler, toque para revelar" });
+    function reveal(ev) {
+      if (wrap.classList.contains("on") && ev && ev.target.closest && ev.target.closest("a")) return;
+      if (ev && ev.key && ev.key !== "Enter" && ev.key !== " ") return;
+      if (ev && ev.key) ev.preventDefault();
+      if (!wrap.classList.contains("on")) {
+        wrap.classList.add("on");
+        wrap.textContent = "";
+        wrap.appendChild(buildInner());
+      }
+    }
+    wrap.addEventListener("click", reveal);
+    wrap.addEventListener("keydown", reveal);
+    return wrap;
+  }
   // Anotação entre parênteses de uma alcunha, em até 3 pedaços (antes / trecho-com-link /
   // depois — ex: "por [Mia Bloodyfur] na infância") — junta só os que tiverem texto, com um
   // espaço entre eles (frase contínua), e só o pedaço do meio vira <a> (nunca a frase toda).
@@ -825,24 +841,23 @@
             var line = el("div", { class: "infobox-alias-line" });
             var note = a.note;
             var noteFlat = note ? [note.before, note.link, note.after].filter(Boolean).join(" ") : "";
-            if (a.vis === "spoiler") {
-              // Spoiler esconde tudo atrás de um clique-pra-revelar só de texto — um link vivo
-              // ali dentro não funcionaria direito (o clique alternaria o spoiler, não navegaria),
-              // então tanto o link da alcunha quanto o da anotação somem, tudo vira texto normal,
-              // igual o resto do spoiler.
-              line.appendChild(spoilerSpan(a.text + (noteFlat ? " (" + noteFlat + ")" : "")));
-            } else {
-              if (a.selfLink) line.appendChild(el("a", { href: wikiHref(a.selfLink), text: a.text }));
-              else line.appendChild(document.createTextNode(a.text));
+            function buildAlias() {
+              var inner = el("span");
+              if (a.selfLink) inner.appendChild(el("a", { href: wikiHref(a.selfLink), text: a.text }));
+              else inner.appendChild(document.createTextNode(a.text));
               if (noteFlat) {
-                line.appendChild(document.createTextNode(" ("));
-                appendAliasNote(line, note);
-                line.appendChild(document.createTextNode(")"));
+                inner.appendChild(document.createTextNode(" ("));
+                appendAliasNote(inner, note);
+                inner.appendChild(document.createTextNode(")"));
               }
+              return inner;
             }
+            line.appendChild(document.createTextNode("• "));
+            if (a.vis === "spoiler") line.appendChild(spoilerInline(buildAlias, "🙈 spoiler, toque para revelar"));
+            else line.appendChild(buildAlias());
             aliasTd.appendChild(line);
           });
-          itable.appendChild(el("tr", {}, [el("th", { text: "Também conhecido(a) como" }), aliasTd]));
+          itable.appendChild(el("tr", {}, [el("th", { text: "Alcunhas" }), aliasTd]));
         }
         shortFields.forEach(function (f) {
           // Cabeçalho — separador full-width dentro da infobox (tipo os "headers" da Fandom),
@@ -852,7 +867,7 @@
             return;
           }
           var td = el("td", { "data-field-swap": f.key });
-          if (f.vis === "spoiler") td.appendChild(spoilerCover(function () { var s = el("span"); mdInline(s, f.value); return s; }));
+          if (f.vis === "spoiler") td.appendChild(spoilerInline(function () { var s = el("span"); mdInline(s, f.value); return s; }));
           else mdInline(td, f.value);
           // f.master só existe na prévia do dono (wbBuildFullSnapshot) — a publicação de verdade
           // (wbBuildWikiSnapshot) nunca preenche esse campo, então isto nunca aparece pra ninguém
