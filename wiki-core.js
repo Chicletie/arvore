@@ -1047,10 +1047,10 @@
       });
       card.appendChild(tabsWrap);
     }
-    // No desktop, article and infobox share an explicit two-column layout. This avoids relying
-    // on float/clear interaction, which differs when Firefox lays out the following block.
-    var entryLayout = el("div", { class: "entry-layout" + (info ? " has-infobox" : "") });
-    if (info) entryLayout.appendChild(info);
+    // Keep the float inside the same article block as the prose. This lets the text wrap beside
+    // it and naturally expand to full width after the infobox ends in every browser.
+    var entryLayout = el("div", { class: "entry-layout" });
+    if (info) tabPanels[0].el.insertBefore(info, tabPanels[0].el.firstChild);
     tabPanels.forEach(function (p, i) { p.el.hidden = i !== 0; entryLayout.appendChild(p.el); });
     card.appendChild(entryLayout);
 

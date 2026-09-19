@@ -91,10 +91,10 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .infobox-alias-line:last-child { margin: 0; }
 
 .entry-layout { display: block; }
-.entry-layout.has-infobox > .infobox { float: right; width: 250px; margin: 0 0 16px 22px; }
-.entry-layout.has-infobox > .article { clear: none !important; min-width: 0; }
+.entry-layout > .article { clear: none !important; min-width: 0; }
+.entry-layout > .article > .infobox { float: right; width: 250px; margin: 0 0 16px 22px; }
 @media (max-width: 619px) {
-   .entry-layout.has-infobox > .infobox { float: none; width: 100%; margin: 0 0 18px; }
+   .entry-layout > .article > .infobox { float: none; width: 100%; margin: 0 0 18px; }
 }
 
 /* abas de obra/campanha (variantes) — sit above the article body, mirror infobox tabs visually */
