@@ -1192,9 +1192,19 @@
   // automática da ligação "alma-irmã" e das alcunhas cruzadas (ver wbLinkLupino).
   function wbIsCharacterType(t) { return t === "Personagem" || t === "Lupino"; }
   var FRANCHISE_KINDS = ["Romance", "Trilogia", "Série", "Conto", "Novela", "Roteiro", "Quadrinho", "Campanha de RPG", "Outro"];
+  // Template items beginning with this marker become visual separators in the infobox.
+  var TEMPLATE_HEADER_PREFIX = "@cabecalho:";
+  var CHARACTER_SHORT_FIELDS = ["Status", "Intérprete", "Magia", "Afiliação", "Idade", "Primeira Aparição", "Ocupação", "Origem", "Espécie", "Arma", "Família"];
+  var LEGACY_CHARACTER_TEMPLATE = ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"];
+  var CHARACTER_TEMPLATE = [
+    "Status", TEMPLATE_HEADER_PREFIX + "Arcanismo", "Intérprete",
+    TEMPLATE_HEADER_PREFIX + "Produção", "Magia", "Afiliação", "Idade",
+    TEMPLATE_HEADER_PREFIX + "Relações", "Primeira Aparição", "Ocupação", "Origem", "Espécie", "Arma", "Família",
+    TEMPLATE_HEADER_PREFIX + "Dados Básicos", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"
+  ];
   var WB_TEMPLATES = {
-    "Personagem": ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"],
-    "Lupino": ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"],
+    "Personagem": CHARACTER_TEMPLATE.slice(),
+    "Lupino": CHARACTER_TEMPLATE.slice(),
     "Local": ["População", "Governo", "Clima", "Geografia", "Economia", "História", "Pontos de interesse", "Atmosfera"],
     "Facção": ["Liderança", "Território", "Propósito", "Membros", "Recursos", "Aliados", "Rivais", "Segredos"],
     "Sistema de Magia": ["Fonte", "Quem pode usar", "Como funciona", "Custo / preço", "Limites", "Aparência / sensação", "Tabus"],
@@ -1221,6 +1231,12 @@
     { key: "Espécie", type: "texto" },
     { key: "Notas taxonômicas", type: "nota" }
   ];
+  function templateFieldName(item) { return String(item || "").indexOf(TEMPLATE_HEADER_PREFIX) === 0 ? String(item).slice(TEMPLATE_HEADER_PREFIX.length) : String(item || ""); }
+  function templateFieldType(item) {
+    var name = templateFieldName(item);
+    if (String(item || "").indexOf(TEMPLATE_HEADER_PREFIX) === 0) return "cabecalho";
+    return CHARACTER_SHORT_FIELDS.indexOf(name) !== -1 ? "texto" : guessFieldType(name);
+  }
   var ENTRY_STATUS = [
     { id: "semente", label: "semente", glyph: "🌱" },
     { id: "rascunho", label: "rascunho", glyph: "✍" },
@@ -1414,6 +1430,10 @@
     // seletor de tipo de mundos já existentes.
     WB_TYPES.forEach(function (t) { if (cr.types.indexOf(t) === -1) cr.types.push(t); });
     if (!cr.templates || typeof cr.templates !== "object") cr.templates = clone(WB_TEMPLATES);
+    ["Personagem", "Lupino"].forEach(function (tp) {
+      var current = cr.templates[tp];
+      if (Array.isArray(current) && current.length === LEGACY_CHARACTER_TEMPLATE.length && current.every(function (f, i) { return f === LEGACY_CHARACTER_TEMPLATE[i]; })) cr.templates[tp] = CHARACTER_TEMPLATE.slice();
+    });
     // Novos campos padrão adicionados a um tipo (ex: a leva de campos curtos pra infobox da
     // wiki, 2026-09-16) precisam chegar em mundos já salvos, não só em mundos novos — mundos
     // existentes têm cr.templates congelado desde a criação. Mescla só o que falta, sem tocar
@@ -3335,7 +3355,11 @@
       e.parentId = parCombo.value || null;
       if (x != null) e.x = x;
       if (y != null) e.y = y;
-      if (g("tmpl") && g("tmpl").checked) (C().templates[e.type] || []).forEach(function (k) { if (!(k in e.fields)) { e.fields[k] = ""; e.fieldMeta[k] = { type: guessFieldType(k), opts: [], vis: guessFieldVis(k), allow: [] }; } });
+      if (g("tmpl") && g("tmpl").checked) (C().templates[e.type] || []).forEach(function (item) {
+        var k = templateFieldName(item);
+        if (k && !(k in e.fields)) e.fields[k] = "";
+        if (k && !e.fieldMeta[k]) e.fieldMeta[k] = { type: templateFieldType(item), opts: [], vis: "publico", allow: [] };
+      });
       if (e.type === "Lupino" && humanCombo.value) wbLinkLupino(e, humanCombo.value);
       var cp = campId && wbCampaign(campId);
       var cse = cp && (cp.seasons || []).filter(function (x) { return x.id === seasonId; })[0];
@@ -5558,6 +5582,37 @@
     save();
     alert("Pronto! " + count + " campos verificados em todas as entradas. Nada foi apagado, só normalizado.");
   }
+  function wbApplyCharacterTemplateOnce() {
+    state.settings = state.settings || {};
+    if (state.settings.characterTemplateV1Applied) {
+      alert("Essa ativação já foi executada e está bloqueada para evitar uma segunda limpeza.");
+      return;
+    }
+    var targets = [], protectedEntry = null;
+    [state.criacao, state.mesa].forEach(function (cr) {
+      (cr.entries || []).forEach(function (e) {
+        if (!wbIsCharacterType(e.type)) return;
+        if (String(e.title || "").trim().toLowerCase() === "alucard whitefang") protectedEntry = e;
+        else targets.push(e);
+      });
+    });
+    if (!window.confirm("Isso vai limpar os campos escritos de " + targets.length + " entrada(s) Personagem/Lupino e recriar o modelo novo. Nomes, galerias, ligações e o restante dos dados serão preservados. Alucard Whitefang será ignorado. Continuar?")) return;
+    targets.forEach(function (e) {
+      var fields = {}, fieldMeta = {};
+      (CHARACTER_TEMPLATE || []).forEach(function (item) {
+        var key = templateFieldName(item);
+        if (!key) return;
+        fields[key] = "";
+        fieldMeta[key] = { type: templateFieldType(item), opts: [], vis: "publico", allow: [] };
+      });
+      e.fields = fields;
+      e.fieldMeta = fieldMeta;
+    });
+    state.settings.characterTemplateV1Applied = { at: new Date().toISOString(), changed: targets.length, protected: !!protectedEntry };
+    save();
+    alert("Pronto! " + targets.length + " entrada(s) receberam o modelo novo. Alucard Whitefang e as galerias foram preservados.");
+    render();
+  }
   function wbEntryToMarkdown(e) {
     var f = flowerById(e.universeId);
     var lines = ["# " + (e.title || "(sem título)")];
@@ -7440,7 +7495,9 @@
     v.appendChild(el("div", { class: "card" }, [
       el("div", { class: "wb-eyebrow", text: "Manutenção" }),
       el("p", { class: "hint", style: "margin:4px 0 8px", text: "Verifica todas as entradas (multiverso e mesa) e garante que nenhum campo ficou preso num formato antigo de dados, depois da reforma do editor. Não apaga nem reescreve nenhum conteúdo, só normaliza o formato interno." }),
-      el("button", { class: "btn ghost sm", type: "button", text: "🔄 verificar/normalizar entradas antigas", onclick: wbForceMigrateFields })
+      el("button", { class: "btn ghost sm", type: "button", text: "🔄 verificar/normalizar entradas antigas", onclick: wbForceMigrateFields }),
+      el("p", { class: "hint", style: "margin:14px 0 8px", text: "Ativação única: recria os campos do modelo de Personagem/Lupino. Preserva nomes, galerias, ligações e o restante da entrada; ignora Alucard Whitefang." }),
+      el("button", { class: "btn ghost sm", type: "button", text: state.settings.characterTemplateV1Applied ? "✓ modelo de Personagem já aplicado" : "⚠ aplicar novo modelo a Personagem/Lupino", disabled: state.settings.characterTemplateV1Applied ? "disabled" : null, onclick: wbApplyCharacterTemplateOnce })
     ]));
     C().types.forEach(function (tp) {
       var card = el("div", { class: "card" });
@@ -7456,7 +7513,11 @@
       var fields = C().templates[tp] || (C().templates[tp] = []);
       fields.forEach(function (fld, i) {
         card.appendChild(el("div", { class: "inline", style: "margin-bottom:5px" }, [
-          el("input", { class: "field grow", value: fld, onchange: function (ev) { fields[i] = ev.target.value.trim(); save(); } }),
+          el("input", { class: "field grow", value: templateFieldName(fld), onchange: function (ev) {
+            var value = ev.target.value.trim();
+            fields[i] = String(fld).indexOf(TEMPLATE_HEADER_PREFIX) === 0 ? TEMPLATE_HEADER_PREFIX + value : value;
+            save();
+          } }),
           delBtn(function () { fields.splice(i, 1); save(); render(); })
         ]));
       });
