@@ -5595,7 +5595,7 @@
   }
   function wbApplyCharacterTemplateOnce() {
     state.settings = state.settings || {};
-    if (state.settings.characterTemplateV1Applied) {
+    if (state.settings.characterTemplateV2Applied) {
       alert("Essa ativação já foi executada e está bloqueada para evitar uma segunda limpeza.");
       return;
     }
@@ -5619,7 +5619,7 @@
       e.fields = fields;
       e.fieldMeta = fieldMeta;
     });
-    state.settings.characterTemplateV1Applied = { at: new Date().toISOString(), changed: targets.length, protected: !!protectedEntry };
+    state.settings.characterTemplateV2Applied = { at: new Date().toISOString(), changed: targets.length, protected: !!protectedEntry };
     save();
     alert("Pronto! " + targets.length + " entrada(s) receberam o modelo novo. Alucard Whitefang e as galerias foram preservados.");
     render();
@@ -7508,7 +7508,7 @@
       el("p", { class: "hint", style: "margin:4px 0 8px", text: "Verifica todas as entradas (multiverso e mesa) e garante que nenhum campo ficou preso num formato antigo de dados, depois da reforma do editor. Não apaga nem reescreve nenhum conteúdo, só normaliza o formato interno." }),
       el("button", { class: "btn ghost sm", type: "button", text: "🔄 verificar/normalizar entradas antigas", onclick: wbForceMigrateFields }),
       el("p", { class: "hint", style: "margin:14px 0 8px", text: "Ativação única: recria os campos do modelo de Personagem/Lupino. Preserva nomes, galerias, ligações e o restante da entrada; ignora Alucard Whitefang." }),
-      el("button", { class: "btn ghost sm", type: "button", text: state.settings.characterTemplateV1Applied ? "✓ modelo de Personagem já aplicado" : "⚠ aplicar novo modelo a Personagem/Lupino", disabled: state.settings.characterTemplateV1Applied ? "disabled" : null, onclick: wbApplyCharacterTemplateOnce })
+      el("button", { class: "btn ghost sm", type: "button", text: state.settings.characterTemplateV2Applied ? "✓ modelo de Personagem já aplicado" : "⚠ aplicar novo modelo a Personagem/Lupino", disabled: state.settings.characterTemplateV2Applied ? "disabled" : null, onclick: wbApplyCharacterTemplateOnce })
     ]));
     C().types.forEach(function (tp) {
       var card = el("div", { class: "card" });
