@@ -595,7 +595,15 @@
   }
   .wb-read h1 { font-family: var(--font-display); font-weight: 500; font-size: 40px; line-height: 1.05; margin: 10px 0 6px; letter-spacing: 0.005em; }
   .wb-read .wb-summary { font-size: 20px; font-style: italic; color: var(--muted); margin: 4px 0 18px; line-height: 1.5; }
-  .wb-read .wb-prose { font-size: 18px; line-height: 1.75; color: var(--ink); }
+  .wb-read .wb-prose {
+    min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word;
+    font-size: 18px; line-height: 1.75; color: var(--ink);
+  }
+  .wb-prose > div, .wb-prose p, .wb-prose li, .wb-prose blockquote,
+  .wb-prose table, .wb-prose td, .wb-prose th, .wb-prose a, .wb-prose span,
+  .wb-prose strong, .wb-prose em, .wb-prose del {
+    max-width: 100%; min-width: 0; overflow-wrap: anywhere; word-break: break-word;
+  }
   .wb-read .wb-prose.has-dropcap > div > p:first-of-type::first-letter {
     font-family: var(--font-display); font-weight: 600; font-size: 3.8em; line-height: .78;
     float: left; margin: 4px 12px 0 0; color: var(--gold-ink);
@@ -2227,8 +2235,11 @@
   function renderMarkdown(text) {
     var wrap = el("div");
     var lines = String(text || "").split("\n");
-    var listBuf = null, listOrdered = false, i = 0;
-    function flush() { if (listBuf) { wrap.appendChild(listBuf); listBuf = null; } }
+    var listBuf = null, listOrdered = false, paragraph = null, i = 0;
+    function flush() {
+      if (listBuf) { wrap.appendChild(listBuf); listBuf = null; }
+      if (paragraph) { wrap.appendChild(paragraph); paragraph = null; }
+    }
     for (i = 0; i < lines.length; i++) {
       var ln = lines[i];
       if (/^```/.test(ln)) {
@@ -2275,8 +2286,9 @@
         if (!listBuf || listOrdered) { flush(); listBuf = el("ul"); listOrdered = false; }
         var liEl = el("li"); mdInline(liEl, li[1]); listBuf.appendChild(liEl); continue;
       }
-      flush();
-      var p = el("p"); mdInline(p, ln); wrap.appendChild(p);
+      if (!paragraph) paragraph = el("p");
+      else paragraph.appendChild(document.createTextNode(" "));
+      mdInline(paragraph, ln);
     }
     flush();
     return wrap;
