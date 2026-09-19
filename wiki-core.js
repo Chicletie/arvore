@@ -1047,12 +1047,10 @@
       });
       card.appendChild(tabsWrap);
     }
-    // Keep the float inside the same article block as the prose. This lets the text wrap beside
-    // it and naturally expand to full width after the infobox ends in every browser.
-    var entryLayout = el("div", { class: "entry-layout" });
-    if (info) tabPanels[0].el.insertBefore(info, tabPanels[0].el.firstChild);
-    tabPanels.forEach(function (p, i) { p.el.hidden = i !== 0; entryLayout.appendChild(p.el); });
-    card.appendChild(entryLayout);
+    // Infobox entra só agora (depois das abas): ela flutua à direita a partir daqui, então as
+    // abas — inseridas antes — ficam acima dela em vez de presas atrás/embaixo.
+    if (info) card.appendChild(info);
+    tabPanels.forEach(function (p, i) { p.el.hidden = i !== 0; card.appendChild(p.el); });
 
     // posts — diário datado da própria entrada (mais recente primeiro; já vem ordenado do
     // snapshot). É sobre a entrada inteira, não de uma variante de obra específica, então mora

@@ -65,8 +65,9 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .topbar .sep { color: var(--faint); font-size: 13px; }
 .topbar .topbar-uni { font-size: 13px; color: var(--muted); }
 
-/* infobox — full-width block shared consistently by all browsers */
+/* infobox — floats right of the article on wide screens, stacks full-width on narrow ones */
 .infobox { float: none; width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin: 0 0 18px; overflow: hidden; }
+@media (min-width: 620px) { .infobox { float: right; width: 250px; margin: 0 0 16px 22px; } }
 .infobox .cover { width: 100%; display: block; max-height: 280px; object-fit: cover; }
 .infobox-quote { padding: 10px 14px; font-family: var(--font-wb); font-style: italic; font-size: 12.5px; line-height: 1.45; text-align: center; color: var(--muted); background: var(--surface-2); border-bottom: 1px solid var(--border); }
 /* Nota de mestre — só existe na prévia "ver como wiki" do próprio dono (nunca no snapshot
@@ -88,10 +89,6 @@ h1 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin
 .infobox-header-row:first-child th { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .infobox-alias-line { font-style: italic; margin: 0 0 3px; }
 .infobox-alias-line:last-child { margin: 0; }
-
-.entry-layout { display: block; }
-.entry-layout > .article { clear: none !important; min-width: 0; }
-.entry-layout > .article > .infobox { float: none; width: 100%; margin: 0 0 18px; }
 
 /* abas de obra/campanha (variantes) — sit above the article body, mirror infobox tabs visually */
 .work-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 4px 0 18px; clear: both; }
