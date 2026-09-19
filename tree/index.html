@@ -1238,15 +1238,10 @@
     return CHARACTER_SHORT_FIELDS.indexOf(name) !== -1 ? "texto" : guessFieldType(name);
   }
   function wbOrderedFieldKeys(e) {
-    var keys = [], seen = {};
-    if (wbIsCharacterType(e.type)) {
-      (C().templates[e.type] || []).forEach(function (item) {
-        var key = templateFieldName(item);
-        if (key && Object.prototype.hasOwnProperty.call(e.fields || {}, key) && !seen[key]) { seen[key] = true; keys.push(key); }
-      });
-    }
-    Object.keys(e.fields || {}).forEach(function (key) { if (!seen[key]) { seen[key] = true; keys.push(key); } });
-    return keys;
+    // The entry's saved key order is the manual order chosen in its editor. Templates are
+    // applied only by explicit creation/import actions and must never override that order while
+    // rendering or publishing an existing entry.
+    return Object.keys(e.fields || {});
   }
   var ENTRY_STATUS = [
     { id: "semente", label: "semente", glyph: "🌱" },
@@ -5624,6 +5619,32 @@
     alert("Pronto! " + targets.length + " entrada(s) receberam o modelo novo. Alucard Whitefang e as galerias foram preservados.");
     render();
   }
+  function wbRepairCharacterFieldOrder() {
+    var count = 0;
+    if (!window.confirm("Restaurar a ordem padrão dos campos de Personagem/Lupino? Isso só reorganiza os campos; não apaga valores, galerias, nomes ou outros dados.")) return;
+    [state.criacao, state.mesa].forEach(function (cr) {
+      (cr.entries || []).forEach(function (e) {
+        if (!wbIsCharacterType(e.type)) return;
+        var oldFields = e.fields || {}, oldMeta = e.fieldMeta || {}, fields = {}, fieldMeta = {}, seen = {};
+        CHARACTER_TEMPLATE.forEach(function (item) {
+          var key = templateFieldName(item);
+          if (!Object.prototype.hasOwnProperty.call(oldFields, key)) return;
+          fields[key] = oldFields[key];
+          fieldMeta[key] = oldMeta[key];
+          seen[key] = true;
+        });
+        Object.keys(oldFields).forEach(function (key) {
+          if (!seen[key]) { fields[key] = oldFields[key]; fieldMeta[key] = oldMeta[key]; }
+        });
+        e.fields = fields;
+        e.fieldMeta = fieldMeta;
+        count++;
+      });
+    });
+    save();
+    alert("Ordem restaurada em " + count + " entrada(s). Nenhum conteúdo foi apagado.");
+    render();
+  }
   function wbImportTemplateFromEntry(tp) {
     var candidates = [];
     [state.criacao, state.mesa].forEach(function (cr, ci) {
@@ -7549,7 +7570,8 @@
       el("p", { class: "hint", style: "margin:4px 0 8px", text: "Verifica todas as entradas (multiverso e mesa) e garante que nenhum campo ficou preso num formato antigo de dados, depois da reforma do editor. Não apaga nem reescreve nenhum conteúdo, só normaliza o formato interno." }),
       el("button", { class: "btn ghost sm", type: "button", text: "🔄 verificar/normalizar entradas antigas", onclick: wbForceMigrateFields }),
       el("p", { class: "hint", style: "margin:14px 0 8px", text: "Ativação única: recria os campos do modelo de Personagem/Lupino. Preserva nomes, galerias, ligações e o restante da entrada; ignora Alucard Whitefang." }),
-      el("button", { class: "btn ghost sm", type: "button", text: state.settings.characterTemplateV2Applied ? "✓ modelo de Personagem já aplicado" : "⚠ aplicar novo modelo a Personagem/Lupino", disabled: state.settings.characterTemplateV2Applied ? "disabled" : null, onclick: wbApplyCharacterTemplateOnce })
+      el("button", { class: "btn ghost sm", type: "button", text: state.settings.characterTemplateV2Applied ? "✓ modelo de Personagem já aplicado" : "⚠ aplicar novo modelo a Personagem/Lupino", disabled: state.settings.characterTemplateV2Applied ? "disabled" : null, onclick: wbApplyCharacterTemplateOnce }),
+      el("button", { class: "btn ghost sm", type: "button", text: "↕ restaurar ordem padrão de Personagem/Lupino", style: "margin-top:8px", onclick: wbRepairCharacterFieldOrder })
     ]));
     C().types.forEach(function (tp) {
       var card = el("div", { class: "card" });
