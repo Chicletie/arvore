@@ -1194,13 +1194,14 @@
   var FRANCHISE_KINDS = ["Romance", "Trilogia", "Série", "Conto", "Novela", "Roteiro", "Quadrinho", "Campanha de RPG", "Outro"];
   // Template items beginning with this marker become visual separators in the infobox.
   var TEMPLATE_HEADER_PREFIX = "@cabecalho:";
-  var CHARACTER_SHORT_FIELDS = ["Status", "Intérprete", "Magia", "Afiliação", "Idade", "Primeira Aparição", "Ocupação", "Origem", "Espécie", "Arma", "Família"];
+  var CHARACTER_SHORT_FIELDS = ["Status", "Intérprete", "Magia", "Afiliação", "Idade", "Primeira Aparição", "Ocupação", "Origem", "Espécie", "Arma", "Família", "Carta"];
   var LEGACY_CHARACTER_TEMPLATE = ["Idade", "Ocupação", "Afiliação", "Espécie", "Status", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"];
+  var BROKEN_CHARACTER_TEMPLATE = ["Status", "@cabecalho:Arcanismo", "Intérprete", "@cabecalho:Produção", "Magia", "Afiliação", "Idade", "@cabecalho:Relações", "Primeira Aparição", "Ocupação", "Origem", "Espécie", "Arma", "Família", "@cabecalho:Dados Básicos", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"];
   var CHARACTER_TEMPLATE = [
-    "Status", TEMPLATE_HEADER_PREFIX + "Arcanismo", "Intérprete",
-    TEMPLATE_HEADER_PREFIX + "Produção", "Magia", "Afiliação", "Idade",
-    TEMPLATE_HEADER_PREFIX + "Relações", "Primeira Aparição", "Ocupação", "Origem", "Espécie", "Arma", "Família",
-    TEMPLATE_HEADER_PREFIX + "Dados Básicos", "Aparência", "Personalidade", "Motivação", "Medos", "Arco", "Voz e maneirismos", "Vínculos-chave"
+    TEMPLATE_HEADER_PREFIX + "Dados Básicos", "Espécie", "Idade", "Origem", "Status",
+    TEMPLATE_HEADER_PREFIX + "Relações", "Ocupação", "Afiliação", "Família",
+    TEMPLATE_HEADER_PREFIX + "Arcanismo", "Magia", "Arma", "Carta",
+    TEMPLATE_HEADER_PREFIX + "Produção", "Intérprete", "Primeira Aparição"
   ];
   var WB_TEMPLATES = {
     "Personagem": CHARACTER_TEMPLATE.slice(),
@@ -1438,7 +1439,7 @@
     if (!cr.templates || typeof cr.templates !== "object") cr.templates = clone(WB_TEMPLATES);
     ["Personagem", "Lupino"].forEach(function (tp) {
       var current = cr.templates[tp];
-      if (Array.isArray(current) && current.length === LEGACY_CHARACTER_TEMPLATE.length && current.every(function (f, i) { return f === LEGACY_CHARACTER_TEMPLATE[i]; })) cr.templates[tp] = CHARACTER_TEMPLATE.slice();
+      if (Array.isArray(current) && (current.length === LEGACY_CHARACTER_TEMPLATE.length && current.every(function (f, i) { return f === LEGACY_CHARACTER_TEMPLATE[i]; }) || current.length === BROKEN_CHARACTER_TEMPLATE.length && current.every(function (f, i) { return f === BROKEN_CHARACTER_TEMPLATE[i]; }))) cr.templates[tp] = CHARACTER_TEMPLATE.slice();
     });
     // Novos campos padrão adicionados a um tipo (ex: a leva de campos curtos pra infobox da
     // wiki, 2026-09-16) precisam chegar em mundos já salvos, não só em mundos novos — mundos
@@ -5623,6 +5624,8 @@
     var count = 0;
     if (!window.confirm("Restaurar a ordem padrão dos campos de Personagem/Lupino? Isso só reorganiza os campos; não apaga valores, galerias, nomes ou outros dados.")) return;
     [state.criacao, state.mesa].forEach(function (cr) {
+      cr.templates.Personagem = CHARACTER_TEMPLATE.slice();
+      cr.templates.Lupino = CHARACTER_TEMPLATE.slice();
       (cr.entries || []).forEach(function (e) {
         if (!wbIsCharacterType(e.type)) return;
         var oldFields = e.fields || {}, oldMeta = e.fieldMeta || {}, fields = {}, fieldMeta = {}, seen = {};
