@@ -5624,6 +5624,47 @@
     alert("Pronto! " + targets.length + " entrada(s) receberam o modelo novo. Alucard Whitefang e as galerias foram preservados.");
     render();
   }
+  function wbImportTemplateFromEntry(tp) {
+    var candidates = [];
+    [state.criacao, state.mesa].forEach(function (cr, ci) {
+      (cr.entries || []).forEach(function (e) {
+        if (e.type === tp) candidates.push({ entry: e, world: ci === 0 ? "árvore" : "mesa" });
+      });
+    });
+    if (!candidates.length) { alert("Não existe nenhuma entry do tipo " + tp + " para usar como modelo."); return; }
+    var choices = candidates.map(function (c, i) { return (i + 1) + ". " + (c.entry.title || "(sem título)") + " · " + c.world; }).join("\n");
+    var answer = window.prompt("Escolha o número da entry que servirá de modelo para " + tp + ":\n\n" + choices, "1");
+    if (answer == null) return;
+    var picked = candidates[parseInt(answer, 10) - 1];
+    if (!picked) { alert("Número inválido."); return; }
+    var source = picked.entry, sourceKeys = Object.keys(source.fields || {});
+    if (!sourceKeys.length) { alert("Essa entry não tem campos para importar como modelo."); return; }
+    var imported = sourceKeys.map(function (key) {
+      return wbFieldMeta(source, key).type === "cabecalho" ? TEMPLATE_HEADER_PREFIX + key : key;
+    });
+    if (!window.confirm("Usar \"" + (source.title || "(sem título)") + "\" como modelo de " + tp + " e regularizar todas as entries desse tipo? Valores existentes serão preservados por nome; campos extras ficarão no final.")) return;
+    [state.criacao, state.mesa].forEach(function (cr) {
+      cr.templates[tp] = imported.slice();
+      (cr.entries || []).forEach(function (e) {
+        if (e.type !== tp) return;
+        var oldFields = e.fields || {}, oldMeta = e.fieldMeta || {}, fields = {}, fieldMeta = {}, seen = {};
+        imported.forEach(function (item) {
+          var key = templateFieldName(item), sourceMeta = wbFieldMeta(source, key), old = oldMeta[key];
+          fields[key] = Object.prototype.hasOwnProperty.call(oldFields, key) ? oldFields[key] : "";
+          fieldMeta[key] = old ? old : { type: templateFieldType(item), opts: clone(sourceMeta.opts || []), vis: "publico", allow: [] };
+          fieldMeta[key].type = templateFieldType(item);
+          seen[key] = true;
+        });
+        Object.keys(oldFields).forEach(function (key) {
+          if (!seen[key]) { fields[key] = oldFields[key]; fieldMeta[key] = oldMeta[key] || { type: guessFieldType(key), opts: [], vis: "publico", allow: [] }; }
+        });
+        e.fields = fields; e.fieldMeta = fieldMeta;
+      });
+    });
+    save();
+    alert("Template importado de \"" + (source.title || "(sem título)") + "\". Todas as entries de " + tp + " foram regularizadas.");
+    render();
+  }
   function wbEntryToMarkdown(e) {
     var f = flowerById(e.universeId);
     var lines = ["# " + (e.title || "(sem título)")];
@@ -7536,6 +7577,7 @@
       af.appendChild(el("input", { class: "field grow", placeholder: "novo campo padrão" }));
       af.appendChild(el("button", { class: "btn ghost sm", type: "submit", text: "+" }));
       card.appendChild(af);
+      card.appendChild(el("button", { class: "btn ghost sm", type: "button", text: "importar template de uma entry e regularizar", style: "margin-top:8px", onclick: function () { wbImportTemplateFromEntry(tp); } }));
       if (WB_TYPES.indexOf(tp) === -1) card.appendChild(el("button", { class: "link", type: "button", text: "remover tipo", style: "color:var(--neg);margin-top:6px", onclick: function () { C().types = C().types.filter(function (x) { return x !== tp; }); delete C().templates[tp]; delete C().typeMeta[tp]; save(); render(); } }));
       v.appendChild(card);
     });
