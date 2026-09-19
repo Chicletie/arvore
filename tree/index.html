@@ -823,14 +823,30 @@
 
   /* ---- Editor WYSIWYG (Toast UI Editor) ---- */
   .md-edit { position: relative; }
-  .md-edit .toastui-editor-defaultUI { border-color: var(--border-strong); border-radius: var(--radius-sm); }
+  .md-edit .toastui-editor-defaultUI,
+  .md-edit .toastui-editor-main,
+  .md-edit .toastui-editor-ww-container,
+  .md-edit .toastui-editor-contents {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .md-edit .toastui-editor-defaultUI { border-color: var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; }
   .md-edit .toastui-editor-toolbar { background: var(--surface); border-color: var(--border-strong); }
+  .md-edit .toastui-editor-ww-container { overflow-x: hidden; }
   .md-edit .toastui-editor-contents {
     font-family: var(--font-wb); font-size: 16px; color: var(--ink);
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
     max-width: 100%;
+  }
+  .md-edit [contenteditable="true"],
+  .md-edit .ProseMirror {
+    min-width: 0;
+    max-width: 100%;
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
   }
   .md-edit .toastui-editor-contents *,
   .md-edit .toastui-editor-contents p,
